@@ -1,12 +1,21 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { View, StyleSheet } from "react-native";
-import { StoreProvider, useStore } from "./Store";
+import { StoreProvider } from "./Store";
+import { ThemeProvider, useTheme } from "./theme";
 import Navigation from "./Navigation";
 
-const App = () => {
+const Frame = () => {
+  const { colors, scheme } = useTheme();
   return (
-    <View style={styles.webContainer}>
-      <View style={styles.mobileViewport}>
+    <View
+      style={[
+        styles.webContainer,
+        { backgroundColor: scheme === "light" ? "#E5E5E5" : "#1a1a1a" },
+      ]}
+    >
+      <View
+        style={[styles.mobileViewport, { backgroundColor: colors.background }]}
+      >
         <Navigation />
       </View>
     </View>
@@ -15,16 +24,17 @@ const App = () => {
 
 export default function () {
   return (
-    <StoreProvider>
-      <App />
-    </StoreProvider>
+    <ThemeProvider>
+      <StoreProvider>
+        <Frame />
+      </StoreProvider>
+    </ThemeProvider>
   );
 }
 
 const styles = StyleSheet.create({
   webContainer: {
     flex: 1,
-    backgroundColor: "#1a1a1a",
     justifyContent: "center",
     alignItems: "center",
     // @ts-ignore - web-only style
@@ -37,7 +47,6 @@ const styles = StyleSheet.create({
     // @ts-ignore - web-only style
     height: "100vh",
     maxHeight: 844,
-    backgroundColor: "#000000",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,

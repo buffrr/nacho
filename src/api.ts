@@ -1,18 +1,17 @@
 import { Cert, CertData, isCert, isCertData } from "@/cert";
-import { Network } from "@/Store";
 
-function getApiBaseUrl(network: Network): string {
-  return network === "testnet4"
-    ? "https://testnet.atbitcoin.com/api"
-    : "https://testnet.atbitcoin.com/api";
-}
+// Override with EXPO_PUBLIC_API_URL; otherwise use the local dev server in dev
+// and the hosted operator in production.
+// TODO: point production at the mainnet host once the server-side switch lands.
+const API_BASE_URL =
+  (process.env.EXPO_PUBLIC_API_URL as string | undefined) ||
+  (__DEV__
+    ? "http://127.0.0.1:8888/api"
+    : "https://testnet.atbitcoin.com/api");
 
-export async function fetchProposedHandles(
-  network: Network,
-  query: string,
-): Promise<string[]> {
+export async function fetchProposedHandles(query: string): Promise<string[]> {
   try {
-    const response = await fetch(`${getApiBaseUrl(network)}/proposed`, {
+    const response = await fetch(`${API_BASE_URL}/proposed`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -32,10 +31,11 @@ export async function fetchProposedHandles(
   }
 }
 
-export type HandleStatus =
+export type HandleStatus = (
   | {
       handle: string;
       status: "available" | "unknown" | "invalid" | "preallocated";
+      product_id?: string;
     }
   | {
       handle: string;
@@ -56,7 +56,8 @@ export type HandleStatus =
       status: "taken";
       script_pubkey: string;
       certificate: Cert;
-    };
+    }
+) & { price?: number };
 
 export function isHandleStatus(obj: unknown): obj is HandleStatus {
   if (!obj || typeof obj !== "object") {
@@ -90,11 +91,10 @@ export function isHandleStatus(obj: unknown): obj is HandleStatus {
 }
 
 export async function fetchHandlesStatuses(
-  network: Network,
   handles: string[],
 ): Promise<HandleStatus[]> {
   try {
-    const response = await fetch(`${getApiBaseUrl(network)}/spaces/status`, {
+    const response = await fetch(`${API_BASE_URL}/spaces/status`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -121,18 +121,82 @@ export async function fetchHandlesStatuses(
 }
 
 export async function fetchHandleStatus(
-  network: Network,
   handle: string,
 ): Promise<HandleStatus> {
-  const status = (await fetchHandlesStatuses(network, [handle]))[0];
+  const status = (await fetchHandlesStatuses([handle]))[0];
   if (status !== undefined) {
     return status;
   }
   return { handle, status: "unknown" };
 }
 
+export type PurchaseSupport = "supported" | "unsupported" | "unknown";
+
+// Whether a handle can be bought directly through the atbitcoin purchase rail.
+// The operator only returns a concrete status (available/taken/...) for spaces it
+// actually handles; "unknown"/"invalid" mean it doesn't recognize the space, so
+// those take the create-request path. A missing status means we couldn't reach
+// the server.
+//
+// NOTE: this is a heuristic over the current API. If the server later exposes an
+// explicit capability signal, this is the single place to change.
+export function purchaseSupportFromStatus(
+  status: HandleStatus["status"] | null,
+): PurchaseSupport {
+  switch (status) {
+    case "available":
+    case "taken":
+    case "reserved":
+    case "processing_payment":
+    case "preallocated":
+      return "supported";
+    case "invalid":
+    case "unknown":
+      return "unsupported";
+    default:
+      return "unknown";
+  }
+}
+
+export type PurchaseInfo = {
+  support: PurchaseSupport;
+  price?: number;
+};
+
+export async function checkPurchaseInfo(
+  handle: string,
+): Promise<PurchaseInfo> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/spaces/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ handles: [handle] }),
+    });
+    // The operator returns 400 when it doesn't support the space/extension.
+    if (response.status === 400) {
+      return { support: "unsupported" };
+    }
+    if (!response.ok) {
+      return { support: "unknown" };
+    }
+    const data = await response.json();
+    const raw = Array.isArray(data) ? data[0] : undefined;
+    const status = isHandleStatus(raw) ? raw.status : null;
+    const price =
+      raw && typeof raw.price === "number" ? (raw.price as number) : undefined;
+    return { support: purchaseSupportFromStatus(status), price };
+  } catch (error) {
+    console.error("Failed to check purchase info:", error);
+    return { support: "unknown" };
+  }
+}
+
+// Prices are returned in USD cents.
+export function formatPrice(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
 export async function reserveHandle(
-  network: Network,
   handle: string,
   script_pubkey: string,
 ): Promise<
@@ -144,7 +208,7 @@ export async function reserveHandle(
   | { error: string }
 > {
   try {
-    const response = await fetch(`${getApiBaseUrl(network)}/reserve`, {
+    const response = await fetch(`${API_BASE_URL}/reserve`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -177,7 +241,6 @@ export async function reserveHandle(
 }
 
 export async function claimHandleIAP(
-  network: Network,
   handle: string,
   script_pubkey: string,
   purchase_token: string,
@@ -187,7 +250,7 @@ export async function claimHandleIAP(
   error?: string;
 }> {
   try {
-    const response = await fetch(`${getApiBaseUrl(network)}/claim`, {
+    const response = await fetch(`${API_BASE_URL}/claim`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -215,5 +278,41 @@ export async function claimHandleIAP(
       handle_status: { handle, status: "unknown" },
       error: "Network error",
     };
+  }
+}
+
+export type ClaimCodeResult =
+  | { ok: true; handle: string; status: string }
+  | { ok: false; error: string; httpStatus: number };
+
+// Web-purchase redemption: bind our key to a handle the buyer already paid for
+// on the web, using a claim code (URL token or short code). Returns the handle
+// the code was issued for.
+export async function claimCode(
+  code: string,
+  script_pubkey: string,
+): Promise<ClaimCodeResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/claim-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, script_pubkey }),
+    });
+    const data = await response.json().catch(() => ({}) as any);
+    if (response.ok && typeof data.handle === "string") {
+      return {
+        ok: true,
+        handle: data.handle,
+        status: typeof data.status === "string" ? data.status : "taken",
+      };
+    }
+    return {
+      ok: false,
+      error: typeof data.error === "string" ? data.error : "Failed to redeem code",
+      httpStatus: response.status,
+    };
+  } catch (error) {
+    console.error("Failed to redeem claim code:", error);
+    return { ok: false, error: "Network error", httpStatus: 0 };
   }
 }

@@ -17,6 +17,9 @@
     "@react-navigation/native-stack": "^7.3.21",
     "@scure/bip32": "^1.7.0",
     "@scure/bip39": "^1.6.0",
+    "@spacesprotocol/fabric-react-native": "^0.2.3",
+    "@spacesprotocol/fabric-web": "^0.2.3",
+    "@spacesprotocol/react-native-libveritas": "^0.2.0",
     "@undecaf/zbar-wasm": "^0.9.16",
     "buffer": "^6.0.3",
     "expo": "~54.0.31",
@@ -44,5 +47,8 @@
     "typescript": "~5.9.2"
   },
   "private": true,
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "overrides": {
+    "@spacesprotocol/react-native-libveritas": "$@spacesprotocol/react-native-libveritas"
+  }
 }

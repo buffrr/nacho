@@ -1,5 +1,6 @@
 import React from "react";
 import { Text, View, StyleSheet } from "react-native";
+import { useTheme } from "@/theme";
 
 interface HeaderProps {
   headText: string;
@@ -8,13 +9,22 @@ interface HeaderProps {
 }
 
 export function Header({ headText, tailText, subText }: HeaderProps) {
+  const { colors } = useTheme();
   return (
     <>
       <View style={styles.header}>
-        <Text style={styles.orangeText}>{headText} </Text>
-        <Text style={styles.whiteText}>{tailText}</Text>
+        <Text style={[styles.orangeText, { color: colors.accent }]}>
+          {headText}{" "}
+        </Text>
+        <Text style={[styles.whiteText, { color: colors.text }]}>
+          {tailText}
+        </Text>
       </View>
-      {subText && <Text style={styles.subheader}>{subText}</Text>}
+      {subText && (
+        <Text style={[styles.subheader, { color: colors.textMuted }]}>
+          {subText}
+        </Text>
+      )}
     </>
   );
 }
@@ -24,7 +34,10 @@ interface SubheaderProps {
 }
 
 export function Subheader({ text }: SubheaderProps) {
-  return <Text style={styles.subheader}>{text}</Text>;
+  const { colors } = useTheme();
+  return (
+    <Text style={[styles.subheader, { color: colors.textMuted }]}>{text}</Text>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -38,16 +51,13 @@ const styles = StyleSheet.create({
   orangeText: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#FF7B00",
   },
   whiteText: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#FFFFFF",
   },
   subheader: {
     fontSize: 18,
-    color: "#D6D6D6",
     textAlign: "center",
     lineHeight: 26,
     marginBottom: 40,

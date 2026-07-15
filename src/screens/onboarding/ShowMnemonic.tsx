@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,47 +7,75 @@ import {
   ScrollView,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { generateMnemonic, xpubFromMnemonic } from "@/keys";
+import {
+  generateMnemonic,
+  xpubFromMnemonic,
+  xprvFromMnemonic,
+} from "@/keys";
+import { useStore } from "@/Store";
 import { OnboardingStackParamList } from "@/Navigation";
 import { Button } from "@/ui/Button";
 import { Header } from "@/ui/Header";
 import { Layout } from "@/ui/Layout";
 import { SvgXml } from "react-native-svg";
+import { Colors, useTheme } from "@/theme";
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, "ShowMnemonic">;
 
 export default function ({ navigation }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { setupKeystore } = useStore();
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Create the keystore now and let the user back up the seed phrase later
+  // (it's stored in secure storage and revealable from Settings).
+  const backUpLater = async () => {
+    setIsLoading(true);
+    await new Promise((r) => setTimeout(r, 5));
+    const phrase = mnemonic ?? generateMnemonic();
+    await setupKeystore(xprvFromMnemonic(phrase), {}, phrase);
+  };
 
   const mnemonicWords = mnemonic ? mnemonic.split(" ") : [];
 
   return (
     <Layout
       footer={
-        <Button
-          text={
-            isLoading
-              ? "Preparing..."
-              : mnemonic === null
-                ? "Tap to reveal your 12 words"
-                : "I've saved my seed phrase"
-          }
-          onPress={() => {
-            setIsLoading(true);
-            setTimeout(() => {
-              if (mnemonic === null) {
-                setMnemonic(generateMnemonic());
-              } else {
-                const xpub = xpubFromMnemonic(mnemonic);
-                navigation.navigate("EnterMnemonic", { xpub });
-              }
-              setIsLoading(false);
-            }, 5);
-          }}
-          type="main"
-          disabled={isLoading}
-        />
+        <>
+          <Button
+            text={
+              isLoading
+                ? "Preparing..."
+                : mnemonic === null
+                  ? "Tap to reveal your 12 words"
+                  : "I've saved my seed phrase"
+            }
+            onPress={() => {
+              setIsLoading(true);
+              setTimeout(() => {
+                if (mnemonic === null) {
+                  setMnemonic(generateMnemonic());
+                } else {
+                  const xpub = xpubFromMnemonic(mnemonic);
+                  navigation.navigate("EnterMnemonic", { xpub });
+                }
+                setIsLoading(false);
+              }, 5);
+            }}
+            type="main"
+            disabled={isLoading}
+          />
+          {mnemonic === null && (
+            <Button
+              text="Back up later"
+              onPress={backUpLater}
+              type="secondary"
+              disabled={isLoading}
+            />
+          )}
+        </>
       }
     >
       {!mnemonic ? (
@@ -55,7 +83,7 @@ export default function ({ navigation }: Props) {
           <Header
             headText="Generate"
             tailText="Seed Phrase"
-            subText="Your seed phrase is the master key to your wallet."
+            subText="Your seed phrase is the master key to your handles."
           />
 
           <View style={styles.warningsContainer}>
@@ -75,7 +103,7 @@ export default function ({ navigation }: Props) {
               <View style={styles.warningContent}>
                 <Text style={styles.warningTitle}>Never share it</Text>
                 <Text style={styles.warningText}>
-                  Anyone with these words can access your wallet.
+                  Anyone with these words can control your handles.
                 </Text>
               </View>
             </View>
@@ -117,7 +145,7 @@ export default function ({ navigation }: Props) {
               <View style={styles.warningContent}>
                 <Text style={styles.warningTitle}>No reset option</Text>
                 <Text style={styles.warningText}>
-                  Without it, you can't recover your wallet.
+                  Without it, you can't recover your handles.
                 </Text>
               </View>
             </View>
@@ -128,7 +156,7 @@ export default function ({ navigation }: Props) {
           <Header
             headText="Back Up"
             tailText="Your Seed Phrase"
-            subText="Write down these 12 words in order. They're the only way to recover your wallet."
+            subText="Write down these 12 words in order. They're the only way to recover your handles."
           />
 
           <View style={styles.mnemonicContainer}>
@@ -147,64 +175,65 @@ export default function ({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  warningsContainer: {
-    flex: 1,
-    gap: 30,
-    marginTop: 40,
-  },
-  warningItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 16,
-  },
-  warningIcon: {
-    fontSize: 24,
-    marginTop: 2,
-  },
-  warningContent: {
-    flex: 1,
-  },
-  warningTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    marginBottom: 8,
-  },
-  warningText: {
-    fontSize: 16,
-    color: "#D6D6D6",
-    lineHeight: 22,
-  },
-  mnemonicContainer: {
-    flex: 1,
-    marginTop: 20,
-  },
-  wordsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginBottom: 30,
-  },
-  wordItem: {
-    width: "48%",
-    backgroundColor: "#1A1A1A",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  wordNumber: {
-    fontSize: 14,
-    color: "#FF7B00",
-    fontWeight: "500",
-  },
-  wordText: {
-    fontSize: 14,
-    fontWeight: "400",
-    color: "#FFFFFF",
-    flex: 1,
-  },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    warningsContainer: {
+      flex: 1,
+      gap: 30,
+      marginTop: 40,
+    },
+    warningItem: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 16,
+    },
+    warningIcon: {
+      fontSize: 24,
+      marginTop: 2,
+    },
+    warningContent: {
+      flex: 1,
+    },
+    warningTitle: {
+      fontSize: 18,
+      fontWeight: "bold",
+      color: c.text,
+      marginBottom: 8,
+    },
+    warningText: {
+      fontSize: 16,
+      color: c.textFaint,
+      lineHeight: 22,
+    },
+    mnemonicContainer: {
+      flex: 1,
+      marginTop: 20,
+    },
+    wordsGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      marginBottom: 30,
+    },
+    wordItem: {
+      width: "48%",
+      backgroundColor: c.surface,
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    wordNumber: {
+      fontSize: 14,
+      color: c.accent,
+      fontWeight: "500",
+    },
+    wordText: {
+      fontSize: 14,
+      fontWeight: "400",
+      color: c.text,
+      flex: 1,
+    },
+  });

@@ -6,7 +6,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HandlesStackParamList } from "@/Navigation";
 import { open } from "@/file";
 import { useStore } from "@/Store";
-import { pubFromPath, p2trScriptFromPub } from "@/keys";
+import { scriptForHandle } from "@/keys";
 import { isCert, extractCertData } from "@/cert";
 import { Layout } from "@/ui/Layout";
 import { Header } from "@/ui/Header";
@@ -19,6 +19,7 @@ type ImportError =
   | "invalidJson"
   | "fileLoadFailed"
   | "invalidCert"
+  | "wrongHandle"
   | "invalidHandle"
   | null;
 
@@ -37,7 +38,7 @@ interface Props {
 }
 
 export default function ImportCertificate({ route, navigation }: Props) {
-  const { network } = route.params;
+  const { handle } = route.params;
   const { xpub, handles, setHandleCertData } = useStore();
   const [hasCameraPermission, setHasCameraPermission] = useState<
     boolean | null
@@ -82,6 +83,8 @@ export default function ImportCertificate({ route, navigation }: Props) {
         return "Failed to load file";
       case "invalidCert":
         return "Invalid certificate format";
+      case "wrongHandle":
+        return `This certificate is for a different handle, not ${handle}`;
       case "invalidHandle":
         return "Invalid handle / pubkey combination";
       default:
@@ -143,19 +146,23 @@ export default function ImportCertificate({ route, navigation }: Props) {
       setError("invalidCert");
       return;
     }
+    if (data.handle !== handle) {
+      setError("wrongHandle");
+      return;
+    }
     const certData = extractCertData(data);
-    const { handle, script_pubkey } = data;
-    const handleData = handles?.[network]?.[handle];
+    const { script_pubkey } = data;
+    const handleData = handles?.[handle];
     if (
       handleData === undefined ||
       xpub === null ||
-      p2trScriptFromPub(pubFromPath(xpub, handleData.path)) !== script_pubkey
+      scriptForHandle(xpub, handleData) !== script_pubkey
     ) {
       setError("invalidHandle");
       return;
     }
-    setHandleCertData(network, handle, certData).then(() =>
-      navigation.navigate("ShowHandle", { network, handle }),
+    setHandleCertData(handle, certData).then(() =>
+      navigation.navigate("ShowHandle", { handle }),
     );
   };
 
@@ -172,7 +179,7 @@ export default function ImportCertificate({ route, navigation }: Props) {
       <Header
         headText="Import"
         tailText="Certificate"
-        subText="Scan a QR code or upload a file to add your certificate."
+        subText={`Scan a QR code or upload a file to add the certificate for ${handle}.`}
       />
 
       {hasCameraPermission && (

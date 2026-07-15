@@ -2,6 +2,7 @@ import React, { ReactNode } from "react";
 import { View, StyleSheet } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@/theme";
 
 interface LayoutProps {
   children: ReactNode;
@@ -17,6 +18,7 @@ export function Layout({
   scrollable = true,
 }: LayoutProps) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   const content = scrollable ? (
     <KeyboardAwareScrollView
@@ -33,11 +35,23 @@ export function Layout({
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {overlay && <View style={styles.overlay} />}
+    <View
+      style={[
+        styles.container,
+        { paddingTop: insets.top, backgroundColor: colors.background },
+      ]}
+    >
+      {overlay && (
+        <View style={[styles.overlay, { backgroundColor: colors.overlay }]} />
+      )}
       {content}
       {footer && (
-        <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
+        <View
+          style={[
+            styles.footer,
+            { paddingBottom: insets.bottom, backgroundColor: colors.background },
+          ]}
+        >
           {footer}
         </View>
       )}
@@ -48,7 +62,6 @@ export function Layout({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
   },
   scrollView: {
     flex: 1,
@@ -61,7 +74,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   footer: {
-    backgroundColor: "#000000",
     paddingTop: 20,
     paddingHorizontal: 20,
     zIndex: 10,
@@ -72,7 +84,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
     zIndex: 5,
   },
 });

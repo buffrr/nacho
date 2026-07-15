@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { TouchableOpacity, Text, StyleSheet } from "react-native";
+import { Colors, useTheme } from "@/theme";
 
 interface ButtonProps {
   text: string;
@@ -14,6 +15,9 @@ export function Button({
   type = "main",
   disabled = false,
 }: ButtonProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const getButtonStyle = () => {
     switch (type) {
       case "main":
@@ -29,22 +33,14 @@ export function Button({
           disabled && styles.dangerButtonDisabled,
         ];
       case "secondary":
-        return [
-          styles.button,
-          styles.secondaryButton,
-          disabled && styles.secondaryButtonDisabled,
-        ];
+        return [styles.button, styles.secondaryButton];
     }
   };
 
   const getTextStyle = () => {
     switch (type) {
       case "main":
-        return [
-          styles.buttonText,
-          styles.mainButtonText,
-          disabled && styles.mainButtonTextDisabled,
-        ];
+        return [styles.buttonText, styles.mainButtonText];
       case "danger":
         return [
           styles.buttonText,
@@ -71,53 +67,48 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
-  button: {
-    borderRadius: 50,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    marginBottom: 16,
-    alignItems: "center",
-  },
-  buttonText: {
-    fontSize: 18,
-    fontWeight: "400",
-  },
-  mainButton: {
-    backgroundColor: "#FF7B00",
-  },
-  mainButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-  },
-  mainButtonDisabled: {
-    backgroundColor: "#271300",
-  },
-  mainButtonTextDisabled: {
-    color: "#FFFFFF",
-  },
-  secondaryButton: {
-    backgroundColor: "transparent",
-  },
-  secondaryButtonText: {
-    color: "#FF7B00",
-  },
-  secondaryButtonDisabled: {
-    backgroundColor: "transparent",
-  },
-  secondaryButtonTextDisabled: {
-    color: "#B8571F",
-  },
-  dangerButton: {
-    backgroundColor: "#330000",
-  },
-  dangerButtonText: {
-    color: "#FF0000",
-  },
-  dangerButtonDisabled: {
-    backgroundColor: "#1A0000",
-  },
-  dangerButtonTextDisabled: {
-    color: "#800000",
-  },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    button: {
+      borderRadius: 14,
+      paddingVertical: 18,
+      paddingHorizontal: 24,
+      marginBottom: 16,
+      alignItems: "center",
+    },
+    buttonText: {
+      fontSize: 18,
+      fontWeight: "400",
+    },
+    mainButton: {
+      backgroundColor: c.accent,
+    },
+    mainButtonText: {
+      color: c.accentText,
+      fontWeight: "600",
+    },
+    mainButtonDisabled: {
+      backgroundColor: c.accentDisabledBg,
+    },
+    secondaryButton: {
+      backgroundColor: "transparent",
+    },
+    secondaryButtonText: {
+      color: c.accent,
+    },
+    secondaryButtonTextDisabled: {
+      color: c.accentMuted,
+    },
+    dangerButton: {
+      backgroundColor: c.dangerBg,
+    },
+    dangerButtonText: {
+      color: c.dangerText,
+    },
+    dangerButtonDisabled: {
+      backgroundColor: c.dangerBgDisabled,
+    },
+    dangerButtonTextDisabled: {
+      color: c.dangerTextDisabled,
+    },
+  });

@@ -13,4 +13,7 @@ config.transformer.getTransformOptions = async () => ({
 
 config.resolver.sourceExts = [...config.resolver.sourceExts, "mjs"];
 
+// Serve the libveritas WASM binary as an asset so wasm-bindgen can fetch it.
+config.resolver.assetExts = [...config.resolver.assetExts, "wasm"];
+
 module.exports = config;

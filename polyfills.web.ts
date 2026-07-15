@@ -1,7 +1,10 @@
+import { Buffer } from "buffer";
+
+// Set synchronously at module load (before any render) so code paths that use
+// Buffer during the first render — e.g. key derivation in the handle list —
+// don't race an async import.
 if (typeof global.Buffer === "undefined") {
-  import("buffer").then(({ Buffer }) => {
-    global.Buffer = Buffer;
-  });
+  global.Buffer = Buffer;
 }
 
 if (!("BarcodeDetector" in window)) {

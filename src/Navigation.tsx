@@ -1,17 +1,22 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { TouchableOpacity, Text } from "react-native";
-import { Handles, Network, useStore } from "@/Store";
+import { HandlesMap, useStore } from "@/Store";
+import { Colors, useTheme } from "@/theme";
+import { SearchButton } from "@/ui/icons";
 import OnboardingHome from "./screens/onboarding/Home";
 import ShowMnemonic from "./screens/onboarding/ShowMnemonic";
 import ImportKeystore from "./screens/onboarding/ImportKeystore";
 import EnterMnemonic from "./screens/onboarding/EnterMnemonic";
 import ListHandles from "./screens/main/ListHandles";
 import ShowHandle from "./screens/main/ShowHandle";
-import AddHandle from "./screens/main/AddHandle";
+import CreateRequest from "./screens/main/CreateRequest";
 import ImportCertificate from "./screens/main/ImportCertificate";
-import SignNostrEvent from "./screens/main/SignNostrEvent";
+import Settings from "./screens/main/Settings";
+import Resolve from "./screens/main/Resolve";
+import ImportKeypair from "./screens/main/ImportKeypair";
+import Redeem from "./screens/main/Redeem";
+import RevealSeed from "./screens/main/RevealSeed";
 
 export type RootStackParamList = {
   Main: undefined;
@@ -24,27 +29,31 @@ export type OnboardingStackParamList = {
   Home: undefined;
   ShowMnemonic: undefined;
   ImportKeystore: undefined;
-  EnterMnemonic: { xpub: string; handles?: Handles };
+  EnterMnemonic: { xpub: string; handles?: HandlesMap };
 };
 
 const OnboardingStack = createNativeStackNavigator<OnboardingStackParamList>();
 
 export type HandlesStackParamList = {
-  ListHandles: { network: Network };
-  ShowHandle: { network: Network; handle: string };
-  AddHandle: { network: Network; initialHandle?: string };
-  ImportCertificate: { network: Network };
-  SignNostrEvent: { network: Network; handle: string };
+  ListHandles: undefined;
+  ShowHandle: { handle: string };
+  CreateRequest: { initialHandle?: string };
+  ImportKeypair: { handle?: string };
+  Redeem: { code?: string };
+  ImportCertificate: { handle: string };
+  Settings: undefined;
+  Resolve: undefined;
+  RevealSeed: undefined;
 };
 
 const HandlesStack = createNativeStackNavigator<HandlesStackParamList>();
 
-const screenOptions = {
+const makeScreenOptions = (c: Colors) => ({
   headerShown: true,
   headerStyle: {
-    backgroundColor: "#000000",
+    backgroundColor: c.background,
   },
-  headerTintColor: "#FFFFFF",
+  headerTintColor: c.text,
   headerTitleStyle: {
     fontWeight: "600" as const,
     fontSize: 18,
@@ -52,13 +61,14 @@ const screenOptions = {
   headerBackTitleVisible: false,
   headerShadowVisible: false,
   contentStyle: {
-    backgroundColor: "#000000",
+    backgroundColor: c.background,
   },
-};
+});
 
 function OnboardingNavigator() {
+  const { colors } = useTheme();
   return (
-    <OnboardingStack.Navigator screenOptions={screenOptions}>
+    <OnboardingStack.Navigator screenOptions={makeScreenOptions(colors)}>
       <OnboardingStack.Screen
         name="Home"
         component={OnboardingHome}
@@ -84,74 +94,64 @@ function OnboardingNavigator() {
 }
 
 function MainNavigator() {
-  const networkSwitcher = (navigation: any, network: Network) => {
-    const newNetwork: Network = network === "testnet4" ? "mainnet" : "testnet4";
-    const displayName = network === "mainnet" ? "Mainnet" : "Testnet";
-    return (
-      <TouchableOpacity
-        onPress={() =>
-          navigation.reset({
-            index: 0,
-            routes: [{ name: "ListHandles", params: { network: newNetwork } }],
-          })
-        }
-        style={{ paddingRight: 16 }}
-      >
-        <Text style={{ color: "#FF7B00", fontSize: 16, fontWeight: "400" }}>
-          {displayName}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
+  const { colors } = useTheme();
   return (
     <HandlesStack.Navigator
-      screenOptions={screenOptions}
+      screenOptions={makeScreenOptions(colors)}
       initialRouteName="ListHandles"
     >
       <HandlesStack.Screen
         name="ListHandles"
         component={ListHandles}
-        options={({ navigation, route }) => ({
+        options={({ navigation }) => ({
           title: "Handles",
-          headerRight: () => networkSwitcher(navigation, route.params.network),
+          headerRight: () => (
+            <SearchButton onPress={() => navigation.navigate("Resolve")} />
+          ),
         })}
-        initialParams={{ network: "testnet4" }}
-        getId={({ params }) => params.network}
       />
       <HandlesStack.Screen
         name="ShowHandle"
         component={ShowHandle}
-        options={({ navigation, route }) => ({
-          title: "Handles",
-          headerRight: () => networkSwitcher(navigation, route.params.network),
-        })}
-        getId={({ params }) => `${params.network}-${params.handle}`}
+        options={{ title: "Handle" }}
       />
       <HandlesStack.Screen
-        name="AddHandle"
-        component={AddHandle}
-        options={({ navigation, route }) => ({
-          title: "Handles",
-          headerRight: () => networkSwitcher(navigation, route.params.network),
-        })}
-        getId={({ params }) => params.network}
+        name="CreateRequest"
+        component={CreateRequest}
+        options={{ title: "Add Handle" }}
+        initialParams={{}}
+      />
+      <HandlesStack.Screen
+        name="ImportKeypair"
+        component={ImportKeypair}
+        options={{ title: "Import Keypair" }}
+        initialParams={{}}
+      />
+      <HandlesStack.Screen
+        name="Redeem"
+        component={Redeem}
+        options={{ title: "Redeem Code" }}
+        initialParams={{}}
       />
       <HandlesStack.Screen
         name="ImportCertificate"
         component={ImportCertificate}
-        options={({ navigation, route }) => ({
-          title: "Certificate",
-          headerRight: () => networkSwitcher(navigation, route.params.network),
-        })}
+        options={{ title: "Import Certificate" }}
       />
       <HandlesStack.Screen
-        name="SignNostrEvent"
-        component={SignNostrEvent}
-        options={({ navigation, route }) => ({
-          title: "Nostr Event",
-          headerRight: () => networkSwitcher(navigation, route.params.network),
-        })}
+        name="Settings"
+        component={Settings}
+        options={{ title: "Settings" }}
+      />
+      <HandlesStack.Screen
+        name="RevealSeed"
+        component={RevealSeed}
+        options={{ title: "Seed Phrase" }}
+      />
+      <HandlesStack.Screen
+        name="Resolve"
+        component={Resolve}
+        options={{ title: "Resolve" }}
       />
     </HandlesStack.Navigator>
   );
@@ -159,6 +159,7 @@ function MainNavigator() {
 
 export default function RootNavigator() {
   const { xpub, handles } = useStore();
+  const { colors, scheme } = useTheme();
   const isConfigured = xpub !== null && handles !== null;
 
   return (
@@ -166,14 +167,14 @@ export default function RootNavigator() {
       linking={undefined}
       onStateChange={undefined}
       theme={{
-        dark: true,
+        dark: scheme === "dark",
         colors: {
-          primary: "#FF7B00",
-          background: "#000000",
-          card: "#000000",
-          text: "#FFFFFF",
-          border: "#333333",
-          notification: "#FF7B00",
+          primary: colors.accent,
+          background: colors.background,
+          card: colors.background,
+          text: colors.text,
+          border: colors.border,
+          notification: colors.accent,
         },
         fonts: {
           regular: {
@@ -198,7 +199,7 @@ export default function RootNavigator() {
       <RootStack.Navigator
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: "#000000" },
+          contentStyle: { backgroundColor: colors.background },
         }}
       >
         {isConfigured ? (

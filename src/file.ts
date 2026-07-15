@@ -29,6 +29,34 @@ export async function save(fileName: string, data: unknown): Promise<void> {
   }
 }
 
+export async function saveBinary(
+  fileName: string,
+  bytes: Uint8Array,
+  mimeType = "application/octet-stream",
+): Promise<void> {
+  if (Platform.OS === "web") {
+    const blob = new Blob([bytes as unknown as BlobPart], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  } else {
+    const file = new File(Paths.cache, fileName);
+    if (file.exists) {
+      file.delete();
+    }
+    file.write(bytes);
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(file.uri, {
+        mimeType,
+        dialogTitle: "Send file",
+      });
+    }
+  }
+}
+
 export async function open(): Promise<{ data: unknown; filename: string }> {
   const result = await DocumentPicker.getDocumentAsync({
     type: "application/json",

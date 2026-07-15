@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 import { open } from "@/file";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useStore, Keystore, isKeystore } from "@/Store";
+import { Colors, useTheme } from "@/theme";
 import { OnboardingStackParamList } from "@/Navigation";
 import { Layout } from "@/ui/Layout";
 import { Header } from "@/ui/Header";
@@ -19,6 +20,8 @@ import { Message } from "@/ui/Message";
 type Props = NativeStackScreenProps<OnboardingStackParamList, "ImportKeystore">;
 
 export default function ImportKeystore({ navigation }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [keystore, setKeystore] = useState<Keystore | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -81,7 +84,7 @@ export default function ImportKeystore({ navigation }: Props) {
       <Header
         headText="Import"
         tailText="Keystore"
-        subText="Select a JSON keystore file to import your wallet configuration."
+        subText="Select a JSON keystore file to import your configuration."
       />
 
       <View style={styles.fileSelectionContainer}>
@@ -103,26 +106,27 @@ export default function ImportKeystore({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  fileSelectionContainer: {
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  fileInfoContainer: {
-    backgroundColor: "#1A1A1A",
-    borderRadius: 8,
-    padding: 16,
-    marginTop: 20,
-  },
-  fileInfoTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#FF7B00",
-    marginBottom: 8,
-  },
-  fileName: {
-    fontSize: 16,
-    fontWeight: "400",
-    color: "#FFFFFF",
-  },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    fileSelectionContainer: {
+      marginTop: 20,
+      marginBottom: 30,
+    },
+    fileInfoContainer: {
+      backgroundColor: c.surface,
+      borderRadius: 8,
+      padding: 16,
+      marginTop: 20,
+    },
+    fileInfoTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: c.accent,
+      marginBottom: 8,
+    },
+    fileName: {
+      fontSize: 16,
+      fontWeight: "400",
+      color: c.text,
+    },
+  });

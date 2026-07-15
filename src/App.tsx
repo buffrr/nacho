@@ -1,15 +1,14 @@
-import React, { useEffect } from "react";
-import { StoreProvider, useStore } from "./Store";
+import React from "react";
+import { StoreProvider } from "./Store";
+import { ThemeProvider } from "./theme";
 import Navigation from "./Navigation";
-
-const App = () => {
-  return <Navigation />;
-};
 
 export default function () {
   return (
-    <StoreProvider>
-      <App />
-    </StoreProvider>
+    <ThemeProvider>
+      <StoreProvider>
+        <Navigation />
+      </StoreProvider>
+    </ThemeProvider>
   );
 }

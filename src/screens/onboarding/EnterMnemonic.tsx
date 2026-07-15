@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { Button } from "@/ui/Button";
 import { Header } from "@/ui/Header";
 import { Layout } from "@/ui/Layout";
 import { Message } from "@/ui/Message";
+import { Colors, useTheme } from "@/theme";
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, "EnterMnemonic">;
 
@@ -23,6 +24,8 @@ export default function ({ navigation, route }: Props) {
   type ValidationError = "invalid" | "mismatch" | null;
 
   const { setupKeystore } = useStore();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [inputWords, setInputWords] = useState<string[]>(Array(12).fill(""));
   const [error, setError] = useState<ValidationError>(null);
   const inputRefs = useRef<(TextInput | null)[]>(Array(12).fill(null));
@@ -52,7 +55,7 @@ export default function ({ navigation, route }: Props) {
       return;
     }
 
-    setupKeystore(xprv, handles || {});
+    setupKeystore(xprv, handles || {}, mnemonic);
   };
 
   const getMessage = (error: ValidationError): string => {
@@ -109,8 +112,8 @@ export default function ({ navigation, route }: Props) {
               value={word}
               onChangeText={(value) => handleWordChange(index, value)}
               placeholder=""
-              placeholderTextColor="#4A4A4A"
-              selectionColor="#FFFFFF"
+              placeholderTextColor={colors.placeholder}
+              selectionColor={colors.text}
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="off"
@@ -124,40 +127,41 @@ export default function ({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  inputContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  wordInputContainer: {
-    width: "48%",
-    backgroundColor: "#1A1A1A",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    minWidth: 0,
-  },
-  wordInputNumber: {
-    fontSize: 14,
-    color: "#FF7B00",
-    fontWeight: "500",
-  },
-  wordInput: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "400",
-    color: "#FFFFFF",
-    padding: 0,
-    margin: 0,
-    textAlign: "left",
-    minWidth: 0,
-    // @ts-ignore - web-only style to remove focus outline
-    outlineStyle: "none",
-  } as any,
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    inputContainer: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      marginTop: 20,
+      marginBottom: 30,
+    },
+    wordInputContainer: {
+      width: "48%",
+      backgroundColor: c.surface,
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      minWidth: 0,
+    },
+    wordInputNumber: {
+      fontSize: 14,
+      color: c.accent,
+      fontWeight: "500",
+    },
+    wordInput: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: "400",
+      color: c.text,
+      padding: 0,
+      margin: 0,
+      textAlign: "left",
+      minWidth: 0,
+      // @ts-ignore - web-only style to remove focus outline
+      outlineStyle: "none",
+    } as any,
+  });
