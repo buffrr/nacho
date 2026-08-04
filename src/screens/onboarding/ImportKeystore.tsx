@@ -13,7 +13,7 @@ import { useStore, Keystore, isKeystore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { OnboardingStackParamList } from "@/Navigation";
 import { Layout } from "@/ui/Layout";
-import { Header } from "@/ui/Header";
+import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 
@@ -72,19 +72,20 @@ export default function ImportKeystore({ navigation }: Props) {
 
   return (
     <Layout
+      padTop
       footer={
         <Button
-          text="Import Keystore"
+          text="Import keystore"
           onPress={handleImport}
           type="main"
           disabled={!keystore}
         />
       }
     >
-      <Header
-        headText="Import"
-        tailText="Keystore"
-        subText="Select a JSON keystore file to import your configuration."
+      <ScreenHeader
+        title="Restore from backup"
+        subtitle="Select a JSON keystore file to restore your public key and handles."
+        onBack={() => navigation.goBack()}
       />
 
       <View style={styles.fileSelectionContainer}>

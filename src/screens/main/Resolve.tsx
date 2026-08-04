@@ -1,54 +1,153 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
+  TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import * as Clipboard from "expo-clipboard";
 import { HandlesStackParamList } from "@/Navigation";
 import { Colors, useTheme } from "@/theme";
+import { avatarColors } from "@/handleTile";
 import { Layout } from "@/ui/Layout";
-import { Header } from "@/ui/Header";
-import { Button } from "@/ui/Button";
+import { BottomNav } from "@/ui/BottomNav";
 import { Message } from "@/ui/Message";
-import { Badge } from "@/ui/Badge";
-import { resolveHandle } from "@/fabric";
 import {
-  ResolvedHandle,
-  FabricRecord,
-  VerificationBadge,
-} from "@/fabricResolver";
+  Search,
+  Copy,
+  Check,
+  AtSign,
+  Bitcoin,
+  Zap,
+  EyeOff,
+  Droplet,
+  Anchor,
+  Lock,
+  Key,
+  Hash,
+  FileText,
+  Binary,
+  IconProps,
+} from "@/ui/icons";
+import { resolveHandle } from "@/fabric";
+import { ResolvedHandle } from "@/fabricResolver";
 
 type Props = NativeStackScreenProps<HandlesStackParamList, "Resolve">;
 
-const BADGE: Record<VerificationBadge, { label: string; color: string }> = {
-  orange: { label: "Verified", color: "#FF7B00" },
-  unverified: { label: "Unverified", color: "#6B6B6B" },
-  none: { label: "Unverified", color: "#6B6B6B" },
+type ResRow = {
+  key: string;
+  label: string;
+  value: string; // canonical (copy / payment URI)
+  display: string; // shown, possibly truncated
+  sub?: string;
+  Icon: (p: IconProps) => React.JSX.Element;
+  color: string;
+  uri?: string; // payment URI, if payable
 };
 
 function shorten(value: string): string {
-  if (value.length <= 32) return value;
-  return `${value.slice(0, 18)}…${value.slice(-8)}`;
+  if (value.length <= 22) return value;
+  return `${value.slice(0, 9)}…${value.slice(-6)}`;
 }
 
-function describeRecord(rec: FabricRecord): { tag: string; lines: string[] } {
-  if (typeof rec.key === "string") {
-    return { tag: rec.type, lines: [`${rec.key} = ${(rec.value ?? []).join(", ")}`] };
-  }
-  if (rec.type === "seq") {
-    return { tag: "seq", lines: [`version ${rec.version ?? "?"}`] };
-  }
-  if (rec.type === "sig") {
-    return { tag: "sig", lines: [shorten(String(rec.sig ?? ""))] };
-  }
-  const { type, ...rest } = rec;
-  return { tag: rec.type, lines: [JSON.stringify(rest)] };
+function btcNetwork(addr: string): string {
+  const a = addr.toLowerCase();
+  if (a.startsWith("bcrt")) return "Regtest";
+  if (a.startsWith("tb1") || /^[mn2]/.test(addr)) return "Testnet";
+  return "Mainnet";
 }
 
-export default function Resolve({}: Props) {
+function titleCase(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Classify one `addr` record. Recognized types (Bitcoin, Lightning, Silent
+// Payments, Liquid, Ark, age, nostr…) get a distinctive icon/colour and, where
+// applicable, a payment URI; anything else is still shown (any addr could be a
+// payment rail we don't recognise yet) with a generic icon.
+function classifyAddr(rawKey: string, value: string): ResRow {
+  const key = rawKey.toLowerCase();
+  const base = { key, value, display: shorten(value) };
+
+  if (/^btc$|bitcoin|onchain/.test(key) || /^(bc1|tb1|bcrt|[13])/.test(value)) {
+    const net = btcNetwork(value);
+    return {
+      ...base, label: "Bitcoin", Icon: Bitcoin, color: "#F7931A",
+      uri: `bitcoin:${value}`,
+      // Only surface the network when it's NOT mainnet, as a safety flag.
+      sub: net === "Mainnet" ? undefined : net,
+    };
+  }
+  if (/^ln$|lightning|lnurl|bolt11/.test(key) || /^lnbc/i.test(value)) {
+    return {
+      ...base, label: "Lightning",
+      display: value.length > 28 ? shorten(value) : value,
+      Icon: Zap, color: "#EAB308", uri: `lightning:${value}`,
+    };
+  }
+  if (/^sp$|silent/.test(key) || /^sp1/i.test(value)) {
+    return { ...base, label: "Silent Payment", Icon: EyeOff, color: "#8B5CF6", uri: `bitcoin:${value}` };
+  }
+  if (/liquid|^lq$/.test(key) || /^(lq1|ex1|vjl)/i.test(value)) {
+    return { ...base, label: "Liquid", Icon: Droplet, color: "#2563EB", uri: `liquidnetwork:${value}` };
+  }
+  if (/^ark$/.test(key) || /^ark1/i.test(value)) {
+    return { ...base, label: "Ark", Icon: Anchor, color: "#0D9488", uri: `ark:${value}` };
+  }
+  if (/^age$/.test(key) || /^age1/.test(value)) {
+    return { ...base, label: "Age", Icon: Lock, color: "#64748B" };
+  }
+  if (/nostr|^npub$/.test(key) || /^npub1/.test(value)) {
+    return { ...base, label: "Nostr", Icon: Key, color: "#7C3AED" };
+  }
+  return { ...base, label: titleCase(rawKey), Icon: Hash, color: "#64748B" };
+}
+
+// Split the zone's records into addresses (all `addr` records, in published
+// order — payment vs non-payment isn't separated since any addr may be a
+// payment rail) and plain records (txt / blob). seq/sig are protocol internals.
+function classify(resolved: ResolvedHandle): {
+  addresses: ResRow[];
+  records: ResRow[];
+} {
+  const addresses: ResRow[] = [];
+  const records: ResRow[] = [];
+
+  for (const rec of resolved.zone.records ?? []) {
+    const key = typeof rec.key === "string" ? rec.key.toLowerCase() : "";
+    const values = (rec.value ?? []).map(String);
+    const value = values.find(Boolean) ?? "";
+
+    if (rec.type === "addr" && typeof rec.key === "string" && value) {
+      addresses.push(classifyAddr(rec.key, value));
+    } else if (rec.type === "txt" && key) {
+      const v = values.join(", ");
+      records.push({
+        key, label: String(rec.key), value: v,
+        display: v.length > 40 ? shorten(v) : v,
+        Icon: FileText, color: "#64748B",
+      });
+    } else if (rec.type === "blob") {
+      const v = values.join("");
+      records.push({
+        key: key || "blob", label: rec.key ? String(rec.key) : "Blob",
+        value: v, display: v ? shorten(v) : "binary data",
+        Icon: Binary, color: "#64748B",
+      });
+    }
+  }
+
+  return { addresses, records };
+}
+
+function copyText(text: string) {
+  Clipboard.setStringAsync(text);
+}
+
+export default function Resolve({ route }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [handle, setHandle] = useState("");
@@ -57,10 +156,8 @@ export default function Resolve({}: Props) {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canResolve = handle.trim().includes("@") && !isLoading;
-
-  const onResolve = async () => {
-    const name = handle.trim().toLowerCase();
+  const onResolve = async (nameArg?: string) => {
+    const name = (nameArg ?? handle).trim().toLowerCase();
     if (!name.includes("@") || isLoading) return;
     setIsLoading(true);
     setError(null);
@@ -74,111 +171,148 @@ export default function Resolve({}: Props) {
         setNotFound(true);
       }
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Failed to resolve handle",
-      );
+      setError(e instanceof Error ? e.message : "Failed to resolve handle");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const renderHandleName = (name: string) => {
-    const parts = name.split("@");
-    if (parts.length === 2) {
-      return (
-        <>
-          <Text style={styles.subPart}>{parts[0]}</Text>
-          <Text style={styles.spacePart}>@{parts[1]}</Text>
-        </>
-      );
+  const prefill = route.params?.prefill;
+  useEffect(() => {
+    if (prefill) {
+      setHandle(prefill);
+      onResolve(prefill);
     }
-    return <Text style={styles.spacePart}>{name}</Text>;
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
+
+  const { addresses, records } = result
+    ? classify(result)
+    : { addresses: [], records: [] };
+  // Fabric's three-tier badge: "orange" = verified against a trusted (Safety ID)
+  // anchor → green Verified; "unverified" = observed only / no anchor → grey
+  // Unverified; "none" = matched a semi-trusted anchor → show no badge at all
+  // (per the design, a pinned semi-trusted anchor is trustworthy enough to not
+  // flag). Only "unverified" warrants a warning.
+  const verified = result?.badge === "orange";
+  const showBadge = result?.badge === "orange" || result?.badge === "unverified";
+  const isEmpty = addresses.length === 0 && records.length === 0;
+
+  const renderSection = (title: string, rows: ResRow[]) =>
+    rows.length === 0 ? null : (
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>{title}</Text>
+        <View style={styles.card}>
+          {rows.map((row, i) => (
+            <React.Fragment key={row.key + i}>
+              {i > 0 && <View style={styles.divider} />}
+              <View style={styles.row}>
+                <View style={[styles.iconTile, { backgroundColor: row.color + "22" }]}>
+                  <row.Icon size={20} color={row.color} />
+                </View>
+                <View style={styles.rowMid}>
+                  <Text style={styles.rowLabel}>
+                    {row.label}
+                    {row.sub ? ` · ${row.sub}` : ""}
+                  </Text>
+                  <Text style={styles.rowValue} numberOfLines={1}>
+                    {row.display}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => copyText(row.value)} hitSlop={6}>
+                  <Copy size={16} color={colors.iconDefault} />
+                </TouchableOpacity>
+              </View>
+            </React.Fragment>
+          ))}
+        </View>
+      </View>
+    );
 
   return (
     <Layout
-      footer={
-        <Button
-          text={isLoading ? "Resolving…" : "Resolve"}
-          onPress={onResolve}
-          type="main"
-          disabled={!canResolve}
-        />
-      }
+      padTop
+      footer={<BottomNav active="resolve" />}
     >
-      <Header
-        headText="Resolve"
-        tailText="Handle"
-        subText="Look up a handle's records from the certrelay network."
-      />
+      <Text style={styles.title}>Resolve</Text>
+      <Text style={styles.subtitle}>Look up a handle to pay or verify.</Text>
 
-      <TextInput
-        value={handle}
-        onChangeText={(text) => setHandle(text.trim().toLowerCase())}
-        onSubmitEditing={onResolve}
-        placeholder="grace@key"
-        placeholderTextColor={colors.placeholder}
-        style={styles.input}
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={!isLoading}
-        returnKeyType="search"
-      />
+      <View style={styles.lookup}>
+        <Search size={20} color={colors.textMuted} />
+        <TextInput
+          value={handle}
+          onChangeText={(text) => setHandle(text.trim().toLowerCase())}
+          onSubmitEditing={() => onResolve()}
+          placeholder="satoshi@bitcoin"
+          placeholderTextColor={colors.placeholder}
+          style={styles.lookupInput}
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!isLoading}
+          returnKeyType="search"
+        />
+        {handle.trim().includes("@") && !isLoading && (
+          <TouchableOpacity onPress={() => onResolve()} hitSlop={8}>
+            <Text style={styles.go}>Resolve</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {isLoading && (
-        <ActivityIndicator
-          color="#FF7B00"
-          style={styles.loader}
-          size="large"
-        />
+        <ActivityIndicator color={colors.accent} style={styles.loader} size="large" />
       )}
-
       {error && <Message message={error} type="error" />}
       {notFound && (
         <Message message="Handle not found on the network." type="error" />
       )}
 
       {result && (
-        <View style={styles.result}>
-          <View style={styles.resultHeader}>
-            <Text style={styles.resultHandle}>
-              {renderHandleName(result.handle)}
+        <>
+          <View style={styles.identity}>
+            <View
+              style={[
+                styles.avatar,
+                { backgroundColor: avatarColors(colors, result.handle).bg },
+              ]}
+            >
+              <AtSign size={22} color={avatarColors(colors, result.handle).fg} />
+            </View>
+            <Text style={styles.idName} numberOfLines={1}>
+              {result.handle}
             </Text>
-            <Badge
-              label={BADGE[result.badge].label}
-              color={BADGE[result.badge].color}
-            />
+            {showBadge && (
+              <View
+                style={[
+                  styles.badge,
+                  {
+                    backgroundColor: verified
+                      ? colors.statusGreenBg
+                      : colors.statusGreyBg,
+                  },
+                ]}
+              >
+                {verified && <Check size={14} color={colors.statusGreenFg} />}
+                <Text
+                  style={[
+                    styles.badgeText,
+                    { color: verified ? colors.statusGreenFg : colors.statusGreyFg },
+                  ]}
+                >
+                  {verified ? "Verified" : "Unverified"}
+                </Text>
+              </View>
+            )}
           </View>
 
-          {result.zone.sovereignty && (
-            <Text style={styles.meta}>
-              Sovereignty: {result.zone.sovereignty}
-            </Text>
-          )}
-          {result.zone.num_id && (
-            <Text style={styles.meta} numberOfLines={1}>
-              ID: {result.zone.num_id}
-            </Text>
-          )}
+          {renderSection("ADDRESSES", addresses)}
+          {renderSection("RECORDS", records)}
 
-          <Text style={styles.sectionLabel}>Records</Text>
-          {(result.zone.records ?? []).length === 0 && (
-            <Text style={styles.meta}>No records.</Text>
+          {isEmpty && (
+            <Text style={styles.emptyNote}>
+              This handle has no published records.
+            </Text>
           )}
-          {(result.zone.records ?? []).map((rec, i) => {
-            const { tag, lines } = describeRecord(rec);
-            return (
-              <View key={i} style={styles.record}>
-                <Text style={styles.recordTag}>{tag}</Text>
-                {lines.map((line, j) => (
-                  <Text key={j} style={styles.recordValue}>
-                    {line}
-                  </Text>
-                ))}
-              </View>
-            );
-          })}
-        </View>
+        </>
       )}
     </Layout>
   );
@@ -186,74 +320,134 @@ export default function Resolve({}: Props) {
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    input: {
-      backgroundColor: c.surface,
+    title: {
+      fontSize: 26,
+      fontWeight: "700",
+      color: c.text,
+      marginTop: 4,
+    },
+    subtitle: {
+      fontSize: 14,
+      color: c.textSecondary,
+      marginTop: 6,
+      marginBottom: 20,
+    },
+    lookup: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      height: 50,
+      backgroundColor: c.field,
       borderWidth: 1,
-      borderColor: c.border,
+      borderColor: c.borderWarm,
       borderRadius: 12,
-      padding: 16,
+      paddingHorizontal: 16,
+    },
+    lookupInput: {
+      flex: 1,
       fontSize: 16,
       color: c.text,
-      fontFamily: "monospace",
-      // @ts-ignore - web-only style to remove focus outline
+      // @ts-ignore web-only
       outlineStyle: "none",
     } as any,
+    go: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: c.accent,
+    },
     loader: {
       marginTop: 28,
     },
-    result: {
-      marginTop: 28,
-    },
-    resultHeader: {
+    identity: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 16,
-    },
-    resultHandle: {
-      fontSize: 24,
-      fontWeight: "400",
-      flexShrink: 1,
-    },
-    subPart: {
-      color: c.text,
-    },
-    spacePart: {
-      color: c.accent,
-    },
-    meta: {
-      fontSize: 13,
-      color: c.textMuted,
+      gap: 12,
+      marginTop: 22,
       marginBottom: 4,
     },
-    sectionLabel: {
-      fontSize: 18,
-      color: c.text,
-      fontWeight: "400",
-      marginTop: 20,
-      marginBottom: 12,
-    },
-    record: {
-      backgroundColor: c.surface,
+    avatar: {
+      width: 40,
+      height: 40,
       borderRadius: 12,
-      padding: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    idName: {
+      flex: 1,
+      fontSize: 18,
+      fontWeight: "700",
+      color: c.text,
+    },
+    badge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 20,
+    },
+    badgeText: {
+      fontSize: 12,
+      fontWeight: "500",
+    },
+    section: {
+      marginTop: 18,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      fontWeight: "500",
+      letterSpacing: 0.6,
+      color: c.textMuted,
       marginBottom: 10,
     },
-    recordTag: {
-      fontSize: 11,
-      fontWeight: "700",
-      color: c.accent,
-      textTransform: "uppercase",
-      letterSpacing: 1,
-      marginBottom: 6,
+    card: {
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.borderWarm,
+      borderRadius: 16,
+      overflow: "hidden",
+      shadowColor: "#000",
+      shadowOpacity: 0.06,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 2,
     },
-    recordValue: {
-      fontSize: 14,
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    iconTile: {
+      width: 40,
+      height: 40,
+      borderRadius: 11,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    rowMid: {
+      flex: 1,
+      gap: 2,
+    },
+    rowLabel: {
+      fontSize: 15,
+      fontWeight: "600",
       color: c.text,
+    },
+    rowValue: {
+      fontSize: 13,
+      color: c.textSecondary,
       fontFamily: "monospace",
-      lineHeight: 20,
-      // @ts-ignore - web-only word breaking
-      wordBreak: "break-all",
-      overflowWrap: "break-word",
-    } as any,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: c.border,
+      marginLeft: 66,
+    },
+    emptyNote: {
+      fontSize: 14,
+      color: c.textSecondary,
+      marginTop: 20,
+    },
   });

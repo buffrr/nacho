@@ -58,7 +58,7 @@ export default function ({ navigation }: Props) {
             type="main"
           />
           <Button
-            text="Restore existing keystore"
+            text="Restore from backup"
             onPress={() => navigation.navigate("ImportKeystore")}
             type="secondary"
           />
@@ -69,9 +69,10 @@ export default function ({ navigation }: Props) {
         <SvgXml xml={logoXml} width={280} height={160} />
         <View style={styles.headerContainer}>
           <View style={styles.ownRow}>
-            <Text style={styles.ownText}>Own your </Text>
+            <Text style={styles.ownText}>Own </Text>
             <AtbitcoinLogo height={20} />
           </View>
+          <Text style={styles.tagline}>Self-custodial handles for Bitcoin.</Text>
         </View>
       </View>
     </Layout>
@@ -97,6 +98,12 @@ const makeStyles = (c: Colors) =>
     ownText: {
       fontSize: 20,
       fontWeight: "400",
-      color: c.textMuted,
+      color: c.text,
+    },
+    tagline: {
+      fontSize: 15,
+      color: c.textSecondary,
+      marginTop: 14,
+      textAlign: "center",
     },
   });

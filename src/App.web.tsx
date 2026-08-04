@@ -3,6 +3,9 @@ import { View, StyleSheet } from "react-native";
 import { StoreProvider } from "./Store";
 import { ThemeProvider, useTheme } from "./theme";
 import Navigation from "./Navigation";
+import { useKarla, applyKarlaDefault } from "./fonts";
+
+applyKarlaDefault();
 
 const Frame = () => {
   const { colors, scheme } = useTheme();
@@ -23,6 +26,8 @@ const Frame = () => {
 };
 
 export default function () {
+  const fontsLoaded = useKarla();
+  if (!fontsLoaded) return null;
   return (
     <ThemeProvider>
       <StoreProvider>

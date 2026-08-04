@@ -5,13 +5,13 @@ import { HandlesStackParamList } from "@/Navigation";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
-import { Header } from "@/ui/Header";
+import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 
 type Props = NativeStackScreenProps<HandlesStackParamList, "RevealSeed">;
 
-export default function RevealSeed({}: Props) {
+export default function RevealSeed({ navigation }: Props) {
   const { getMnemonic } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -30,11 +30,11 @@ export default function RevealSeed({}: Props) {
 
   if (words !== null && words.length === 0) {
     return (
-      <Layout>
-        <Header
-          headText="Seed"
-          tailText="Phrase"
-          subText="No seed phrase is stored on this device."
+      <Layout padTop>
+        <ScreenHeader
+          title="Seed phrase"
+          subtitle="No seed phrase is stored on this device."
+          onBack={() => navigation.goBack()}
         />
         <Message
           message="This keystore was set up without saving its seed phrase. Back it up with the keystore file from Settings instead."
@@ -46,6 +46,7 @@ export default function RevealSeed({}: Props) {
 
   return (
     <Layout
+      padTop
       footer={
         !revealed ? (
           <Button
@@ -57,10 +58,10 @@ export default function RevealSeed({}: Props) {
         ) : undefined
       }
     >
-      <Header
-        headText="Seed"
-        tailText="Phrase"
-        subText="Write these 12 words down in order and keep them offline. Anyone with them controls your handles."
+      <ScreenHeader
+        title="Seed phrase"
+        subtitle="Write these 12 words down in order and keep them offline. Anyone with them controls your handles."
+        onBack={() => navigation.goBack()}
       />
 
       {revealed && words && (
@@ -86,22 +87,24 @@ const makeStyles = (c: Colors) =>
     },
     wordItem: {
       width: "48%",
-      backgroundColor: c.surface,
-      borderRadius: 8,
-      padding: 12,
-      marginBottom: 12,
+      backgroundColor: c.field,
+      borderRadius: 10,
+      paddingVertical: 13,
+      paddingHorizontal: 14,
+      marginBottom: 10,
       flexDirection: "row",
       alignItems: "center",
-      gap: 8,
+      gap: 10,
     },
     wordNumber: {
       fontSize: 14,
-      color: c.accent,
+      color: c.textMuted,
       fontWeight: "500",
+      minWidth: 18,
     },
     wordText: {
-      fontSize: 14,
-      fontWeight: "400",
+      fontSize: 15,
+      fontWeight: "500",
       color: c.text,
       flex: 1,
     },

@@ -7,7 +7,7 @@ import { Colors, useTheme } from "@/theme";
 import { isValidHandle } from "@/handle";
 import { isValidPrivkeyHex } from "@/keys";
 import { Layout } from "@/ui/Layout";
-import { Header } from "@/ui/Header";
+import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 
@@ -49,19 +49,20 @@ export default function ImportKeypair({ route, navigation }: Props) {
 
   return (
     <Layout
+      padTop
       footer={
         <Button
-          text={isLoading ? "Importing..." : "Import Keypair"}
+          text={isLoading ? "Importing..." : "Import keypair"}
           onPress={submit}
           type="main"
           disabled={!canSubmit}
         />
       }
     >
-      <Header
-        headText="Import"
-        tailText="Keypair"
-        subText="Add a handle backed by an existing private key, not derived from your seed phrase."
+      <ScreenHeader
+        title="Import keypair"
+        subtitle="Add a handle backed by an existing private key, not derived from your seed phrase."
+        onBack={() => navigation.goBack()}
       />
 
       <TextInput
@@ -102,15 +103,14 @@ export default function ImportKeypair({ route, navigation }: Props) {
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
     input: {
-      backgroundColor: c.surface,
-      borderWidth: 1,
-      borderColor: c.border,
-      borderRadius: 12,
-      padding: 16,
+      backgroundColor: c.field,
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 17,
       fontSize: 16,
       color: c.text,
       fontFamily: "monospace",
-      marginBottom: 16,
+      marginBottom: 12,
       // @ts-ignore - web-only style to remove focus outline
       outlineStyle: "none",
     } as any,

@@ -15,7 +15,7 @@ import {
 import { useStore } from "@/Store";
 import { OnboardingStackParamList } from "@/Navigation";
 import { Button } from "@/ui/Button";
-import { Header } from "@/ui/Header";
+import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Layout } from "@/ui/Layout";
 import { SvgXml } from "react-native-svg";
 import { Colors, useTheme } from "@/theme";
@@ -42,6 +42,7 @@ export default function ({ navigation }: Props) {
 
   return (
     <Layout
+      padTop
       footer={
         <>
           <Button
@@ -80,10 +81,10 @@ export default function ({ navigation }: Props) {
     >
       {!mnemonic ? (
         <>
-          <Header
-            headText="Generate"
-            tailText="Seed Phrase"
-            subText="Your seed phrase is the master key to your handles."
+          <ScreenHeader
+            title="Generate seed phrase"
+            subtitle="Your seed phrase is the master key to your handles."
+            onBack={() => navigation.goBack()}
           />
 
           <View style={styles.warningsContainer}>
@@ -153,10 +154,9 @@ export default function ({ navigation }: Props) {
         </>
       ) : (
         <>
-          <Header
-            headText="Back Up"
-            tailText="Your Seed Phrase"
-            subText="Write down these 12 words in order. They're the only way to recover your handles."
+          <ScreenHeader
+            title="Back up your seed phrase"
+            subtitle="Write down these 12 words in order. They're the only way to recover your handles."
           />
 
           <View style={styles.mnemonicContainer}>
@@ -179,35 +179,34 @@ const makeStyles = (c: Colors) =>
   StyleSheet.create({
     warningsContainer: {
       flex: 1,
-      gap: 30,
-      marginTop: 40,
+      gap: 22,
+      marginTop: 12,
     },
     warningItem: {
       flexDirection: "row",
       alignItems: "flex-start",
-      gap: 16,
+      gap: 14,
     },
     warningIcon: {
-      fontSize: 24,
-      marginTop: 2,
+      marginTop: 1,
     },
     warningContent: {
       flex: 1,
     },
     warningTitle: {
-      fontSize: 18,
-      fontWeight: "bold",
+      fontSize: 16,
+      fontWeight: "600",
       color: c.text,
-      marginBottom: 8,
+      marginBottom: 4,
     },
     warningText: {
-      fontSize: 16,
-      color: c.textFaint,
-      lineHeight: 22,
+      fontSize: 14,
+      color: c.textSecondary,
+      lineHeight: 20,
     },
     mnemonicContainer: {
       flex: 1,
-      marginTop: 20,
+      marginTop: 4,
     },
     wordsGrid: {
       flexDirection: "row",
@@ -217,22 +216,24 @@ const makeStyles = (c: Colors) =>
     },
     wordItem: {
       width: "48%",
-      backgroundColor: c.surface,
-      borderRadius: 8,
-      padding: 12,
-      marginBottom: 12,
+      backgroundColor: c.field,
+      borderRadius: 10,
+      paddingVertical: 13,
+      paddingHorizontal: 14,
+      marginBottom: 10,
       flexDirection: "row",
       alignItems: "center",
-      gap: 8,
+      gap: 10,
     },
     wordNumber: {
       fontSize: 14,
-      color: c.accent,
+      color: c.textMuted,
       fontWeight: "500",
+      minWidth: 18,
     },
     wordText: {
-      fontSize: 14,
-      fontWeight: "400",
+      fontSize: 15,
+      fontWeight: "500",
       color: c.text,
       flex: 1,
     },

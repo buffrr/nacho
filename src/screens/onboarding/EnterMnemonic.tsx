@@ -11,7 +11,7 @@ import { useStore } from "@/Store";
 import { validateMnemonic, xprvFromMnemonic, xpubFromXprv } from "@/keys";
 import { OnboardingStackParamList } from "@/Navigation";
 import { Button } from "@/ui/Button";
-import { Header } from "@/ui/Header";
+import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Layout } from "@/ui/Layout";
 import { Message } from "@/ui/Message";
 import { Colors, useTheme } from "@/theme";
@@ -77,23 +77,24 @@ export default function ({ navigation, route }: Props) {
 
   return (
     <Layout
+      padTop
       footer={
         <Button
-          text="Verify Seed Phrase"
+          text="Verify seed phrase"
           onPress={handleContinue}
           type="main"
           disabled={!isComplete}
         />
       }
     >
-      <Header
-        headText={isNew ? "Confirm" : "Enter"}
-        tailText="Seed Phrase"
-        subText={
+      <ScreenHeader
+        title={isNew ? "Confirm seed phrase" : "Enter seed phrase"}
+        subtitle={
           isNew
             ? "Enter your 12-word seed phrase to confirm you've saved it correctly."
             : "Enter your 12-word seed phrase to confirm you have the private key associated with the keystore."
         }
+        onBack={() => navigation.goBack()}
       />
 
       <View style={styles.inputContainer}>
@@ -133,24 +134,26 @@ const makeStyles = (c: Colors) =>
       flexDirection: "row",
       flexWrap: "wrap",
       justifyContent: "space-between",
-      marginTop: 20,
+      marginTop: 4,
       marginBottom: 30,
     },
     wordInputContainer: {
       width: "48%",
-      backgroundColor: c.surface,
-      borderRadius: 8,
-      padding: 12,
-      marginBottom: 12,
+      backgroundColor: c.field,
+      borderRadius: 10,
+      paddingVertical: 13,
+      paddingHorizontal: 14,
+      marginBottom: 10,
       flexDirection: "row",
       alignItems: "center",
-      gap: 8,
+      gap: 10,
       minWidth: 0,
     },
     wordInputNumber: {
       fontSize: 14,
-      color: c.accent,
+      color: c.textMuted,
       fontWeight: "500",
+      minWidth: 18,
     },
     wordInput: {
       flex: 1,

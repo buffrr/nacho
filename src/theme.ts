@@ -8,79 +8,151 @@ import React, {
 import { useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// Semantic color tokens mirroring the Nacho v2 Figma variable system.
 export type Colors = {
-  background: string;
-  surface: string;
+  // surfaces
+  background: string; // surface/screen
+  card: string; // surface/card
+  surface: string; // filled container (interim; use `card` + border for v2 tiles)
   surfaceSunken: string;
-  chip: string;
-  text: string;
-  textMuted: string;
+  field: string; // surface/field — input backgrounds
+  chip: string; // chip/bg
+  tileNeutral: string; // surface/tile-neutral — dark utility surface (gear, etc.)
+  // text
+  text: string; // text/primary
+  textSecondary: string; // text/secondary — row labels, subtitles (#73737a)
+  textMuted: string; // text/muted
   textFaint: string;
   placeholder: string;
-  border: string;
-  accent: string;
-  accentText: string;
+  iconDefault: string; // icon/default
+  accentText: string; // text/on-accent
+  // lines
+  border: string; // border/divider
+  borderWarm: string; // border/warm
+  // accent
+  accent: string; // accent/primary
   accentMuted: string;
   accentDisabledBg: string;
+  // danger
   danger: string;
   dangerText: string;
   dangerBg: string;
   dangerBgDisabled: string;
   dangerTextDisabled: string;
+  // success (maps to status green)
   success: string;
   successBg: string;
   successText: string;
   overlay: string;
+  // status pills (fg on bg)
+  statusGreenFg: string;
+  statusGreenBg: string;
+  statusAmberFg: string;
+  statusAmberBg: string;
+  statusBlueFg: string;
+  statusBlueBg: string;
+  statusGreyFg: string;
+  statusGreyBg: string;
+  // tile / avatar backgrounds
+  tileTealFg: string;
+  tileTealBg: string;
+  tileOrangeBg: string;
+  tileLavenderBg: string;
+  tileGoldBg: string;
+  tileBlueBg: string;
+  tilePinkBg: string;
 };
 
 export const darkColors: Colors = {
-  background: "#000000",
-  surface: "#1A1A1A",
-  surfaceSunken: "#0F0F0F",
-  chip: "#2A2A2A",
-  text: "#FFFFFF",
-  textMuted: "#8A8A8A",
-  textFaint: "#D6D6D6",
-  placeholder: "#4A4A4A",
-  border: "#333333",
-  accent: "#FF7B00",
+  background: "#0E0E11",
+  card: "#1B1B1F",
+  surface: "#1B1B1F",
+  surfaceSunken: "#27272B",
+  field: "#27272B",
+  chip: "#27272B",
+  tileNeutral: "#333339",
+  text: "#F2F2F6",
+  textSecondary: "#A2A2AC",
+  textMuted: "#80808A",
+  textFaint: "#9E9EA8",
+  placeholder: "#80808A",
+  iconDefault: "#B2B2BD",
   accentText: "#FFFFFF",
+  border: "#303037",
+  borderWarm: "#5F3D1C",
+  accent: "#FF7B00",
   accentMuted: "#B8571F",
-  accentDisabledBg: "#271300",
-  danger: "#FF4D4D",
-  dangerText: "#FF0000",
-  dangerBg: "#330000",
-  dangerBgDisabled: "#1A0000",
-  dangerTextDisabled: "#800000",
-  success: "#10B981",
-  successBg: "#003300",
-  successText: "#00FF00",
-  overlay: "rgba(0,0,0,0.7)",
+  accentDisabledBg: "#3D291C",
+  danger: "#FF6B6B",
+  dangerText: "#FF6B6B",
+  dangerBg: "#321C1C",
+  dangerBgDisabled: "#2A1616",
+  dangerTextDisabled: "#7A3B3B",
+  success: "#1B8C49",
+  successBg: "#1C2C20",
+  successText: "#3FBE6E",
+  overlay: "rgba(0,0,0,0.6)",
+  statusGreenFg: "#3FBE6E",
+  statusGreenBg: "#1C2C20",
+  statusAmberFg: "#D89A3C",
+  statusAmberBg: "#44331C",
+  statusBlueFg: "#5A8FE6",
+  statusBlueBg: "#1C2535",
+  statusGreyFg: "#9E9EA8",
+  statusGreyBg: "#1C1D20",
+  tileTealFg: "#2FB79A",
+  tileTealBg: "#1C352E",
+  tileOrangeBg: "#3D291C",
+  tileLavenderBg: "#221C30",
+  tileGoldBg: "#40381C",
+  tileBlueBg: "#1C2739",
+  tilePinkBg: "#321C28",
 };
 
 export const lightColors: Colors = {
   background: "#FFFFFF",
-  surface: "#F2F2F2",
-  surfaceSunken: "#EAEAEA",
-  chip: "#E5E5E5",
-  text: "#111111",
-  textMuted: "#6B6B6B",
-  textFaint: "#555555",
-  placeholder: "#A0A0A0",
-  border: "#E3E3E3",
-  accent: "#FF7B00",
+  card: "#FFFFFF",
+  surface: "#F2F3F6",
+  surfaceSunken: "#E9EAED",
+  field: "#F2F3F6",
+  chip: "#E5E6E9",
+  tileNeutral: "#0E0E12",
+  text: "#0E0E12",
+  textSecondary: "#6B6B75",
+  textMuted: "#94949E",
+  textFaint: "#6B6B73",
+  placeholder: "#B8B8BF",
+  iconDefault: "#B8B8BF",
   accentText: "#FFFFFF",
+  border: "#E5E7EA",
+  borderWarm: "#F6D3B0",
+  accent: "#FF7B00",
   accentMuted: "#B8571F",
   accentDisabledBg: "#FFD9B3",
-  danger: "#E53935",
-  dangerText: "#D32F2F",
+  danger: "#E5484D",
+  dangerText: "#D3352B",
   dangerBg: "#FDECEC",
   dangerBgDisabled: "#F7DADA",
   dangerTextDisabled: "#E9A0A0",
-  success: "#10B981",
-  successBg: "#E7F7EF",
-  successText: "#0A7D4B",
+  success: "#1B8C49",
+  successBg: "#E5F6EA",
+  successText: "#1B8C49",
   overlay: "rgba(0,0,0,0.4)",
+  statusGreenFg: "#1B8C49",
+  statusGreenBg: "#E5F6EA",
+  statusAmberFg: "#B8730D",
+  statusAmberBg: "#FEECD4",
+  statusBlueFg: "#2567CA",
+  statusBlueBg: "#E4EEFE",
+  statusGreyFg: "#6B6B73",
+  statusGreyBg: "#EAEBEE",
+  tileTealFg: "#088C70",
+  tileTealBg: "#D9F4EC",
+  tileOrangeBg: "#FCE7D9",
+  tileLavenderBg: "#ECE6FB",
+  tileGoldBg: "#FAF1D4",
+  tileBlueBg: "#E0ECFE",
+  tilePinkBg: "#FCE5F2",
 };
 
 export type ThemeMode = "system" | "light" | "dark";

@@ -9,6 +9,10 @@ interface LayoutProps {
   footer?: ReactNode;
   overlay?: boolean;
   scrollable?: boolean;
+  // Headerless tab screens (no native nav header) need explicit top space to
+  // clear the status bar / window edge. On native the safe-area inset already
+  // covers this; on web there is no inset, so fall back to a fixed gap.
+  padTop?: boolean;
 }
 
 export function Layout({
@@ -16,9 +20,11 @@ export function Layout({
   footer,
   overlay = false,
   scrollable = true,
+  padTop = false,
 }: LayoutProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const topInset = padTop ? Math.max(insets.top, 20) : insets.top;
 
   const content = scrollable ? (
     <KeyboardAwareScrollView
@@ -38,7 +44,7 @@ export function Layout({
     <View
       style={[
         styles.container,
-        { paddingTop: insets.top, backgroundColor: colors.background },
+        { paddingTop: topInset, backgroundColor: colors.background },
       ]}
     >
       {overlay && (

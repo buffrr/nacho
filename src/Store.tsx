@@ -351,6 +351,9 @@ type StoreContextType = {
   ) => Promise<void>;
   createHandle: (handle: string) => Promise<void>;
   nextScriptPubkey: () => string | null;
+  // The handle entry we *would* derive next, computed without persisting — lets
+  // a purchase flow derive/show a key before committing the handle to the store.
+  nextHandleData: () => HandleData | null;
   importKeypair: (handle: string, privkeyHex: string) => Promise<void>;
   removeHandle: (handle: string) => Promise<void>;
   setHandleCertData: (handle: string, cert: CertData | null) => Promise<void>;
@@ -456,6 +459,13 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       return null;
     }
     return p2trScriptFromPub(pubFromPath(xpub, nextDerivedPath(handles)));
+  };
+
+  const nextHandleData = (): HandleData | null => {
+    if (handles === null) {
+      return null;
+    }
+    return { source: "derived", path: nextDerivedPath(handles) };
   };
 
   const importKeypair = async (
@@ -601,6 +611,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         setupKeystore,
         createHandle,
         nextScriptPubkey,
+        nextHandleData,
         importKeypair,
         removeHandle,
         setHandleCertData,

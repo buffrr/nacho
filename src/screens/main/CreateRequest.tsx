@@ -6,7 +6,7 @@ import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { RouteProp } from "@react-navigation/native";
 import { Layout } from "@/ui/Layout";
-import { Header } from "@/ui/Header";
+import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 import {
@@ -157,33 +157,20 @@ export default function CreateRequest({ route, navigation }: Props) {
 
   return (
     <Layout
+      padTop
       footer={
-        <>
-          <Button
-            text={buttonText}
-            onPress={submit}
-            type="main"
-            disabled={!canSubmit}
-          />
-          <Button
-            text="Redeem a code"
-            onPress={() => navigation.navigate("Redeem", {})}
-            type="secondary"
-          />
-          <Button
-            text="Import existing private key"
-            onPress={() =>
-              navigation.navigate("ImportKeypair", valid ? { handle } : {})
-            }
-            type="secondary"
-          />
-        </>
+        <Button
+          text={buttonText}
+          onPress={submit}
+          type="main"
+          disabled={!canSubmit}
+        />
       }
     >
-      <Header
-        headText="Add"
-        tailText="Handle"
-        subText="Enter a handle to add it to your keystore and derive its key."
+      <ScreenHeader
+        title="Create a request"
+        subtitle="Enter a handle to add it to your keystore and derive its key."
+        onBack={() => navigation.goBack()}
       />
       <TextInput
         value={handle}
@@ -207,11 +194,10 @@ export default function CreateRequest({ route, navigation }: Props) {
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
     input: {
-      backgroundColor: c.surface,
-      borderWidth: 1,
-      borderColor: c.border,
-      borderRadius: 12,
-      padding: 16,
+      backgroundColor: c.field,
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 17,
       fontSize: 16,
       color: c.text,
       fontFamily: "monospace",

@@ -61,5 +61,17 @@ target 'nacho' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
+
+    # Workaround for @spacesprotocol/react-native-libveritas (as of 0.3.3): its
+    # vendored xcframework ships the static lib as `liblibveritas_uniffi.a`
+    # (double `lib`), but CocoaPods emits `-lveritas_uniffi` (which searches for
+    # `libveritas_uniffi.a`) → `ld: library 'veritas_uniffi' not found`.
+    # Point the flag at the library's actual name instead of renaming the file.
+    # Remove once upstream names the lib target `veritas_uniffi`.
+    Dir.glob(File.join(installer.sandbox.root, 'Target Support Files', '**', '*.xcconfig')).each do |xcconfig|
+      contents = File.read(xcconfig)
+      fixed = contents.gsub('-l"veritas_uniffi"', '-l"libveritas_uniffi"')
+      File.write(xcconfig, fixed) unless fixed == contents
+    end
   end
 end

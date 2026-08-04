@@ -40,7 +40,8 @@
           "recordAudioAndroid": false
         }
       ],
-      "expo-iap"
+      "expo-iap",
+      "expo-font"
     ],
     "extra": {
       "eas": {

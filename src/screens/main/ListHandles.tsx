@@ -1,66 +1,34 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  TextInput,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HandlesStackParamList } from "@/Navigation";
 import { HandleData, useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
+import { scriptForHandle } from "@/keys";
+import { scriptMatchesStatus } from "@/handleStatus";
+import { handlePill, avatarColors } from "@/handleTile";
 import { Layout } from "@/ui/Layout";
 import { BottomNav } from "@/ui/BottomNav";
-import { Badge } from "@/ui/Badge";
-import { scriptForHandle } from "@/keys";
-import {
-  fetchProposedHandles,
-  fetchHandlesStatuses,
-  formatPrice,
-  HandleStatus,
-} from "@/api";
-import {
-  getHandleBadge,
-  sovereigntyBadge,
-  scriptMatchesStatus,
-  StatusBadge,
-  STATUS_COLOR,
-} from "@/handleStatus";
+import { HandleTile } from "@/ui/HandleTile";
+import { Plus, ShoppingBag } from "@/ui/icons";
+import { fetchHandlesStatuses, HandleStatus } from "@/api";
 
-type ListHandlesNavigationProp = NativeStackNavigationProp<
-  HandlesStackParamList,
-  "ListHandles"
->;
+type Nav = NativeStackNavigationProp<HandlesStackParamList, "ListHandles">;
 
-interface Props {
-  navigation: ListHandlesNavigationProp;
-}
-
-export default function ListHandles({ navigation }: Props) {
-  const { xpub, handles } = useStore();
+export default function ListHandles({ navigation }: { navigation: Nav }) {
+  const { handles, xpub } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [proposedHandles, setProposedHandles] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<Record<string, HandleStatus>>({});
 
-  useEffect(() => {
-    const timeoutId = setTimeout(async () => {
-      if (searchQuery) {
-        const results = await fetchProposedHandles(searchQuery);
-        setProposedHandles(results);
-      } else {
-        setProposedHandles([]);
-      }
-    }, 300);
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
-
-  const handlesMap = handles || {};
-  const handlesList = Object.entries(handlesMap);
+  const handlesList = Object.entries(handles || {});
   const handlesKey = handlesList.map(([name]) => name).join(",");
 
   useFocusEffect(
@@ -76,9 +44,7 @@ export default function ListHandles({ navigation }: Props) {
         if (!active) return;
         setStatuses((prev) => {
           const next = { ...prev };
-          for (const status of results) {
-            next[status.handle] = status;
-          }
+          for (const s of results) next[s.handle] = s;
           return next;
         });
       })();
@@ -88,170 +54,70 @@ export default function ListHandles({ navigation }: Props) {
     }, [handlesKey]),
   );
 
-  // Statuses (with price) for the proposed search results.
-  useEffect(() => {
-    if (proposedHandles.length === 0) {
-      return;
-    }
-    let active = true;
-    (async () => {
-      const results = await fetchHandlesStatuses(proposedHandles);
-      if (!active) return;
-      setStatuses((prev) => {
-        const next = { ...prev };
-        for (const status of results) {
-          next[status.handle] = status;
-        }
-        return next;
-      });
-    })();
-    return () => {
-      active = false;
-    };
-  }, [proposedHandles]);
-
-  const badgeFor = (handleName: string, handleData: HandleData): StatusBadge => {
+  const pillFor = (name: string, handleData: HandleData) => {
     const ourScript = xpub ? scriptForHandle(xpub, handleData) : null;
-    // Prefer the cached certrelay resolution once the handle is live.
-    const resolution = handleData.resolution;
-    if (resolution?.found) {
-      if (
-        resolution.scriptPubkey &&
-        ourScript &&
-        resolution.scriptPubkey !== ourScript
-      ) {
-        return { label: "Different key", color: STATUS_COLOR.red };
-      }
-      return sovereigntyBadge(resolution.sovereignty);
-    }
-    const status = statuses[handleName];
+    const status = statuses[name];
     const scriptMatches =
       status && ourScript ? scriptMatchesStatus(status, ourScript) : null;
-    return getHandleBadge({
-      status: status?.status ?? null,
-      hasCert: !!handleData.cert,
-      scriptMatches,
-      price: status?.price,
-    });
-  };
-  const combinedHandles = [
-    ...(searchQuery
-      ? handlesList.filter(([handleName]) => handleName.includes(searchQuery))
-      : handlesList),
-    ...proposedHandles
-      .filter((proposedHandle) => !handles || !handlesMap[proposedHandle])
-      .map((handle) => [handle, null] as [string, null]),
-  ];
-
-  const renderItem = ({ item }: { item: [string, HandleData | null] }) => {
-    const [handleName, handleData] = item;
-
-    if (handleData === null) {
-      return renderProposedHandle({ item: handleName });
-    } else {
-      return renderHandle({ item: [handleName, handleData] });
-    }
-  };
-
-  const renderHandleName = (name: string) => {
-    const parts = name.split("@");
-    if (parts.length === 2) {
-      return (
-        <>
-          <Text style={styles.handleSubPart}>{parts[0]}</Text>
-          <Text style={styles.handleSpacePart}>@{parts[1]}</Text>
-        </>
-      );
-    }
-    return <Text style={styles.handleSpacePart}>{name}</Text>;
-  };
-
-  const renderMeta = (badge: StatusBadge) => (
-    <View style={styles.metaCol}>
-      <Badge label={badge.label} color={badge.color} />
-      {badge.price !== undefined && (
-        <Text style={styles.price}>{formatPrice(badge.price)}</Text>
-      )}
-    </View>
-  );
-
-  const renderHandle = ({
-    item,
-  }: {
-    item: [string, HandleData];
-  }) => {
-    const [handleName, handleData] = item;
-    const badge = badgeFor(handleName, handleData);
-
-    return (
-      <TouchableOpacity
-        onPress={() =>
-          navigation.navigate("ShowHandle", { handle: handleName })
-        }
-        style={styles.handleItem}
-      >
-        <View style={styles.handleContent}>
-          <Text style={styles.handleName}>{renderHandleName(handleName)}</Text>
-          {renderMeta(badge)}
-        </View>
-      </TouchableOpacity>
+    const resolution = handleData.resolution;
+    const keyMismatch = !!(
+      resolution?.found &&
+      resolution.scriptPubkey &&
+      ourScript &&
+      resolution.scriptPubkey !== ourScript
     );
+    return handlePill(colors, {
+      resolution,
+      keyMismatch,
+      hasCert: !!handleData.certRef || !!handleData.cert,
+      status: status?.status,
+      scriptMatches,
+    });
   };
 
-  const renderProposedHandle = ({ item }: { item: string }) => {
-    const status = statuses[item];
-    const badge = getHandleBadge({
-      status: status?.status ?? "available",
-      hasCert: false,
-      scriptMatches: null,
-      price: status?.price,
-    });
+  const renderItem = ({ item }: { item: [string, HandleData] }) => {
+    const [name, handleData] = item;
     return (
-      <TouchableOpacity
-        style={styles.proposedHandleItem}
-        onPress={() =>
-          navigation.navigate("CreateRequest", { initialHandle: item })
-        }
-      >
-        <View style={styles.handleContent}>
-          <Text style={styles.handleName}>{renderHandleName(item)}</Text>
-          {renderMeta(badge)}
-        </View>
-      </TouchableOpacity>
+      <HandleTile
+        handle={name}
+        pill={pillFor(name, handleData)}
+        avatar={avatarColors(colors, name)}
+        onPress={() => navigation.navigate("ShowHandle", { handle: name })}
+      />
     );
   };
 
   return (
-    <Layout scrollable={false} footer={<BottomNav active="handles" />}>
-      <View style={styles.searchContainer}>
-        <TextInput
-          value={searchQuery}
-          onChangeText={(text) =>
-            setSearchQuery(text.toLowerCase().replace(/[^a-z0-9@.\-]/g, ""))
-          }
-          placeholder="Search handles"
-          placeholderTextColor={colors.placeholder}
-          style={styles.searchInput}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+    <Layout scrollable={false} padTop footer={<BottomNav active="handles" />}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Your handles</Text>
+        <TouchableOpacity
+          style={styles.add}
+          onPress={() => navigation.navigate("RegisterHub")}
+          accessibilityLabel="Add handle"
+        >
+          <Plus size={20} color={colors.accentText} />
+        </TouchableOpacity>
       </View>
 
       <FlatList
-        data={combinedHandles}
+        data={handlesList}
         renderItem={renderItem}
         keyExtractor={(item) => item[0]}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {searchQuery
-                ? "No handles found"
-                : "No handles yet. Tap + to create one."}
-            </Text>
-          </View>
-        }
-        style={styles.handlesList}
         showsVerticalScrollIndicator={false}
+        style={styles.list}
+        ListEmptyComponent={
+          <Text style={styles.empty}>No handles yet. Tap + to add one.</Text>
+        }
+        ListFooterComponent={
+          <TouchableOpacity
+            style={styles.shopButton}
+            onPress={() => navigation.navigate("Shop")}
+          >
+            <ShoppingBag size={18} color={colors.text} />
+            <Text style={styles.shopText}>Shop handles</Text>
+          </TouchableOpacity>
+        }
       />
     </Layout>
   );
@@ -259,68 +125,57 @@ export default function ListHandles({ navigation }: Props) {
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    searchContainer: {
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 4,
       marginBottom: 20,
     },
-    searchInput: {
-      backgroundColor: c.surface,
-      borderWidth: 1,
-      borderColor: c.border,
-      borderRadius: 12,
-      padding: 16,
-      fontSize: 16,
-      color: c.text,
-      fontFamily: "monospace",
-      // @ts-ignore - web-only style to remove focus outline
-      outlineStyle: "none",
-    } as any,
-    handlesList: {
+    title: {
       flex: 1,
-    },
-    handleItem: {
-      backgroundColor: c.surface,
-      borderRadius: 12,
-      marginBottom: 12,
-      padding: 16,
-    },
-    proposedHandleItem: {
-      backgroundColor: c.surface,
-      borderRadius: 12,
-      marginBottom: 12,
-      padding: 16,
-    },
-    handleContent: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-    },
-    handleName: {
-      fontSize: 18,
-      fontWeight: "400",
-      flex: 1,
-    },
-    handleSubPart: {
+      fontSize: 24,
+      fontWeight: "700",
       color: c.text,
     },
-    handleSpacePart: {
-      color: c.accent,
-    },
-    metaCol: {
-      alignItems: "flex-end",
-      marginLeft: 8,
-      gap: 6,
-    },
-    price: {
-      color: c.textFaint,
-      fontSize: 13,
-      fontWeight: "600",
-    },
-    emptyContainer: {
-      padding: 40,
+    add: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: c.accent,
       alignItems: "center",
+      justifyContent: "center",
     },
-    emptyText: {
+    list: {
+      flex: 1,
+    },
+    empty: {
       color: c.textMuted,
+      fontSize: 15,
+      textAlign: "center",
+      marginTop: 40,
+      marginBottom: 20,
+    },
+    shopButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.borderWarm,
+      borderRadius: 14,
+      height: 54,
+      marginTop: 4,
+      shadowColor: "#000",
+      shadowOpacity: 0.06,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 2,
+    },
+    shopText: {
       fontSize: 16,
+      fontWeight: "500",
+      color: c.text,
     },
   });

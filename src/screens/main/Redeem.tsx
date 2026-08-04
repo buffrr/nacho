@@ -5,7 +5,7 @@ import { HandlesStackParamList } from "@/Navigation";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
-import { Header } from "@/ui/Header";
+import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 import { claimCode } from "@/api";
@@ -57,6 +57,7 @@ export default function Redeem({ route, navigation }: Props) {
 
   return (
     <Layout
+      padTop
       footer={
         <Button
           text={isLoading ? "Redeeming…" : "Redeem"}
@@ -66,10 +67,10 @@ export default function Redeem({ route, navigation }: Props) {
         />
       }
     >
-      <Header
-        headText="Redeem"
-        tailText="Code"
-        subText="Bought a handle on the web? Enter your claim code to bind it to a new key."
+      <ScreenHeader
+        title="Redeem code"
+        subtitle="Bought a handle on the web? Enter your claim code to bind it to a new key."
+        onBack={() => navigation.goBack()}
       />
       <TextInput
         value={code}
@@ -92,14 +93,14 @@ export default function Redeem({ route, navigation }: Props) {
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
     input: {
-      backgroundColor: c.surface,
-      borderWidth: 1,
-      borderColor: c.border,
-      borderRadius: 12,
-      padding: 16,
+      backgroundColor: c.field,
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 17,
       fontSize: 16,
       color: c.text,
       fontFamily: "monospace",
+      letterSpacing: 1,
       // @ts-ignore - web-only style to remove focus outline
       outlineStyle: "none",
     } as any,

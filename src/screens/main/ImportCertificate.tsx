@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Platform } from "react-native";
-import { Camera, CameraView } from "expo-camera";
+import React, { useState, useEffect, useMemo } from "react";
+import { View, StyleSheet } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HandlesStackParamList } from "@/Navigation";
@@ -8,13 +8,14 @@ import { open } from "@/file";
 import { useStore } from "@/Store";
 import { scriptForHandle } from "@/keys";
 import { isCert, extractCertData } from "@/cert";
+import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
-import { Header } from "@/ui/Header";
+import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
+import { QrScanner } from "@/ui/QrScanner";
 
 type ImportError =
-  | "cameraPermissionFailed"
   | "downloadFailed"
   | "invalidJson"
   | "fileLoadFailed"
@@ -40,30 +41,12 @@ interface Props {
 export default function ImportCertificate({ route, navigation }: Props) {
   const { handle } = route.params;
   const { xpub, handles, setHandleCertData } = useStore();
-  const [hasCameraPermission, setHasCameraPermission] = useState<
-    boolean | null
-  >(null);
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const isFocused = useIsFocused();
   const [error, setError] = useState<ImportError>(null);
-  const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
-
-  useEffect(() => {
-    const requestCameraPermission = async () => {
-      if (Platform.OS === "web") {
-        setHasCameraPermission(true);
-        return;
-      }
-
-      try {
-        const { status } = await Camera.requestCameraPermissionsAsync();
-        setHasCameraPermission(status === "granted");
-      } catch (error) {
-        setHasCameraPermission(false);
-        setError("cameraPermissionFailed");
-      }
-    };
-
-    requestCameraPermission();
-  }, []);
+  const [busy, setBusy] = useState(false);
+  const [scanNonce, setScanNonce] = useState(0);
 
   useEffect(() => {
     if (!error) return;
@@ -73,12 +56,10 @@ export default function ImportCertificate({ route, navigation }: Props) {
 
   const getMessage = (error: ImportError): string => {
     switch (error) {
-      case "cameraPermissionFailed":
-        return "Failed to request camera permission";
       case "downloadFailed":
         return "Failed to download data from URL";
       case "invalidJson":
-        return "Invalid JSON format";
+        return "That QR code isn't a certificate";
       case "fileLoadFailed":
         return "Failed to load file";
       case "invalidCert":
@@ -92,19 +73,18 @@ export default function ImportCertificate({ route, navigation }: Props) {
     }
   };
 
-  const handleBarCodeScanned = async ({
-    data,
-  }: {
-    type: string;
-    data: string;
-  }) => {
-    if (data === lastScannedCode) return;
-    setLastScannedCode(data);
-    if (data.startsWith("http://") || data.startsWith("https://")) {
-      await downloadAndApplyJson(data);
-    } else {
-      await applyJson(data);
-    }
+  const onScan = (data: string) => {
+    if (busy) return;
+    setBusy(true);
+    const done = () => {
+      setBusy(false);
+      setScanNonce((n) => n + 1); // re-arm the scanner for another attempt
+    };
+    const p =
+      data.startsWith("http://") || data.startsWith("https://")
+        ? downloadAndApplyJson(data)
+        : applyJson(data);
+    p.finally(done);
   };
 
   const downloadAndApplyJson = async (url: string) => {
@@ -168,85 +148,69 @@ export default function ImportCertificate({ route, navigation }: Props) {
 
   return (
     <Layout
+      padTop
       footer={
         <Button
-          text="Upload Certificate File"
+          text="Upload certificate file"
           onPress={handleFileImport}
           type="main"
         />
       }
     >
-      <Header
-        headText="Import"
-        tailText="Certificate"
-        subText={`Scan a QR code or upload a file to add the certificate for ${handle}.`}
+      <ScreenHeader
+        title="Import certificate"
+        subtitle={`Scan a QR code or upload a file to add the certificate for ${handle}.`}
+        onBack={() => navigation.goBack()}
       />
 
-      {hasCameraPermission && (
-        <View style={styles.uploadArea}>
-          <View style={styles.cameraContainer}>
-            <CameraView
-              style={styles.camera}
-              facing="back"
-              onBarcodeScanned={handleBarCodeScanned}
-              barcodeScannerSettings={{
-                barcodeTypes: ["qr"],
-              }}
-            />
-            <View style={styles.cameraOverlay}>
-              <View style={styles.scanArea} />
-              <Text style={styles.scanText}>
-                Position QR code within the frame
-              </Text>
-            </View>
-          </View>
+      <View style={styles.frame}>
+        <View style={styles.camera}>
+          <QrScanner
+            key={scanNonce}
+            active={isFocused && !busy}
+            onScan={onScan}
+            onError={(m) => setError(m as ImportError)}
+          />
         </View>
-      )}
+        <View style={[styles.corner, styles.tl]} />
+        <View style={[styles.corner, styles.tr]} />
+        <View style={[styles.corner, styles.bl]} />
+        <View style={[styles.corner, styles.br]} />
+      </View>
 
       {error && <Message message={getMessage(error)} type="error" />}
     </Layout>
   );
 }
 
-const styles = StyleSheet.create({
-  uploadArea: {
-    flex: 1,
-    marginBottom: 20,
-  },
-  cameraContainer: {
-    flex: 1,
-    minHeight: 400,
-    position: "relative",
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  camera: {
-    flex: 1,
-  },
-  cameraOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  scanArea: {
-    width: 250,
-    height: 250,
-    borderWidth: 2,
-    borderColor: "#fff",
-    borderRadius: 12,
-    backgroundColor: "transparent",
-  },
-  scanText: {
-    color: "#fff",
-    fontSize: 16,
-    marginTop: 16,
-    textAlign: "center",
-    backgroundColor: "rgba(0,0,0,0.7)",
-    padding: 12,
-    borderRadius: 8,
-  },
-});
+const BRACKET = 34;
+const THICK = 4;
+
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    frame: {
+      alignSelf: "center",
+      width: 295,
+      height: 295,
+      borderRadius: 24,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 4,
+    },
+    camera: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: 24,
+      overflow: "hidden",
+      backgroundColor: c.tileNeutral,
+    },
+    corner: {
+      position: "absolute",
+      width: BRACKET,
+      height: BRACKET,
+      borderColor: c.accent,
+    },
+    tl: { top: 16, left: 16, borderTopWidth: THICK, borderLeftWidth: THICK, borderTopLeftRadius: 14 },
+    tr: { top: 16, right: 16, borderTopWidth: THICK, borderRightWidth: THICK, borderTopRightRadius: 14 },
+    bl: { bottom: 16, left: 16, borderBottomWidth: THICK, borderLeftWidth: THICK, borderBottomLeftRadius: 14 },
+    br: { bottom: 16, right: 16, borderBottomWidth: THICK, borderRightWidth: THICK, borderBottomRightRadius: 14 },
+  });

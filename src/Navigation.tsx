@@ -3,7 +3,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { HandlesMap, useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
-import { SearchButton } from "@/ui/icons";
+import { RecordsDraftProvider } from "@/RecordsDraft";
 import OnboardingHome from "./screens/onboarding/Home";
 import ShowMnemonic from "./screens/onboarding/ShowMnemonic";
 import ImportKeystore from "./screens/onboarding/ImportKeystore";
@@ -17,6 +17,10 @@ import Resolve from "./screens/main/Resolve";
 import ImportKeypair from "./screens/main/ImportKeypair";
 import Redeem from "./screens/main/Redeem";
 import RevealSeed from "./screens/main/RevealSeed";
+import Shop from "./screens/main/Shop";
+import RegisterHub from "./screens/main/RegisterHub";
+import EditRecord from "./screens/main/EditRecord";
+import VerifyAnchor from "./screens/main/VerifyAnchor";
 
 export type RootStackParamList = {
   Main: undefined;
@@ -36,14 +40,18 @@ const OnboardingStack = createNativeStackNavigator<OnboardingStackParamList>();
 
 export type HandlesStackParamList = {
   ListHandles: undefined;
+  Shop: undefined;
+  Resolve: { prefill?: string } | undefined;
+  RegisterHub: undefined;
   ShowHandle: { handle: string };
   CreateRequest: { initialHandle?: string };
   ImportKeypair: { handle?: string };
   Redeem: { code?: string };
   ImportCertificate: { handle: string };
   Settings: undefined;
-  Resolve: undefined;
+  VerifyAnchor: undefined;
   RevealSeed: undefined;
+  EditRecord: { handle: string; index?: number };
 };
 
 const HandlesStack = createNativeStackNavigator<HandlesStackParamList>();
@@ -77,17 +85,17 @@ function OnboardingNavigator() {
       <OnboardingStack.Screen
         name="ShowMnemonic"
         component={ShowMnemonic}
-        options={{ title: "Seed Phrase" }}
+        options={{ headerShown: false }}
       />
       <OnboardingStack.Screen
         name="ImportKeystore"
         component={ImportKeystore}
-        options={{ title: "Keystore" }}
+        options={{ headerShown: false }}
       />
       <OnboardingStack.Screen
         name="EnterMnemonic"
         component={EnterMnemonic}
-        options={{ title: "Seed Phrase" }}
+        options={{ headerShown: false }}
       />
     </OnboardingStack.Navigator>
   );
@@ -96,64 +104,86 @@ function OnboardingNavigator() {
 function MainNavigator() {
   const { colors } = useTheme();
   return (
-    <HandlesStack.Navigator
-      screenOptions={makeScreenOptions(colors)}
-      initialRouteName="ListHandles"
-    >
+    <RecordsDraftProvider>
+      <HandlesStack.Navigator
+        screenOptions={makeScreenOptions(colors)}
+        initialRouteName="ListHandles"
+      >
       <HandlesStack.Screen
         name="ListHandles"
         component={ListHandles}
-        options={({ navigation }) => ({
-          title: "Handles",
-          headerRight: () => (
-            <SearchButton onPress={() => navigation.navigate("Resolve")} />
-          ),
-        })}
+        options={{ headerShown: false, animation: "none" }}
+      />
+      <HandlesStack.Screen
+        name="Shop"
+        component={Shop}
+        options={{ headerShown: false, animation: "none" }}
+      />
+      <HandlesStack.Screen
+        name="RegisterHub"
+        component={RegisterHub}
+        options={{
+          headerShown: false,
+          presentation: "transparentModal",
+          animation: "none",
+          contentStyle: { backgroundColor: "transparent" },
+        }}
       />
       <HandlesStack.Screen
         name="ShowHandle"
         component={ShowHandle}
-        options={{ title: "Handle" }}
+        options={{ headerShown: false }}
       />
       <HandlesStack.Screen
         name="CreateRequest"
         component={CreateRequest}
-        options={{ title: "Add Handle" }}
+        options={{ headerShown: false }}
         initialParams={{}}
       />
       <HandlesStack.Screen
         name="ImportKeypair"
         component={ImportKeypair}
-        options={{ title: "Import Keypair" }}
+        options={{ headerShown: false }}
         initialParams={{}}
       />
       <HandlesStack.Screen
         name="Redeem"
         component={Redeem}
-        options={{ title: "Redeem Code" }}
+        options={{ headerShown: false }}
         initialParams={{}}
       />
       <HandlesStack.Screen
         name="ImportCertificate"
         component={ImportCertificate}
-        options={{ title: "Import Certificate" }}
+        options={{ headerShown: false }}
       />
       <HandlesStack.Screen
         name="Settings"
         component={Settings}
-        options={{ title: "Settings" }}
+        options={{ headerShown: false, animation: "none" }}
+      />
+      <HandlesStack.Screen
+        name="VerifyAnchor"
+        component={VerifyAnchor}
+        options={{ headerShown: false }}
       />
       <HandlesStack.Screen
         name="RevealSeed"
         component={RevealSeed}
-        options={{ title: "Seed Phrase" }}
+        options={{ headerShown: false }}
       />
-      <HandlesStack.Screen
-        name="Resolve"
-        component={Resolve}
-        options={{ title: "Resolve" }}
-      />
-    </HandlesStack.Navigator>
+        <HandlesStack.Screen
+          name="Resolve"
+          component={Resolve}
+          options={{ headerShown: false, animation: "none" }}
+        />
+        <HandlesStack.Screen
+          name="EditRecord"
+          component={EditRecord}
+          options={{ headerShown: false }}
+        />
+      </HandlesStack.Navigator>
+    </RecordsDraftProvider>
   );
 }
 
