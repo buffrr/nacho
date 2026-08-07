@@ -1,46 +1,23 @@
-// Native cert store — persists each handle's .spacecert in a dedicated folder
-// under the app document directory (durable, included in iOS device backups).
-// The web build uses certStore.web.ts (IndexedDB) instead.
-import { File, Directory, Paths } from "expo-file-system";
-
-function certsDir(): Directory {
-  const dir = new Directory(Paths.document, "certs");
-  if (!dir.exists) {
-    dir.create();
-  }
-  return dir;
-}
-
-function certFile(handle: string): File {
-  return new File(certsDir(), `${handle}.spacecert`);
-}
+// Certificate store — each handle's .spacecert bytes, kept in the single SQLite
+// database (src/db.ts) so they travel with the one-file backup. Native and web
+// now share this store (the old filesystem/IndexedDB split is gone).
+import { certSet, certGet, certHas, certDelete } from "@/db";
 
 export async function saveCert(
   handle: string,
   bytes: Uint8Array,
 ): Promise<void> {
-  const file = certFile(handle);
-  if (file.exists) {
-    file.delete();
-  }
-  file.write(bytes);
+  await certSet(handle, bytes);
 }
 
 export async function loadCert(handle: string): Promise<Uint8Array | null> {
-  const file = certFile(handle);
-  if (!file.exists) {
-    return null;
-  }
-  return await file.bytes();
+  return certGet(handle);
 }
 
 export async function hasCert(handle: string): Promise<boolean> {
-  return certFile(handle).exists;
+  return certHas(handle);
 }
 
 export async function deleteCert(handle: string): Promise<void> {
-  const file = certFile(handle);
-  if (file.exists) {
-    file.delete();
-  }
+  await certDelete(handle);
 }

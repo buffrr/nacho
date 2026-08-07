@@ -8,6 +8,7 @@ import {
   ResolvedHandle,
   EditableRecord,
 } from "@/fabricResolver";
+import { activeSeeds, loadNetConfig, onNetConfigChange } from "@/config";
 
 // Unlike `@spacesprotocol/fabric-web/signing`, the native signing module only
 // re-exports the primitives and doesn't auto-register the Schnorr signer, so
@@ -15,6 +16,8 @@ import {
 Fabric.registerSigner(signSchnorr);
 import {
   applyDefaultSemiTrust,
+  loadTrustState,
+  saveTrustState,
   trustStateOf,
   trustedAnchorOf,
   tipHeightOf,
@@ -29,15 +32,44 @@ let client: Fabric | null = null;
 
 function getClient(): Fabric {
   if (!client) {
-    client = new Fabric();
+    // Seeds come from the user-editable network config (mainnet or dev set).
+    // Empty → let the SDK use its built-in DEFAULT_SEEDS.
+    const seeds = activeSeeds();
+    client = new Fabric(seeds ? { seeds } : undefined);
   }
   return client;
 }
 
+// Restore any persisted trust state (Safety ID + anchors) once, then refresh
+// the semi-trusted anchor to the current tip (persisting if it moved). Memoized
+// so it runs a single time per session; awaited before every resolve. Loads the
+// network config first so the client is built with the right seeds.
+let initPromise: Promise<void> | null = null;
+function ensureInit(): Promise<void> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      await loadNetConfig();
+      const c = getClient();
+      await loadTrustState(c);
+      await applyDefaultSemiTrust(c, () => saveTrustState(c));
+    })();
+  }
+  return initPromise;
+}
+
+// Rebuild the client + trust caches when the network config changes (dev-mode
+// toggle or edited endpoints), so the next resolve uses the new seeds/anchors.
+function resetFabric(): void {
+  client = null;
+  initPromise = null;
+  resetTrustCache();
+}
+onNetConfigChange(resetFabric);
+
 export async function resolveHandle(
   handle: string,
 ): Promise<ResolvedHandle | null> {
-  await applyDefaultSemiTrust(getClient());
+  await ensureInit();
   const resolved = await resolveWith(getClient(), handle);
   // TEMP diagnostic: why does native badge grace@key as "unverified" while web
   // returns "none"? Logs the badge, pinned trust state, and whether the native
@@ -58,9 +90,24 @@ export async function resolveHandle(
   return resolved;
 }
 
-// Ensure the default semi-trusted anchor is pinned, returning it for display.
-export function ensureSemiTrust(): Promise<TrustAnchor | null> {
-  return applyDefaultSemiTrust(getClient());
+// Resolve with a throwaway client so the SDK's in-memory zone cache can't return
+// a stale zone — used by the post-purchase onboarding poll to detect the cert
+// appearing / the sovereignty upgrade. Reads the pinned anchors from persisted
+// trust state (no re-fetch). TEMP until Fabric exposes a no-cache option.
+export async function resolveHandleFresh(
+  handle: string,
+): Promise<ResolvedHandle | null> {
+  await loadNetConfig();
+  const seeds = activeSeeds();
+  const fresh = new Fabric(seeds ? { seeds } : undefined);
+  await loadTrustState(fresh);
+  return resolveWith(fresh, handle);
+}
+
+// Ensure trust state is restored + the semi anchor refreshed, returning it.
+export async function ensureSemiTrust(): Promise<TrustAnchor | null> {
+  await ensureInit();
+  return cachedTrustAnchor();
 }
 
 export function getTrustState(): TrustState {
@@ -81,18 +128,23 @@ export function getTipHeight(): number | null {
   return tipHeightOf(getClient());
 }
 
-export function refreshSemiTrust(): Promise<TrustAnchor | null> {
+export async function refreshSemiTrust(): Promise<TrustAnchor | null> {
+  await ensureInit();
   resetTrustCache();
-  return ensureSemiTrust();
+  const c = getClient();
+  return applyDefaultSemiTrust(c, () => saveTrustState(c));
 }
 
 // Pin a fully-trusted Safety ID from either a `veritas://scan?id=…` QR/link or
-// a bare hex Trust ID. Throws if the input is neither.
+// a bare hex Trust ID, then persist so it survives restarts. Throws if the
+// input is neither.
 export async function trustFromInput(input: string): Promise<void> {
   const parsed = parseTrustInput(input);
   if (!parsed) throw new Error("Unrecognized Trust ID");
-  if (parsed.kind === "qr") await getClient().trustFromQr(parsed.payload);
-  else await getClient().trust(parsed.id);
+  const c = getClient();
+  if (parsed.kind === "qr") await c.trustFromQr(parsed.payload);
+  else await c.trust(parsed.id);
+  await saveTrustState(c);
 }
 
 // Fetch the handle's certificate chain (.spacecert bytes) from certrelay.

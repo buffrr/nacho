@@ -15,12 +15,7 @@ import { avatarColors } from "@/handleTile";
 import { Layout } from "@/ui/Layout";
 import { BottomNav } from "@/ui/BottomNav";
 import { AtSign, Search } from "@/ui/icons";
-import {
-  fetchProposedHandles,
-  fetchHandlesStatuses,
-  formatPrice,
-  HandleStatus,
-} from "@/api";
+import { searchHandles, formatPrice, SearchMatch } from "@/api";
 
 type Props = NativeStackScreenProps<HandlesStackParamList, "Shop">;
 
@@ -29,41 +24,44 @@ export default function Shop({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [query, setQuery] = useState("");
-  const [proposed, setProposed] = useState<string[]>([]);
-  const [statuses, setStatuses] = useState<Record<string, HandleStatus>>({});
+  const [matches, setMatches] = useState<SearchMatch[]>([]);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
-    const id = setTimeout(async () => {
-      if (!query) {
-        setProposed([]);
-        return;
-      }
-      const results = await fetchProposedHandles(query);
-      setProposed(results);
-    }, 300);
-    return () => clearTimeout(id);
-  }, [query]);
-
-  useEffect(() => {
-    if (proposed.length === 0) return;
+    if (!query) {
+      setMatches([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
     let active = true;
-    (async () => {
-      const results = await fetchHandlesStatuses(proposed);
+    const id = setTimeout(async () => {
+      const results = await searchHandles(query);
       if (!active) return;
-      const map: Record<string, HandleStatus> = {};
-      for (const s of results) map[s.handle] = s;
-      setStatuses(map);
-    })();
+      setMatches(results);
+      setSearching(false);
+    }, 300);
     return () => {
       active = false;
+      clearTimeout(id);
     };
-  }, [proposed]);
+  }, [query]);
 
-  const available = proposed.filter((h) => !handles?.[h]);
-  const openCount = available.filter(
-    (h) => statuses[h]?.status === "available",
-  ).length;
-  const takenCount = available.length - openCount;
+  // Show the operator's real candidates (name expanded across its spaces), minus
+  // handles already in the keystore and unusable statuses. Available first.
+  const shown = matches
+    .filter(
+      (m) =>
+        m.status !== "invalid" &&
+        m.status !== "unknown" &&
+        !handles?.[m.handle],
+    )
+    .sort(
+      (a, b) =>
+        (a.status === "available" ? 0 : 1) - (b.status === "available" ? 0 : 1),
+    );
+  const openCount = shown.filter((m) => m.status === "available").length;
+  const takenCount = shown.length - openCount;
 
   // Don't persist the handle here — just open its detail in a prospective state.
   // It's committed to the keystore only once the purchase is reserved.
@@ -71,36 +69,31 @@ export default function Shop({ navigation }: Props) {
     navigation.navigate("ShowHandle", { handle });
   };
 
-  const renderItem = ({ item }: { item: string }) => {
-    const status = statuses[item];
-    const isTaken = status?.status && status.status !== "available";
+  const renderItem = ({ item }: { item: SearchMatch }) => {
+    const isAvailable = item.status === "available";
     const price =
-      status?.status === "available" && typeof status.price === "number"
-        ? status.price
-        : undefined;
+      isAvailable && typeof item.price === "number" ? item.price : undefined;
     return (
       <View style={styles.row}>
-        <View style={[styles.avatar, { backgroundColor: avatarColors(colors, item).bg }]}>
-          <AtSign size={22} color={avatarColors(colors, item).fg} />
+        <View style={[styles.avatar, { backgroundColor: avatarColors(colors, item.handle).bg }]}>
+          <AtSign size={22} color={avatarColors(colors, item.handle).fg} />
         </View>
         <View style={styles.mid}>
           <Text style={styles.name} numberOfLines={1}>
-            {item}
+            {item.handle}
           </Text>
-          {price !== undefined ? (
-            <Text style={styles.price}>{formatPrice(price)}</Text>
-          ) : isTaken ? (
-            <Text style={styles.price}>Unavailable</Text>
-          ) : null}
+          <Text style={styles.price}>
+            {price !== undefined ? formatPrice(price) : "Unavailable"}
+          </Text>
         </View>
-        {isTaken ? (
+        {isAvailable ? (
+          <TouchableOpacity style={styles.buyBtn} onPress={() => buy(item.handle)}>
+            <Text style={styles.buyText}>Buy</Text>
+          </TouchableOpacity>
+        ) : (
           <View style={styles.takenChip}>
             <Text style={styles.takenText}>Taken</Text>
           </View>
-        ) : (
-          <TouchableOpacity style={styles.buyBtn} onPress={() => buy(item)}>
-            <Text style={styles.buyText}>Buy</Text>
-          </TouchableOpacity>
         )}
       </View>
     );
@@ -127,7 +120,7 @@ export default function Shop({ navigation }: Props) {
         </View>
       </View>
 
-      {available.length > 0 && (
+      {shown.length > 0 && (
         <Text style={styles.sectionLabel}>
           AVAILABLE HANDLES{"   "}
           <Text style={styles.count}>
@@ -137,14 +130,18 @@ export default function Shop({ navigation }: Props) {
       )}
 
       <FlatList
-        data={available}
+        data={shown}
         renderItem={renderItem}
-        keyExtractor={(h) => h}
+        keyExtractor={(m) => m.handle}
         style={styles.list}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <Text style={styles.empty}>
-            {query ? "No handles found" : "Search for a handle to buy."}
+            {!query
+              ? "Search for a handle to buy."
+              : searching
+                ? "Searching…"
+                : "No handles found"}
           </Text>
         }
       />

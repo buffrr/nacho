@@ -7,9 +7,10 @@ import {
   ScrollView,
   Dimensions,
 } from "react-native";
-import { open } from "@/file";
+import { openBinary } from "@/file";
+import { importDbBytes, readKeystoreFromBytes } from "@/db";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useStore, Keystore, isKeystore } from "@/Store";
+import { Keystore, isKeystore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { OnboardingStackParamList } from "@/Navigation";
 import { Layout } from "@/ui/Layout";
@@ -24,22 +25,28 @@ export default function ImportKeystore({ navigation }: Props) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [keystore, setKeystore] = useState<Keystore | null>(null);
+  const [bytes, setBytes] = useState<Uint8Array | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const selectFile = async () => {
     setValidationError(null);
     setKeystore(null);
+    setBytes(null);
     setSelectedFileName(null);
 
     try {
-      const { data, filename } = await open();
+      const { bytes: fileBytes, filename } = await openBinary();
+      const keystoreJson = await readKeystoreFromBytes(fileBytes);
+      const data = keystoreJson ? JSON.parse(keystoreJson) : null;
 
-      if (isKeystore(data)) {
+      if (data && isKeystore(data)) {
         setKeystore(data);
+        setBytes(fileBytes);
         setSelectedFileName(filename);
         setValidationError(null);
       } else {
-        setValidationError("Invalid keystore format in file");
+        setValidationError("That isn't a valid Nacho backup (.sqlite) file.");
       }
     } catch (error) {
       if (error instanceof Error) {
@@ -53,9 +60,19 @@ export default function ImportKeystore({ navigation }: Props) {
     }
   };
 
-  const handleImport = () => {
-    if (keystore) {
+  const handleImport = async () => {
+    if (!keystore || !bytes) return;
+    setImporting(true);
+    setValidationError(null);
+    try {
+      // Load the backup's certs + records + keystore into the live database,
+      // then continue to the seed step to unlock signing.
+      await importDbBytes(bytes);
       navigation.navigate("EnterMnemonic", keystore);
+    } catch {
+      setValidationError("Failed to restore the backup.");
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -75,21 +92,21 @@ export default function ImportKeystore({ navigation }: Props) {
       padTop
       footer={
         <Button
-          text="Import keystore"
+          text={importing ? "Restoring…" : "Restore backup"}
           onPress={handleImport}
           type="main"
-          disabled={!keystore}
+          disabled={!keystore || importing}
         />
       }
     >
       <ScreenHeader
         title="Restore from backup"
-        subtitle="Select a JSON keystore file to restore your public key and handles."
+        subtitle="Select a Nacho backup (.sqlite) to restore your public key, handles, and certificates."
         onBack={() => navigation.goBack()}
       />
 
       <View style={styles.fileSelectionContainer}>
-        <Button text="Select JSON File" onPress={selectFile} type="secondary" />
+        <Button text="Select backup file" onPress={selectFile} type="secondary" />
 
         {renderFileInfo()}
       </View>
@@ -99,7 +116,7 @@ export default function ImportKeystore({ navigation }: Props) {
       )}
       {keystore && !validationError && (
         <Message
-          message="Keystore file validated successfully. Ready to import."
+          message="Backup validated successfully. Ready to restore."
           type="success"
         />
       )}

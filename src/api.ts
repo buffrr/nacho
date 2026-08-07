@@ -1,17 +1,13 @@
 import { Cert, CertData, isCert, isCertData } from "@/cert";
+import { activeApiUrl } from "@/config";
 
-// Override with EXPO_PUBLIC_API_URL; otherwise use the local dev server in dev
-// and the hosted operator in production.
-// TODO: point production at the mainnet host once the server-side switch lands.
-const API_BASE_URL =
-  (process.env.EXPO_PUBLIC_API_URL as string | undefined) ||
-  (__DEV__
-    ? "http://127.0.0.1:8888/api"
-    : "https://testnet.atbitcoin.com/api");
+// The API base comes from the user-editable network config (mainnet or dev set),
+// read at call time so a dev-mode toggle / edited URL takes effect immediately.
+// Callers run after startup (which loads the config), so it's populated.
 
 export async function fetchProposedHandles(query: string): Promise<string[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/proposed`, {
+    const response = await fetch(`${activeApiUrl()}/proposed`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -94,7 +90,7 @@ export async function fetchHandlesStatuses(
   handles: string[],
 ): Promise<HandleStatus[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/spaces/status`, {
+    const response = await fetch(`${activeApiUrl()}/spaces/status`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -128,6 +124,43 @@ export async function fetchHandleStatus(
     return status;
   }
   return { handle, status: "unknown" };
+}
+
+// A single result from the /search endpoint: one candidate handle (the name
+// expanded across each top-level space the operator offers) with its status.
+// `available` matches carry price (cents) + product_id; `invalid` (too short /
+// bad chars) carry neither.
+export type SearchMatch = {
+  handle: string;
+  status: HandleStatus["status"];
+  price?: number;
+  product_id?: string;
+};
+
+// GET /api/search?q=<name|name@space> → matches across the operator's spaces in
+// one call (replaces the old proposed-handles + per-handle status two-step for
+// the Shop). Returns [] on empty query / error / non-2xx (e.g. 400 "q required").
+export async function searchHandles(query: string): Promise<SearchMatch[]> {
+  const q = query.trim();
+  if (!q) return [];
+  try {
+    const response = await fetch(
+      `${activeApiUrl()}/search?q=${encodeURIComponent(q)}`,
+    );
+    if (!response.ok) return [];
+    const data = await response.json();
+    const matches = (data as { matches?: unknown })?.matches;
+    if (!Array.isArray(matches)) return [];
+    return matches.filter(
+      (m): m is SearchMatch =>
+        !!m &&
+        typeof (m as SearchMatch).handle === "string" &&
+        typeof (m as SearchMatch).status === "string",
+    );
+  } catch (error) {
+    console.error("Failed to search handles:", error);
+    return [];
+  }
 }
 
 export type PurchaseSupport = "supported" | "unsupported" | "unknown";
@@ -167,7 +200,7 @@ export async function checkPurchaseInfo(
   handle: string,
 ): Promise<PurchaseInfo> {
   try {
-    const response = await fetch(`${API_BASE_URL}/spaces/status`, {
+    const response = await fetch(`${activeApiUrl()}/spaces/status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ handles: [handle] }),
@@ -208,7 +241,7 @@ export async function reserveHandle(
   | { error: string }
 > {
   try {
-    const response = await fetch(`${API_BASE_URL}/reserve`, {
+    const response = await fetch(`${activeApiUrl()}/reserve`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -250,7 +283,7 @@ export async function claimHandleIAP(
   error?: string;
 }> {
   try {
-    const response = await fetch(`${API_BASE_URL}/claim`, {
+    const response = await fetch(`${activeApiUrl()}/claim`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -293,7 +326,7 @@ export async function claimCode(
   script_pubkey: string,
 ): Promise<ClaimCodeResult> {
   try {
-    const response = await fetch(`${API_BASE_URL}/claim-code`, {
+    const response = await fetch(`${activeApiUrl()}/claim-code`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, script_pubkey }),

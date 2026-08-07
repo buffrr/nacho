@@ -14,6 +14,10 @@ type Draft = { records: EditableRecord[]; seq: number; dirty: boolean };
 type RecordsDraftValue = {
   // Seed a handle's draft from its resolved zone (only if not already loaded).
   ensureLoaded: (handle: string, records: EditableRecord[], seq: number) => void;
+  // Replace the draft with freshly-resolved records — used once a network
+  // resolve returns to update a draft seeded from the (possibly stale) cache.
+  // No-op if the user has unsaved edits (dirty), so edits are never clobbered.
+  applyResolved: (handle: string, records: EditableRecord[], seq: number) => void;
   getRecords: (handle: string) => EditableRecord[];
   getSeq: (handle: string) => number;
   isDirty: (handle: string) => boolean;
@@ -48,6 +52,22 @@ export function RecordsDraftProvider({ children }: { children: ReactNode }) {
           ? prev
           : { ...prev, [handle]: { records, seq, dirty: false } },
       );
+    },
+    [],
+  );
+
+  const applyResolved = useCallback(
+    (handle: string, records: EditableRecord[], seq: number) => {
+      setDrafts((prev) => {
+        const draft = prev[handle];
+        if (draft?.dirty) return prev; // keep unsaved edits
+        // Don't clobber newer local records with an older/stale resolve — right
+        // after publishing, the relay often still returns the previous (or empty,
+        // seq 0) zone before the new records propagate. Only take the network's
+        // data when it's at least as new as what we already have.
+        if (draft && seq < draft.seq) return prev;
+        return { ...prev, [handle]: { records, seq, dirty: false } };
+      });
     },
     [],
   );
@@ -119,6 +139,7 @@ export function RecordsDraftProvider({ children }: { children: ReactNode }) {
     <RecordsDraftContext.Provider
       value={{
         ensureLoaded,
+        applyResolved,
         getRecords,
         getSeq,
         isDirty,

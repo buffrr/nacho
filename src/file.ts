@@ -57,6 +57,32 @@ export async function saveBinary(
   }
 }
 
+// Pick any file and return its raw bytes — used to restore a `.sqlite` backup.
+export async function openBinary(): Promise<{
+  bytes: Uint8Array;
+  filename: string;
+}> {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: "*/*",
+    multiple: false,
+  });
+
+  if (result.canceled) {
+    const error = new Error("File selection canceled");
+    error.name = "UserCancel";
+    throw error;
+  }
+
+  const file = result.assets[0];
+  if (!file.uri) {
+    throw new Error("No file URI available");
+  }
+
+  const response = await fetch(file.uri);
+  const buffer = await response.arrayBuffer();
+  return { bytes: new Uint8Array(buffer), filename: file.name ?? "backup" };
+}
+
 export async function open(): Promise<{ data: unknown; filename: string }> {
   const result = await DocumentPicker.getDocumentAsync({
     type: "application/json",

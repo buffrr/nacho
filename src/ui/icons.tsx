@@ -143,6 +143,20 @@ export function ShieldCheck({ size = 24, color = "#9A9AA0", strokeWidth = 2 }: I
   );
 }
 
+export function Clock({ size = 18, color = "#9A9AA0", strokeWidth = 2 }: IconProps) {
+  return (
+    <Frame size={size} vb={24}>
+      <Path
+        d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        {...cap}
+      />
+      <Path d="M12 6V12L16 14" stroke={color} strokeWidth={strokeWidth} {...cap} />
+    </Frame>
+  );
+}
+
 export function ScanIcon({ size = 24, color = "#9A9AA0", strokeWidth = 2 }: IconProps) {
   return (
     <Frame size={size} vb={24}>

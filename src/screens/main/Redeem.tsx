@@ -13,7 +13,7 @@ import { claimCode } from "@/api";
 type Props = NativeStackScreenProps<HandlesStackParamList, "Redeem">;
 
 export default function Redeem({ route, navigation }: Props) {
-  const { nextScriptPubkey, createHandle } = useStore();
+  const { nextScriptPubkey, createHandle, setHandlePurchase } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [code, setCode] = useState(route.params?.code ?? "");
@@ -48,7 +48,17 @@ export default function Redeem({ route, navigation }: Props) {
     try {
       // Bind succeeded server-side under the next derived key — persist it.
       await createHandle(result.handle);
-      navigation.replace("ShowHandle", { handle: result.handle });
+      // Acquired through nacho (no paid amount here) → show the reassuring
+      // "is yours / issuing certificate" state, not the plain "waiting" note.
+      await setHandlePurchase(result.handle, {});
+      // Reset so Back lands on Your handles rather than the redeem/register flow.
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: "ListHandles" },
+          { name: "ShowHandle", params: { handle: result.handle } },
+        ],
+      });
     } catch (err) {
       setIsLoading(false);
       setError("Redeemed, but failed to save the handle.");

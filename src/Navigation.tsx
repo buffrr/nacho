@@ -13,6 +13,7 @@ import ShowHandle from "./screens/main/ShowHandle";
 import CreateRequest from "./screens/main/CreateRequest";
 import ImportCertificate from "./screens/main/ImportCertificate";
 import Settings from "./screens/main/Settings";
+import Preferences from "./screens/main/Preferences";
 import Resolve from "./screens/main/Resolve";
 import ImportKeypair from "./screens/main/ImportKeypair";
 import Redeem from "./screens/main/Redeem";
@@ -49,6 +50,7 @@ export type HandlesStackParamList = {
   Redeem: { code?: string };
   ImportCertificate: { handle: string };
   Settings: undefined;
+  Preferences: undefined;
   VerifyAnchor: undefined;
   RevealSeed: undefined;
   EditRecord: { handle: string; index?: number };
@@ -161,6 +163,11 @@ function MainNavigator() {
         name="Settings"
         component={Settings}
         options={{ headerShown: false, animation: "none" }}
+      />
+      <HandlesStack.Screen
+        name="Preferences"
+        component={Preferences}
+        options={{ headerShown: false }}
       />
       <HandlesStack.Screen
         name="VerifyAnchor"

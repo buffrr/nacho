@@ -3,9 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HandlesStackParamList } from "@/Navigation";
-import { useStore } from "@/Store";
-import { save } from "@/file";
-import { Colors, ThemeMode, useTheme } from "@/theme";
+import { saveBinary } from "@/file";
+import { exportDbBytes } from "@/db";
+import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
 import { BottomNav } from "@/ui/BottomNav";
 import { Message } from "@/ui/Message";
@@ -16,6 +16,7 @@ import {
   Download,
   Eye,
   ChevronRight,
+  Settings as SettingsIcon,
 } from "@/ui/icons";
 import {
   ensureSemiTrust,
@@ -26,12 +27,6 @@ import {
   getTipHeight,
 } from "@/fabric";
 import { formatAnchor, TrustAnchor, TrustState } from "@/trust";
-
-const MODES: { id: ThemeMode; label: string }[] = [
-  { id: "system", label: "System" },
-  { id: "light", label: "Light" },
-  { id: "dark", label: "Dark" },
-];
 
 // How stale a trusted (Safety ID) anchor is relative to the current tip — the
 // semi-trusted anchor tracks the tip, so the block gap tells you how far the
@@ -53,8 +48,7 @@ function stalenessText(trustedHeight: number | null, tip: number | null): string
 export default function Settings() {
   const navigation =
     useNavigation<NativeStackNavigationProp<HandlesStackParamList>>();
-  const { xpub, handles } = useStore();
-  const { colors, mode, setMode } = useTheme();
+  const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,9 +96,14 @@ export default function Settings() {
   const backupKeystore = async () => {
     setError(null);
     try {
-      await save(`keystore_${Date.now()}.json`, { xpub, handles });
+      const bytes = await exportDbBytes();
+      await saveBinary(
+        `nacho-backup-${Date.now()}.sqlite`,
+        bytes,
+        "application/x-sqlite3",
+      );
     } catch {
-      setError("Failed to export keystore");
+      setError("Failed to export backup");
     }
   };
 
@@ -118,7 +117,16 @@ export default function Settings() {
 
   return (
     <Layout padTop footer={<BottomNav active="trust" />}>
-      <Text style={styles.screenTitle}>Trust</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.screenTitle}>Trust</Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate("Preferences")}
+          hitSlop={8}
+          accessibilityLabel="Settings"
+        >
+          <SettingsIcon size={22} color={colors.text} />
+        </TouchableOpacity>
+      </View>
 
       {/* SEMI-TRUSTED — the default anchor we fetch from public relays. */}
       <Text style={styles.sectionLabel}>SEMI-TRUSTED</Text>
@@ -243,38 +251,23 @@ export default function Settings() {
         Your keystore holds your public key and handles — never your private key,
         which stays in secure storage.
       </Text>
-
-      <View style={styles.spacer} />
-
-      {/* APPEARANCE */}
-      <Text style={styles.sectionLabel}>APPEARANCE</Text>
-      <View style={styles.segment}>
-        {MODES.map((m) => (
-          <TouchableOpacity
-            key={m.id}
-            style={[styles.segmentItem, mode === m.id && styles.segmentItemActive]}
-            onPress={() => setMode(m.id)}
-          >
-            <Text
-              style={[styles.segmentText, mode === m.id && styles.segmentTextActive]}
-            >
-              {m.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
     </Layout>
   );
 }
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
+    titleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 4,
+      marginBottom: 24,
+    },
     screenTitle: {
       fontSize: 24,
       fontWeight: "700",
       color: c.text,
-      marginTop: 4,
-      marginBottom: 24,
     },
     sectionLabel: {
       fontSize: 12,

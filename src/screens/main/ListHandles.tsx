@@ -12,13 +12,12 @@ import { HandlesStackParamList } from "@/Navigation";
 import { HandleData, useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { scriptForHandle } from "@/keys";
-import { scriptMatchesStatus } from "@/handleStatus";
-import { handlePill, avatarColors } from "@/handleTile";
+import { handleTileInfo, avatarColors } from "@/handleTile";
+import { recordsCounts } from "@/db";
 import { Layout } from "@/ui/Layout";
 import { BottomNav } from "@/ui/BottomNav";
 import { HandleTile } from "@/ui/HandleTile";
 import { Plus, ShoppingBag } from "@/ui/icons";
-import { fetchHandlesStatuses, HandleStatus } from "@/api";
 
 type Nav = NativeStackNavigationProp<HandlesStackParamList, "ListHandles">;
 
@@ -26,39 +25,26 @@ export default function ListHandles({ navigation }: { navigation: Nav }) {
   const { handles, xpub } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [statuses, setStatuses] = useState<Record<string, HandleStatus>>({});
+  const [counts, setCounts] = useState<Record<string, number>>({});
 
   const handlesList = Object.entries(handles || {});
-  const handlesKey = handlesList.map(([name]) => name).join(",");
 
+  // Refresh the cached record counts each time the list gains focus (e.g. after
+  // publishing records on a handle detail screen).
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      (async () => {
-        const names = handlesKey ? handlesKey.split(",") : [];
-        if (names.length === 0) {
-          setStatuses({});
-          return;
-        }
-        const results = await fetchHandlesStatuses(names);
-        if (!active) return;
-        setStatuses((prev) => {
-          const next = { ...prev };
-          for (const s of results) next[s.handle] = s;
-          return next;
-        });
-      })();
+      recordsCounts().then((c) => {
+        if (active) setCounts(c);
+      });
       return () => {
         active = false;
       };
-    }, [handlesKey]),
+    }, []),
   );
 
-  const pillFor = (name: string, handleData: HandleData) => {
+  const infoFor = (name: string, handleData: HandleData) => {
     const ourScript = xpub ? scriptForHandle(xpub, handleData) : null;
-    const status = statuses[name];
-    const scriptMatches =
-      status && ourScript ? scriptMatchesStatus(status, ourScript) : null;
     const resolution = handleData.resolution;
     const keyMismatch = !!(
       resolution?.found &&
@@ -66,12 +52,12 @@ export default function ListHandles({ navigation }: { navigation: Nav }) {
       ourScript &&
       resolution.scriptPubkey !== ourScript
     );
-    return handlePill(colors, {
+    return handleTileInfo({
       resolution,
       keyMismatch,
       hasCert: !!handleData.certRef || !!handleData.cert,
-      status: status?.status,
-      scriptMatches,
+      isImported: handleData.source === "imported",
+      recordCount: counts[name] ?? 0,
     });
   };
 
@@ -80,7 +66,7 @@ export default function ListHandles({ navigation }: { navigation: Nav }) {
     return (
       <HandleTile
         handle={name}
-        pill={pillFor(name, handleData)}
+        info={infoFor(name, handleData)}
         avatar={avatarColors(colors, name)}
         onPress={() => navigation.navigate("ShowHandle", { handle: name })}
       />

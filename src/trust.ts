@@ -11,11 +11,8 @@
 // spacesprotocol.org site uses, so resolution is meaningfully verified out of
 // the box without the user having to scan anything.
 // Docs: https://spacesprotocol.org/docs/developers/sdk/
-
-export const SEMI_TRUST_RELAYS = [
-  "https://relay-cosmos.spacesprotocol.org/anchors",
-  "https://relay-pulsar.spacesprotocol.org/anchors",
-];
+import { kvGet, kvSet } from "@/db";
+import { activeAnchorRelays, networkTag } from "@/config";
 
 export type TrustAnchor = { trustId: string; height: number | null };
 
@@ -37,6 +34,46 @@ export interface TrustClient {
   clearTrusted(): void;
 }
 
+// Adds Fabric's own state persistence (anchors + zone cache) on top.
+export interface PersistableTrustClient extends TrustClient {
+  saveState(): string;
+  loadState(json: string): void;
+}
+
+// The pinned Fabric trust state (trusted Safety ID, semi-trusted, observed,
+// zone cache) lives in the kv table under this key so a scanned Safety ID
+// survives restarts and rides along in the single-file backup. Namespaced by
+// network (dev/mainnet) so a dev/regtest run doesn't load mainnet anchors (which
+// would show e.g. a ~900k mainnet tip against a local chain) — computed at call
+// time since the dev-mode toggle can change at runtime.
+function stateKey(): string {
+  return `fabric_state:${networkTag()}`;
+}
+
+// Restore the persisted Fabric state once, before any resolve/pin. No-op if
+// nothing is saved or the blob is unusable (we just start fresh).
+export async function loadTrustState(
+  client: PersistableTrustClient,
+): Promise<void> {
+  try {
+    const json = await kvGet(stateKey());
+    if (json) client.loadState(json);
+  } catch {
+    // start with no pinned trust
+  }
+}
+
+// Persist the current Fabric state (call after any trust()/semiTrust() change).
+export async function saveTrustState(
+  client: PersistableTrustClient,
+): Promise<void> {
+  try {
+    await kvSet(stateKey(), client.saveState());
+  } catch {
+    // best-effort; state stays for the session either way
+  }
+}
+
 // A Trust ID can arrive two ways: the `veritas://scan?id=…` QR/link a local
 // Veritas client emits, or the bare 32-byte hex id (e.g. copied from the anchor
 // row). Classify the input so the caller can route it to trustFromQr vs trust.
@@ -53,10 +90,14 @@ export function parseTrustInput(
 
 // Fetch the current anchor (root hash + block height) from the relay pool,
 // trying each relay until one answers. Header names match the site's client.
+// The /anchors response is sent with `cache-control: max-age=300`, so we bypass
+// the HTTP cache (no-store + a cache-busting param) — otherwise "Refresh" keeps
+// returning the same stale anchor for up to 5 minutes.
 export async function fetchSemiTrustAnchor(): Promise<TrustAnchor | null> {
-  for (const url of SEMI_TRUST_RELAYS) {
+  for (const url of activeAnchorRelays()) {
     try {
-      const res = await fetch(url, { method: "HEAD" });
+      const bust = `${url}${url.includes("?") ? "&" : "?"}_=${Date.now()}`;
+      const res = await fetch(bust, { method: "HEAD", cache: "no-store" });
       const root = res.headers.get("x-anchor-root");
       if (root) {
         const h = res.headers.get("x-anchor-height");
@@ -72,23 +113,29 @@ export async function fetchSemiTrustAnchor(): Promise<TrustAnchor | null> {
 let cachedAnchor: TrustAnchor | null = null;
 let semiTrustPromise: Promise<TrustAnchor | null> | null = null;
 
-// Pin the default semi-trusted anchor once. Idempotent and safe to await from
-// every resolve — the network fetch + pin happen a single time per session.
+// Refresh the semi-trusted anchor to the current relay tip once per session.
+// This runs even when a trusted (Safety ID) anchor was restored — semiTrust()
+// only touches the semi tier, so the trusted anchor is left intact while the
+// semi one tracks the latest tip. `onPinned` (optional) fires after a re-pin so
+// callers can persist the updated state.
 export function applyDefaultSemiTrust(
   client: TrustClient,
+  onPinned?: () => Promise<void>,
 ): Promise<TrustAnchor | null> {
   if (!semiTrustPromise) {
     semiTrustPromise = (async () => {
       try {
-        if (!client.semiTrusted() && !client.trusted()) {
-          const anchor = await fetchSemiTrustAnchor();
-          if (anchor) {
+        const anchor = await fetchSemiTrustAnchor();
+        if (anchor) {
+          // Only re-pin (and persist) when the tip actually moved.
+          if (client.semiTrusted() !== anchor.trustId) {
             await client.semiTrust(anchor.trustId);
-            cachedAnchor = anchor;
+            await onPinned?.();
           }
+          cachedAnchor = anchor;
         }
       } catch {
-        // leave unpinned; resolution still works as "observed"
+        // leave semi as-is; resolution still works with whatever is pinned
       }
       if (!cachedAnchor) {
         const id = client.semiTrusted() ?? client.trusted() ?? client.observed();

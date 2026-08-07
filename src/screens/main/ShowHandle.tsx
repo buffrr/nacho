@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { View, Text, StyleSheet, Platform, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Platform,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
 import { RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HandlesStackParamList } from "@/Navigation";
@@ -18,7 +25,14 @@ import { BottomSheet } from "@/ui/BottomSheet";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 import { Colors, useTheme } from "@/theme";
-import { resolveHandle, exportCert, publishRecords } from "@/fabric";
+import {
+  resolveHandle,
+  resolveHandleFresh,
+  exportCert,
+  publishRecords,
+  refreshSemiTrust,
+} from "@/fabric";
+import { recordsGet, recordsSet } from "@/db";
 import {
   AtSign,
   MoreVertical,
@@ -30,6 +44,9 @@ import {
   Upload,
   Trash,
   Check,
+  Anchor,
+  ShieldCheck,
+  Clock,
   Infinity as InfinityIcon,
 } from "@/ui/icons";
 import {
@@ -113,12 +130,21 @@ export default function ShowHandle({ route, navigation }: Props) {
     setHandleCertData,
     setHandleResolution,
     setCertRef,
+    setHandleOnboarded,
+    setHandlePurchase,
     getSigningKey,
   } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { ensureLoaded, getRecords, getSeq, setSeq, isDirty, markClean } =
-    useRecordsDraft();
+  const {
+    ensureLoaded,
+    applyResolved,
+    getRecords,
+    getSeq,
+    setSeq,
+    isDirty,
+    markClean,
+  } = useRecordsDraft();
   const [error, setError] = useState<string | null>(null);
   const [handleStatusString, setHandleStatusString] = useState<
     HandleStatus["status"] | null
@@ -131,6 +157,10 @@ export default function ShowHandle({ route, navigation }: Props) {
   const [price, setPrice] = useState<number | null>(null);
   const [resolving, setResolving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  // In-flight purchase (drives the button spinner) — kept separate from the
+  // handle's server status so tapping Buy doesn't flip the pill to "Pending
+  // inclusion" before anything is actually reserved/paid.
+  const [purchasing, setPurchasing] = useState(false);
   const [published, setPublished] = useState(false);
   const [numId, setNumId] = useState<string | null>(null);
   // Alias is published by the operator and read from fabric resolution — it is
@@ -148,6 +178,10 @@ export default function ShowHandle({ route, navigation }: Props) {
   const foundRef = React.useRef<boolean>(
     !!handles?.[handle]?.resolution?.found,
   );
+  // Always-latest refreshResolution, so the onboarding poll's setInterval doesn't
+  // call a stale closure (which would write stale handle data and drop certRef,
+  // flapping between "issuing" and "ready" every tick).
+  const refreshRef = React.useRef<(fresh?: boolean) => void>(() => {});
 
   // A handle reached from Shop ("Buy") isn't in the keystore yet — we show it in
   // a prospective state using the next derivation we *would* use, and only
@@ -168,8 +202,10 @@ export default function ShowHandle({ route, navigation }: Props) {
   const { requestPurchase, finishTransaction } = iap
     ? iap.hook({
         onPurchaseSuccess: async (purchase) => {
+          if (__DEV__) console.log("[nacho/iap] onPurchaseSuccess");
           if (!purchase.purchaseToken) {
             setError("No purchase token received");
+            setPurchasing(false);
             return;
           }
           const result = await claimHandleIAP(
@@ -189,12 +225,21 @@ export default function ShowHandle({ route, navigation }: Props) {
                 isConsumable: true,
               });
             }
+            // The /claim status can be minimal (no script_pubkey), which leaves
+            // the handle looking "Not registered". finalizePurchase re-fetches
+            // the full status, pins the anchor, records the purchase, and resets
+            // Back → Your handles.
+            await finalizePurchase();
           }
+          setPurchasing(false);
         },
         onPurchaseError: (error) => {
+          if (__DEV__)
+            console.log("[nacho/iap] onPurchaseError:", error.code, error.message);
           if (error.code !== "user-cancelled") {
             setError("Purchase failed: " + error.message);
           }
+          setPurchasing(false);
         },
       })
     : ({
@@ -210,6 +255,7 @@ export default function ShowHandle({ route, navigation }: Props) {
             fetchAndUpdateHandleStatus();
           } else {
             await applyHandleStatus(result.handle_status);
+            await finalizePurchase();
           }
           return null;
         },
@@ -248,6 +294,26 @@ export default function ShowHandle({ route, navigation }: Props) {
     return () => clearInterval(id);
   }, []);
 
+  // Seed records from the local cache the moment the screen opens, so they show
+  // instantly (before the network resolve returns and calls applyResolved).
+  useEffect(() => {
+    let active = true;
+    recordsGet(handle).then((json) => {
+      if (!active || !json) return;
+      try {
+        const parsed = JSON.parse(json);
+        if (Array.isArray(parsed.records)) {
+          ensureLoaded(handle, parsed.records, parsed.seq ?? 0);
+        }
+      } catch {
+        // ignore malformed cache
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [handle, ensureLoaded]);
+
   const fetchAndUpdateHandleStatus = async () => {
     const status = await fetchHandleStatus(handle);
     await applyHandleStatus(status);
@@ -255,10 +321,33 @@ export default function ShowHandle({ route, navigation }: Props) {
     setNow(Date.now());
   };
 
-  const refreshResolution = async () => {
+  // Runs once a nacho purchase succeeds: record the purchase (so we show the
+  // reassuring "Purchase complete" state, not the plain "waiting for cert"),
+  // pin the latest anchor, then reset the stack so Back lands on Your handles
+  // rather than the Shop/search screen this was pushed from.
+  const finalizePurchase = async () => {
+    await fetchAndUpdateHandleStatus();
+    // The purchase advanced the chain, so pin the latest anchor before resolving
+    // — otherwise the just-bought handle is newer than the pinned anchor.
+    await refreshSemiTrust();
+    await setHandlePurchase(handle, price !== null ? { amountCents: price } : {});
+    navigation.reset({
+      index: 1,
+      routes: [
+        { name: "ListHandles" },
+        { name: "ShowHandle", params: { handle } },
+      ],
+    });
+  };
+
+  // `fresh` uses a throwaway Fabric client so the SDK's zone cache can't return
+  // stale data — used by the onboarding poll to catch the cert / sovereignty.
+  const refreshResolution = async (fresh = false) => {
     setResolving(true);
     try {
-      const resolved = await resolveHandle(handle);
+      const resolved = fresh
+        ? await resolveHandleFresh(handle)
+        : await resolveHandle(handle);
       if (!resolved) {
         // Don't downgrade a handle we've already seen resolve — the records are
         // likely just still propagating (e.g. right after publishing). Keep the
@@ -288,7 +377,19 @@ export default function ShowHandle({ route, navigation }: Props) {
       const mine = resolved.zone.script_pubkey === script_pubkey;
       if (mine) {
         const { records, seq } = editableFromZone(resolved.zone);
-        ensureLoaded(handle, records, seq);
+        if (__DEV__)
+          console.log(
+            "[nacho/records] resolved seq=" + seq + " count=" + records.length,
+          );
+        // Fresh network data wins over the cache-seeded draft, but applyResolved
+        // ignores it if the user has unsaved edits or it's older than our local
+        // seq (stale/empty resolve right after publishing).
+        applyResolved(handle, records, seq);
+        // Only cache when the relay actually has records, so an empty/stale zone
+        // doesn't overwrite the cache of what we just published.
+        if (seq > 0) {
+          recordsSet(handle, JSON.stringify({ records, seq }), Date.now());
+        }
       }
       const ref = handleData.certRef;
       if (mine && (!ref || ref.sovereignty !== sovereignty)) {
@@ -306,6 +407,7 @@ export default function ShowHandle({ route, navigation }: Props) {
       setResolving(false);
     }
   };
+  refreshRef.current = refreshResolution;
 
   const handleImportCertificate = () => {
     setMenuOpen(false);
@@ -370,11 +472,23 @@ export default function ShowHandle({ route, navigation }: Props) {
       // Use unix seconds as the sequence: always increases, no need to read the
       // previous value.
       const seq = Math.floor(Date.now() / 1000);
-      await publishRecords(cert, getRecords(handle), seq, secretKey);
+      const publishedRecords = getRecords(handle);
+      if (__DEV__)
+        console.log(
+          "[nacho/records] publishing seq=" +
+            seq +
+            " count=" +
+            publishedRecords.length,
+        );
+      await publishRecords(cert, publishedRecords, seq, secretKey);
+      if (__DEV__) console.log("[nacho/records] publish() resolved (no throw)");
       // Keep the just-published records on screen and bump the version — don't
       // clear the draft (which would flash empty/"waiting" until it re-resolves).
       setSeq(handle, seq);
       markClean(handle);
+      // Update the cache with what we just published so it's current on reopen
+      // even before the network reflects it.
+      recordsSet(handle, JSON.stringify({ records: publishedRecords, seq }), Date.now());
       foundRef.current = true;
       setPublished(true);
       refreshResolution();
@@ -391,12 +505,12 @@ export default function ShowHandle({ route, navigation }: Props) {
 
   const handleBuyHandle = async () => {
     setError(null);
-    setHandleStatusString("reserved");
+    setPurchasing(true);
     const result = await reserveHandle(handle, script_pubkey);
     if ("error" in result) {
       setError(result.error);
+      setPurchasing(false);
       if (!isProspective) fetchAndUpdateHandleStatus();
-      else setHandleStatusString(null);
       return;
     }
 
@@ -406,6 +520,9 @@ export default function ShowHandle({ route, navigation }: Props) {
       await createHandle(handle);
     }
 
+    // The purchase outcome arrives via the useIAP onPurchaseSuccess/onPurchaseError
+    // callbacks; this try only catches a failure to *start* the flow. A user
+    // cancel isn't an error worth surfacing.
     try {
       await requestPurchase({
         request: {
@@ -414,12 +531,14 @@ export default function ShowHandle({ route, navigation }: Props) {
         },
         type: "in-app",
       });
-    } catch (error) {
-      setError(
-        "Failed purchase: " +
-          (error instanceof Error ? error.message : String(error)),
-      );
-      fetchAndUpdateHandleStatus();
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (__DEV__) console.log("[nacho/iap] requestPurchase threw:", code, msg);
+      if (code !== "user-cancelled" && !/cancel/i.test(msg)) {
+        setError("Failed purchase: " + msg);
+      }
+      setPurchasing(false);
     }
   };
 
@@ -508,8 +627,51 @@ export default function ShowHandle({ route, navigation }: Props) {
   const isImported = handleData.source === "imported";
   const resolvable = !!resolution?.found && !keyMismatch;
   const owned = resolvable || isImported || isScriptPubkeyValid === true;
-  // Owned but not yet on certrelay → waiting for the certificate to appear.
-  const awaitingCert = owned && !resolvable && !keyMismatch;
+  // We've already grabbed + stored this handle's certificate.
+  const hasCert = !!handleData.certRef || !!cert;
+  // Once we hold the cert we can show + manage records regardless of a flapping
+  // live resolution (e.g. the semi-trusted anchor lagging the handle's block),
+  // so the view doesn't bounce back to "waiting for certificate".
+  const manageable = !keyMismatch && (resolvable || (owned && hasCert));
+  // The handle is actually PAID for (not merely reserved) once it's taken on the
+  // server, resolves on certrelay, we hold its cert, or it's an imported keypair.
+  // A reservation the user never paid for (status "reserved"/"processing_payment")
+  // does NOT count — so it never shows the issuing/waiting/onboarding states.
+  const isPaid =
+    resolvable ||
+    hasCert ||
+    isImported ||
+    handleStatusString === "taken";
+  // "Waiting for the certificate to appear" only applies to a PAID handle that
+  // doesn't have its cert yet (never a reserved/unpaid one).
+  const awaitingCert = isPaid && !keyMismatch && !hasCert;
+  // The handle's current sovereignty — live resolution if we have it, else the
+  // sovereignty captured when we stored the cert.
+  const sovereignty =
+    (resolution?.found ? resolution.sovereignty : undefined) ??
+    handleData.certRef?.sovereignty ??
+    null;
+  const isSovereign = sovereignty === "sovereign";
+  // Post-purchase onboarding: a freshly PAID handle (onboarded === false) walks
+  // through issuing → ready-to-use → sovereign before dropping into the normal
+  // editor. Reserved/unpaid handles and pre-existing ones skip it.
+  const showOnboarding =
+    isPaid && !keyMismatch && handleData.onboarded === false;
+  const onboardStage: "issuing" | "ready" | "sovereign" = !hasCert
+    ? "issuing"
+    : isSovereign
+      ? "sovereign"
+      : "ready";
+
+  // While the onboarding states show, poll resolution so the cert appearing
+  // (then the sovereign upgrade) advances the state without user action.
+  useEffect(() => {
+    if (!showOnboarding) return;
+    const id = setInterval(() => refreshRef.current(true), 5000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showOnboarding]);
+
   // Directly purchasable here → show the dedicated claim/purchase view.
   const buyable =
     !owned &&
@@ -577,6 +739,152 @@ export default function ShowHandle({ route, navigation }: Props) {
   };
 
   const avatar = avatarColors(colors, handle);
+
+  const dismissOnboarding = () => setHandleOnboarded(handle, true);
+
+  // Bought through nacho's IAP → show the reassuring "Purchase complete /
+  // issuing certificate" state; handles registered elsewhere fall back to the
+  // plain "Waiting for certificate" note.
+  const boughtViaNacho = !!handleData.purchase;
+
+  // Post-purchase status card: issuing → ready-to-use → sovereign (see img_10).
+  const renderOnboarding = () => (
+    <View style={styles.onboard}>
+      {onboardStage === "issuing" ? (
+        boughtViaNacho ? (
+          <View
+            style={[styles.onboardIcon, { backgroundColor: colors.statusGreenBg }]}
+          >
+            <Check size={34} color={colors.statusGreenFg} />
+          </View>
+        ) : (
+          <View
+            style={[styles.onboardIcon, { backgroundColor: colors.statusGreyBg }]}
+          >
+            <Clock size={30} color={colors.statusGreyFg} strokeWidth={2} />
+          </View>
+        )
+      ) : onboardStage === "ready" ? (
+        <View style={[styles.onboardIcon, { backgroundColor: colors.statusGreenBg }]}>
+          <Check size={34} color={colors.statusGreenFg} />
+        </View>
+      ) : (
+        <View style={[styles.onboardIcon, { backgroundColor: colors.statusBlueBg }]}>
+          <ShieldCheck size={30} color={colors.statusBlueFg} />
+        </View>
+      )}
+
+      <Text style={styles.onboardName} numberOfLines={1}>
+        {handle}
+      </Text>
+
+      {onboardStage === "issuing" ? (
+        boughtViaNacho ? (
+          <>
+            <Text style={[styles.onboardStatus, { color: colors.statusGreenFg }]}>
+              is yours
+            </Text>
+            <View style={styles.onboardCard}>
+              <ActivityIndicator size="small" color={colors.accent} />
+              <View style={styles.onboardCardText}>
+                <Text style={styles.onboardCardTitle}>
+                  Issuing your certificate
+                </Text>
+                <Text style={styles.onboardCardBody}>
+                  Usually a few minutes. You'll be able to publish records as soon
+                  as it lands.
+                </Text>
+              </View>
+            </View>
+            <View style={styles.onboardDetails}>
+              {handleData.purchase?.amountCents != null && (
+                <View style={styles.onboardDetailRow}>
+                  <Text style={styles.onboardDetailLabel}>Paid</Text>
+                  <Text style={styles.onboardDetailValue}>
+                    {formatPrice(handleData.purchase.amountCents)}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.onboardDetailRow}>
+                <Text style={styles.onboardDetailLabel}>Bound to</Text>
+                <Text style={styles.onboardDetailValue}>
+                  {`${pubkey.slice(0, 8)}…${pubkey.slice(-8)}`}
+                </Text>
+              </View>
+              {handleData.purchase?.orderId ? (
+                <View style={styles.onboardDetailRow}>
+                  <Text style={styles.onboardDetailLabel}>Order</Text>
+                  <Text style={styles.onboardDetailValue}>
+                    {handleData.purchase.orderId}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={[styles.onboardStatus, { color: colors.textMuted }]}>
+              Waiting for certificate
+            </Text>
+            <View style={styles.onboardCard}>
+              <View style={styles.onboardCardText}>
+                <Text style={styles.onboardCardBody}>
+                  The handle is registered to your key. We'll pull the
+                  certificate as soon as a relay has it.
+                </Text>
+              </View>
+            </View>
+            <View style={styles.checkedRow}>
+              <Text style={styles.checkedText}>
+                Last checked {agoText(checkedAt, now)} ·{" "}
+              </Text>
+              <TouchableOpacity
+                onPress={() => refreshResolution()}
+                disabled={resolving}
+                hitSlop={6}
+              >
+                <Text style={styles.refreshText}>
+                  {resolving ? "…" : "Check now"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )
+      ) : onboardStage === "ready" ? (
+        <>
+          <Text style={[styles.onboardStatus, { color: colors.statusGreenFg }]}>
+            Yours — ready to use
+          </Text>
+          <View style={styles.onboardCard}>
+            <Anchor size={18} color={colors.text} />
+            <View style={styles.onboardCardText}>
+              <Text style={styles.onboardCardTitle}>Anchoring to Bitcoin</Text>
+              <Text style={styles.onboardCardBody}>
+                Usually within a day. Nothing to do — you can use the handle now.
+              </Text>
+            </View>
+          </View>
+        </>
+      ) : (
+        <>
+          <Text style={[styles.onboardStatus, { color: colors.statusBlueFg }]}>
+            Sovereign
+          </Text>
+          <View style={styles.onboardCard}>
+            <View style={styles.onboardCardText}>
+              <Text style={styles.onboardCardBody}>
+                Ownership is proven on-chain and can't be revoked. Back up your
+                certificate.
+              </Text>
+              <TouchableOpacity onPress={handleExportCertificate} hitSlop={6}>
+                <Text style={styles.viewProof}>View proof</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </>
+      )}
+    </View>
+  );
 
   const renderPurchase = () => (
     <View style={styles.purchase}>
@@ -652,12 +960,15 @@ export default function ShowHandle({ route, navigation }: Props) {
           <>
             <Button
               text={
-                price !== null
-                  ? `Buy handle · ${formatPrice(price)}`
-                  : "Buy handle"
+                purchasing
+                  ? "Processing…"
+                  : price !== null
+                    ? `Buy handle · ${formatPrice(price)}`
+                    : "Buy handle"
               }
               onPress={handleBuyHandle}
               type="main"
+              disabled={purchasing}
             />
             <TouchableOpacity
               onPress={() => setShowAdvanced((v) => !v)}
@@ -673,7 +984,16 @@ export default function ShowHandle({ route, navigation }: Props) {
               />
             )}
           </>
-        ) : resolvable ? (
+        ) : showOnboarding ? (
+          // "issuing" has no action — it advances on its own once the cert lands.
+          onboardStage === "issuing" ? undefined : (
+            <Button
+              text={onboardStage === "sovereign" ? "Continue" : "Set up records"}
+              onPress={dismissOnboarding}
+              type="main"
+            />
+          )
+        ) : manageable ? (
           // Only offer to publish when there are unsaved record edits.
           isDirty(handle) ? (
             <Button
@@ -697,7 +1017,11 @@ export default function ShowHandle({ route, navigation }: Props) {
           <ArrowLeft size={22} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.topTitle} numberOfLines={1}>
-          {buyable ? "Buy handle" : handle}
+          {buyable
+            ? "Buy handle"
+            : showOnboarding && onboardStage === "issuing" && boughtViaNacho
+              ? "Issuing certificate"
+              : handle}
         </Text>
         <TouchableOpacity
           onPress={() => {
@@ -716,6 +1040,8 @@ export default function ShowHandle({ route, navigation }: Props) {
 
       {buyable ? (
         renderPurchase()
+      ) : showOnboarding ? (
+        renderOnboarding()
       ) : (
         <>
       <View style={styles.identity}>
@@ -736,7 +1062,7 @@ export default function ShowHandle({ route, navigation }: Props) {
             <Text style={styles.statusText}>{pill.label}</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={refreshResolution} disabled={resolving} hitSlop={8}>
+        <TouchableOpacity onPress={() => refreshResolution()} disabled={resolving} hitSlop={8}>
           <Text style={styles.refreshText}>{resolving ? "…" : "Refresh"}</Text>
         </TouchableOpacity>
       </View>
@@ -804,7 +1130,7 @@ export default function ShowHandle({ route, navigation }: Props) {
         )}
       </View>
 
-      {resolvable && (
+      {manageable && (
         <>
           <View style={styles.recordsHead}>
             <Text style={styles.recordsTitle}>Records</Text>
@@ -914,6 +1240,87 @@ const makeStyles = (c: Colors) =>
       alignItems: "center",
       marginTop: 4,
       marginBottom: 24,
+    },
+    // ── Post-purchase onboarding states (issuing / ready / sovereign) ──
+    onboard: {
+      alignItems: "center",
+      paddingTop: 24,
+    },
+    onboardIcon: {
+      width: 72,
+      height: 72,
+      borderRadius: 999,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 18,
+    },
+    onboardName: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: c.text,
+      marginBottom: 6,
+    },
+    onboardStatus: {
+      fontSize: 16,
+      fontWeight: "600",
+      marginBottom: 18,
+    },
+    onboardText: {
+      fontSize: 15,
+      color: c.textSecondary,
+      textAlign: "center",
+      lineHeight: 21,
+      paddingHorizontal: 20,
+      marginTop: 4,
+    },
+    onboardCard: {
+      alignSelf: "stretch",
+      flexDirection: "row",
+      gap: 12,
+      backgroundColor: c.field,
+      borderRadius: 14,
+      padding: 16,
+    },
+    onboardCardText: {
+      flex: 1,
+      gap: 3,
+    },
+    onboardCardTitle: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: c.text,
+    },
+    onboardCardBody: {
+      fontSize: 14,
+      color: c.textSecondary,
+      lineHeight: 19,
+    },
+    viewProof: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: c.accent,
+      marginTop: 10,
+    },
+    onboardDetails: {
+      alignSelf: "stretch",
+      marginTop: 20,
+    },
+    onboardDetailRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 14,
+      borderTopWidth: 1,
+      borderTopColor: c.borderWarm,
+    },
+    onboardDetailLabel: {
+      fontSize: 15,
+      color: c.textSecondary,
+    },
+    onboardDetailValue: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: c.text,
     },
     // ── Purchase / claim view ──
     purchase: {

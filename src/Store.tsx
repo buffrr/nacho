@@ -3,11 +3,15 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useRef,
   ReactNode,
 } from "react";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
+import { kvGet, kvSet, certDelete, recordsDelete } from "@/db";
+import { migrateLegacyStore } from "@/migrateLegacy";
+import { loadNetConfig } from "@/config";
 import { CertData, isCertData, areCertDataEqual } from "@/cert";
 import {
   xpubFromXprv,
@@ -159,6 +163,14 @@ export type HandleResolution =
       updatedAt: number;
     };
 
+// Set when a handle was bought through nacho's in-app purchase, so we can show
+// the reassuring "Purchase complete / issuing certificate" state (vs the plain
+// "waiting for certificate" for handles registered elsewhere).
+export type PurchaseInfo = {
+  amountCents?: number;
+  orderId?: string;
+};
+
 // A handle's key is either derived from the keystore seed (a BIP-32 path) or an
 // externally imported keypair (the public key, with the private key held in
 // secure storage).
@@ -169,6 +181,12 @@ export type HandleData =
       cert?: CertData;
       resolution?: HandleResolution;
       certRef?: CertRef;
+      // Whether the user has walked through the post-purchase onboarding states
+      // (issuing → ready-to-use → sovereign). `false` on a freshly created
+      // handle; undefined on pre-existing ones (treated as already onboarded).
+      onboarded?: boolean;
+      // Present when bought via nacho IAP (drives the "Purchase complete" state).
+      purchase?: PurchaseInfo;
     }
   | {
       source: "imported";
@@ -176,6 +194,8 @@ export type HandleData =
       cert?: CertData;
       resolution?: HandleResolution;
       certRef?: CertRef;
+      onboarded?: boolean;
+      purchase?: PurchaseInfo;
     };
 
 function isHandleResolution(obj: unknown): obj is HandleResolution {
@@ -216,6 +236,8 @@ function normalizeHandleData(obj: unknown): HandleData | null {
     cert?: CertData;
     resolution?: HandleResolution;
     certRef?: CertRef;
+    onboarded?: boolean;
+    purchase?: PurchaseInfo;
   } = {};
   if (handle.cert !== undefined) {
     extra.cert = handle.cert as CertData;
@@ -225,6 +247,16 @@ function normalizeHandleData(obj: unknown): HandleData | null {
   }
   if (isCertRef(handle.certRef)) {
     extra.certRef = handle.certRef;
+  }
+  if (typeof handle.onboarded === "boolean") {
+    extra.onboarded = handle.onboarded;
+  }
+  if (handle.purchase && typeof handle.purchase === "object") {
+    const p = handle.purchase as PurchaseInfo;
+    const info: PurchaseInfo = {};
+    if (typeof p.amountCents === "number") info.amountCents = p.amountCents;
+    if (typeof p.orderId === "string") info.orderId = p.orderId;
+    extra.purchase = info;
   }
 
   // Imported keypair.
@@ -362,6 +394,8 @@ type StoreContextType = {
     resolution: HandleResolution,
   ) => Promise<void>;
   setCertRef: (handle: string, certRef: CertRef | null) => Promise<void>;
+  setHandleOnboarded: (handle: string, value: boolean) => Promise<void>;
+  setHandlePurchase: (handle: string, purchase: PurchaseInfo) => Promise<void>;
 };
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -370,6 +404,12 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   const [xpub, setXpub] = useState<string | null>(null);
   const [handles, setHandles] = useState<HandlesMap | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  // Always-latest handles, updated synchronously in saveKeystore, so the
+  // per-handle setters merge into the current map instead of a stale render
+  // closure (which caused resolution/certRef writes to clobber each other and
+  // the sovereignty pill to flap).
+  const handlesRef = useRef<HandlesMap | null>(null);
+  const currentHandles = () => handlesRef.current ?? handles;
 
   useEffect(() => {
     loadData();
@@ -377,12 +417,18 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
 
   const loadData = async () => {
     try {
-      const keystoreJson = await AsyncStorage.getItem("keystore");
+      // Load the user's network config before anything resolves / hits the API.
+      await loadNetConfig();
+      // Fold any pre-SQLite data (AsyncStorage keystore + old cert store) into
+      // the database once, then read from it.
+      await migrateLegacyStore();
+      const keystoreJson = await kvGet("keystore");
       if (keystoreJson) {
         const keystore = migrateKeystore(JSON.parse(keystoreJson));
         if (keystore) {
           setXpub(keystore.xpub);
           setHandles(keystore.handles);
+          handlesRef.current = keystore.handles;
         }
       }
     } catch (error) {
@@ -398,10 +444,11 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       setXpub(xpubToSave);
       xpubValue = xpubToSave;
     }
-    let handlesValue = handles;
+    let handlesValue = handlesToSave ?? handlesRef.current ?? handles;
     if (handlesToSave !== undefined) {
       setHandles(handlesToSave);
       handlesValue = handlesToSave;
+      handlesRef.current = handlesToSave;
     }
 
     if (xpubValue === null) {
@@ -412,7 +459,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const keystore: Keystore = { xpub: xpubValue, handles: handlesValue };
-    await AsyncStorage.setItem("keystore", JSON.stringify(keystore));
+    await kvSet("keystore", JSON.stringify(keystore));
   };
 
   const getXprv = async (): Promise<string | null> => {
@@ -436,18 +483,21 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const createHandle = async (handle: string): Promise<void> => {
-    if (handles === null) {
+    const base = currentHandles();
+    if (base === null) {
       throw new Error("Cannot create handle without handles");
     }
-    if (handle in handles) {
+    if (handle in base) {
       return;
     }
 
     await saveKeystore({
-      ...handles,
+      ...base,
       [handle]: {
         source: "derived",
-        path: nextDerivedPath(handles),
+        path: nextDerivedPath(base),
+        // New handle → show the post-purchase onboarding states until dismissed.
+        onboarded: false,
       },
     });
   };
@@ -494,10 +544,11 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const removeHandle = async (handle: string): Promise<void> => {
-    if (handles === null) {
+    const base = currentHandles();
+    if (base === null) {
       throw new Error("Cannot remove handle without handles");
     }
-    const handleData = handles[handle];
+    const handleData = base[handle];
     if (handleData === undefined) {
       return;
     }
@@ -506,7 +557,12 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       await secureStorage.removeHandlePrivkey(handle);
     }
 
-    const { [handle]: removed, ...remainingHandles } = handles;
+    // Drop the handle's cert + cached records so they don't linger in the DB
+    // (and the single-file backup) after removal.
+    await certDelete(handle);
+    await recordsDelete(handle);
+
+    const { [handle]: removed, ...remainingHandles } = base;
 
     await saveKeystore(remainingHandles);
   };
@@ -533,11 +589,9 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     handle: string,
     cert: CertData | null,
   ): Promise<void> => {
-    if (handles === null) {
-      throw new Error("Cannot create handle without handles");
-    }
-    const handleData = handles[handle];
-    if (handleData === undefined) {
+    const base = currentHandles();
+    const handleData = base?.[handle];
+    if (!base || handleData === undefined) {
       return;
     }
 
@@ -554,7 +608,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     }
 
     await saveKeystore({
-      ...handles,
+      ...base,
       [handle]: updatedHandleData,
     });
   };
@@ -563,15 +617,13 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     handle: string,
     resolution: HandleResolution,
   ): Promise<void> => {
-    if (handles === null) {
-      return;
-    }
-    const handleData = handles[handle];
-    if (handleData === undefined) {
+    const base = currentHandles();
+    const handleData = base?.[handle];
+    if (!base || handleData === undefined) {
       return;
     }
     await saveKeystore({
-      ...handles,
+      ...base,
       [handle]: { ...handleData, resolution },
     });
   };
@@ -580,11 +632,9 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     handle: string,
     certRef: CertRef | null,
   ): Promise<void> => {
-    if (handles === null) {
-      return;
-    }
-    const handleData = handles[handle];
-    if (handleData === undefined) {
+    const base = currentHandles();
+    const handleData = base?.[handle];
+    if (!base || handleData === undefined) {
       return;
     }
     const updated = { ...handleData };
@@ -593,7 +643,37 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     } else {
       updated.certRef = certRef;
     }
-    await saveKeystore({ ...handles, [handle]: updated });
+    await saveKeystore({ ...base, [handle]: updated });
+  };
+
+  const setHandleOnboarded = async (
+    handle: string,
+    value: boolean,
+  ): Promise<void> => {
+    const base = currentHandles();
+    const handleData = base?.[handle];
+    if (!base || handleData === undefined) {
+      return;
+    }
+    await saveKeystore({
+      ...base,
+      [handle]: { ...handleData, onboarded: value },
+    });
+  };
+
+  const setHandlePurchase = async (
+    handle: string,
+    purchase: PurchaseInfo,
+  ): Promise<void> => {
+    const base = currentHandles();
+    const handleData = base?.[handle];
+    if (!base || handleData === undefined) {
+      return;
+    }
+    await saveKeystore({
+      ...base,
+      [handle]: { ...handleData, purchase },
+    });
   };
 
   if (!isLoaded) {
@@ -617,6 +697,8 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         setHandleCertData,
         setHandleResolution,
         setCertRef,
+        setHandleOnboarded,
+        setHandlePurchase,
       }}
     >
       {children}
