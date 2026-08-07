@@ -14,7 +14,7 @@ import { Keystore, isKeystore } from "@/Store";
 import { usePendingKeystore } from "@/PendingKeystore";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
-import { ScreenHeader } from "@/ui/ScreenHeader";
+import { ScreenSubtitle } from "@/ui/ScreenSubtitle";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 
@@ -90,7 +90,7 @@ export default function ImportKeystore() {
 
   return (
     <Layout
-      padTop
+      underHeader
       footer={
         <Button
           text={importing ? "Restoring…" : "Restore backup"}
@@ -100,11 +100,10 @@ export default function ImportKeystore() {
         />
       }
     >
-      <ScreenHeader
-        title="Restore from backup"
-        subtitle="Select a Nacho backup (.sqlite) to restore your public key, handles, and certificates."
-        onBack={() => router.back()}
-      />
+      <ScreenSubtitle>
+        Select a Nacho backup (.sqlite) to restore your public key, handles, and
+        certificates.
+      </ScreenSubtitle>
 
       <View style={styles.fileSelectionContainer}>
         <Button text="Select backup file" onPress={selectFile} type="secondary" />

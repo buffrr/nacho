@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
-import { ScreenHeader } from "@/ui/ScreenHeader";
+import { ScreenSubtitle } from "@/ui/ScreenSubtitle";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 import {
@@ -144,7 +144,7 @@ export default function CreateRequest() {
 
   return (
     <Layout
-      padTop
+      underHeader
       footer={
         <Button
           text={buttonText}
@@ -154,11 +154,9 @@ export default function CreateRequest() {
         />
       }
     >
-      <ScreenHeader
-        title="Create a request"
-        subtitle="Enter a handle to add it to your keystore and derive its key."
-        onBack={() => router.back()}
-      />
+      <ScreenSubtitle>
+        Enter a handle to add it to your keystore and derive its key.
+      </ScreenSubtitle>
       <TextInput
         value={handle}
         onChangeText={(text) => {

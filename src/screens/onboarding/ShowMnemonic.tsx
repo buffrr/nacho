@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Stack } from "expo-router";
 import {
   generateMnemonic,
   xpubFromMnemonic,
@@ -15,7 +15,7 @@ import {
 import { useStore } from "@/Store";
 import { usePendingKeystore } from "@/PendingKeystore";
 import { Button } from "@/ui/Button";
-import { ScreenHeader } from "@/ui/ScreenHeader";
+import { ScreenSubtitle } from "@/ui/ScreenSubtitle";
 import { Layout } from "@/ui/Layout";
 import { SvgXml } from "react-native-svg";
 import { Colors, useTheme } from "@/theme";
@@ -42,7 +42,7 @@ export default function () {
 
   return (
     <Layout
-      padTop
+      underHeader
       footer={
         <>
           <Button
@@ -80,13 +80,16 @@ export default function () {
         </>
       }
     >
+      <Stack.Screen
+        options={{
+          title: mnemonic ? "Back up your seed phrase" : "Generate seed phrase",
+        }}
+      />
       {!mnemonic ? (
         <>
-          <ScreenHeader
-            title="Generate seed phrase"
-            subtitle="Your seed phrase is the master key to your handles."
-            onBack={() => router.back()}
-          />
+          <ScreenSubtitle>
+            Your seed phrase is the master key to your handles.
+          </ScreenSubtitle>
 
           <View style={styles.warningsContainer}>
             <View style={styles.warningItem}>
@@ -155,10 +158,10 @@ export default function () {
         </>
       ) : (
         <>
-          <ScreenHeader
-            title="Back up your seed phrase"
-            subtitle="Write down these 12 words in order. They're the only way to recover your handles."
-          />
+          <ScreenSubtitle>
+            Write down these 12 words in order. They're the only way to recover
+            your handles.
+          </ScreenSubtitle>
 
           <View style={styles.mnemonicContainer}>
             <View style={styles.wordsGrid}>

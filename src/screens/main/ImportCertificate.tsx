@@ -7,7 +7,7 @@ import { scriptForHandle } from "@/keys";
 import { isCert, extractCertData } from "@/cert";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
-import { ScreenHeader } from "@/ui/ScreenHeader";
+import { ScreenSubtitle } from "@/ui/ScreenSubtitle";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 import { QrScanner } from "@/ui/QrScanner";
@@ -132,7 +132,7 @@ export default function ImportCertificate() {
 
   return (
     <Layout
-      padTop
+      underHeader
       footer={
         <Button
           text="Upload certificate file"
@@ -141,11 +141,9 @@ export default function ImportCertificate() {
         />
       }
     >
-      <ScreenHeader
-        title="Import certificate"
-        subtitle={`Scan a QR code or upload a file to add the certificate for ${handle}.`}
-        onBack={() => router.back()}
-      />
+      <ScreenSubtitle>
+        {`Scan a QR code or upload a file to add the certificate for ${handle}.`}
+      </ScreenSubtitle>
 
       <View style={styles.frame}>
         <View style={styles.camera}>

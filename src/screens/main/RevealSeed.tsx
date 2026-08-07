@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
-import { ScreenHeader } from "@/ui/ScreenHeader";
+import { ScreenSubtitle } from "@/ui/ScreenSubtitle";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 
@@ -28,12 +28,10 @@ export default function RevealSeed() {
 
   if (words !== null && words.length === 0) {
     return (
-      <Layout padTop>
-        <ScreenHeader
-          title="Seed phrase"
-          subtitle="No seed phrase is stored on this device."
-          onBack={() => router.back()}
-        />
+      <Layout underHeader>
+        <ScreenSubtitle>
+          No seed phrase is stored on this device.
+        </ScreenSubtitle>
         <Message
           message="This keystore was set up without saving its seed phrase. Back it up with the keystore file from Settings instead."
           type="error"
@@ -44,7 +42,7 @@ export default function RevealSeed() {
 
   return (
     <Layout
-      padTop
+      underHeader
       footer={
         !revealed ? (
           <Button
@@ -56,11 +54,10 @@ export default function RevealSeed() {
         ) : undefined
       }
     >
-      <ScreenHeader
-        title="Seed phrase"
-        subtitle="Write these 12 words down in order and keep them offline. Anyone with them controls your handles."
-        onBack={() => router.back()}
-      />
+      <ScreenSubtitle>
+        Write these 12 words down in order and keep them offline. Anyone with
+        them controls your handles.
+      </ScreenSubtitle>
 
       {revealed && words && (
         <View style={styles.wordsGrid}>

@@ -4,7 +4,12 @@ import {
   useLocalSearchParams,
   useRouter,
   Redirect,
+  Stack,
 } from "expo-router";
+import type {
+  NativeStackHeaderItem,
+  NativeStackHeaderItemMenuAction,
+} from "@react-navigation/native-stack";
 import {
   View,
   Text,
@@ -12,6 +17,7 @@ import {
   Platform,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useStore } from "@/Store";
 import { pubkeyForHandle, p2trScriptFromPub } from "@/keys";
@@ -23,7 +29,6 @@ import { useRecordsDraft } from "@/RecordsDraft";
 import { editableFromZone } from "@/fabricResolver";
 import { avatarColors, handlePill } from "@/handleTile";
 import { Layout } from "@/ui/Layout";
-import { BottomSheet } from "@/ui/BottomSheet";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 import { Colors, useTheme } from "@/theme";
@@ -37,14 +42,9 @@ import {
 import { recordsGet, recordsSet } from "@/db";
 import {
   AtSign,
-  MoreVertical,
   Copy,
   Pencil,
   Lock,
-  ArrowLeft,
-  Download,
-  Upload,
-  Trash,
   Check,
   Anchor,
   ShieldCheck,
@@ -158,8 +158,6 @@ export default function ShowHandle() {
   // Alias is published by the operator and read from fabric resolution — it is
   // not something the user edits here.
   const [alias, setAlias] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -400,12 +398,10 @@ export default function ShowHandle() {
   refreshRef.current = refreshResolution;
 
   const handleImportCertificate = () => {
-    setMenuOpen(false);
     router.push({ pathname: "/(main)/import-certificate", params: { handle } });
   };
 
   const handleExportCertificate = async () => {
-    setMenuOpen(false);
     const bytes = await loadCert(handle);
     if (bytes) {
       // saveBinary opens the native share sheet on iOS/Android (save to Files,
@@ -435,6 +431,23 @@ export default function ShowHandle() {
     await deleteCert(handle);
     await removeHandle(handle);
     router.replace("/(main)/(tabs)/handles");
+  };
+
+  // Native confirm (Alert) for the destructive remove — replaces the old
+  // in-sheet two-step confirm.
+  const confirmRemoveHandle = () => {
+    Alert.alert(
+      "Remove handle?",
+      `This only removes ${handle} from this keystore. Your seed phrase can re-derive it.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove handle",
+          style: "destructive",
+          onPress: handleRemoveHandle,
+        },
+      ],
+    );
   };
 
   const handleCopyRequest = async () => {
@@ -941,10 +954,51 @@ export default function ShowHandle() {
     </View>
   );
 
+  const headerTitle = buyable
+    ? "Buy handle"
+    : showOnboarding && onboardStage === "issuing" && boughtViaNacho
+      ? "Issuing certificate"
+      : handle;
+
+  // The ⋯ options as a NATIVE header menu (UIMenu). Only when the handle is
+  // owned (not while buying).
+  const menuActions: NativeStackHeaderItemMenuAction[] = [
+    {
+      type: "action",
+      label: "Import certificate",
+      icon: { type: "sfSymbol", name: "square.and.arrow.down" },
+      onPress: handleImportCertificate,
+    },
+  ];
+  if (handleData.certRef) {
+    menuActions.push({
+      type: "action",
+      label: "Export certificate",
+      icon: { type: "sfSymbol", name: "square.and.arrow.up" },
+      onPress: handleExportCertificate,
+    });
+  }
+  menuActions.push({
+    type: "action",
+    label: "Remove handle",
+    icon: { type: "sfSymbol", name: "trash" },
+    destructive: true,
+    onPress: confirmRemoveHandle,
+  });
+  const headerItems: NativeStackHeaderItem[] = buyable
+    ? []
+    : [
+        {
+          type: "menu",
+          label: "Options",
+          icon: { type: "sfSymbol", name: "ellipsis" },
+          menu: { items: menuActions },
+        },
+      ];
+
   return (
-    <View style={{ flex: 1 }}>
     <Layout
-      padTop
+      underHeader
       footer={
         buyable ? (
           <>
@@ -998,32 +1052,12 @@ export default function ShowHandle() {
         )
       }
     >
-      <View style={styles.topbar}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          hitSlop={8}
-          accessibilityLabel="Back"
-        >
-          <ArrowLeft size={22} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.topTitle} numberOfLines={1}>
-          {buyable
-            ? "Buy handle"
-            : showOnboarding && onboardStage === "issuing" && boughtViaNacho
-              ? "Issuing certificate"
-              : handle}
-        </Text>
-        <TouchableOpacity
-          onPress={() => {
-            setConfirmingRemove(false);
-            setMenuOpen(true);
-          }}
-          hitSlop={8}
-          accessibilityLabel="Options"
-        >
-          <MoreVertical size={22} color={colors.text} />
-        </TouchableOpacity>
-      </View>
+      <Stack.Screen
+        options={{
+          title: headerTitle,
+          unstable_headerRightItems: () => headerItems,
+        }}
+      />
 
       {error && <Message message={error} type="error" />}
       {notice && !error && <Message message={notice} type="success" />}
@@ -1168,66 +1202,6 @@ export default function ShowHandle() {
       )}
 
     </Layout>
-
-      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)}>
-        {confirmingRemove ? (
-          <>
-            <Text style={styles.sheetTitle}>Remove handle?</Text>
-            <Text style={styles.sheetText}>
-              This only removes {handle} from this keystore. Your seed phrase can
-              re-derive it.
-            </Text>
-            <Button
-              text="Remove handle"
-              onPress={handleRemoveHandle}
-              type="danger"
-            />
-            <Button
-              text="Back"
-              onPress={() => setConfirmingRemove(false)}
-              type="secondary"
-            />
-          </>
-        ) : (
-          <>
-            <TouchableOpacity
-              style={styles.menuRow}
-              onPress={handleImportCertificate}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: colors.field }]}>
-                <Upload size={20} color={colors.text} />
-              </View>
-              <Text style={styles.menuRowText}>Import certificate</Text>
-            </TouchableOpacity>
-            {handleData.certRef && (
-              <TouchableOpacity
-                style={styles.menuRow}
-                onPress={handleExportCertificate}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.menuIcon, { backgroundColor: colors.field }]}>
-                  <Download size={20} color={colors.text} />
-                </View>
-                <Text style={styles.menuRowText}>Export certificate</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={styles.menuRow}
-              onPress={() => setConfirmingRemove(true)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: colors.dangerBg }]}>
-                <Trash size={20} color={colors.danger} />
-              </View>
-              <Text style={[styles.menuRowText, { color: colors.danger }]}>
-                Remove handle
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </BottomSheet>
-    </View>
   );
 }
 

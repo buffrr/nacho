@@ -6,18 +6,17 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { useRouter, Redirect } from "expo-router";
+import { Redirect, Stack } from "expo-router";
 import { useStore } from "@/Store";
 import { validateMnemonic, xprvFromMnemonic, xpubFromXprv } from "@/keys";
 import { usePendingKeystore } from "@/PendingKeystore";
 import { Button } from "@/ui/Button";
-import { ScreenHeader } from "@/ui/ScreenHeader";
+import { ScreenSubtitle } from "@/ui/ScreenSubtitle";
 import { Layout } from "@/ui/Layout";
 import { Message } from "@/ui/Message";
 import { Colors, useTheme } from "@/theme";
 
 export default function () {
-  const router = useRouter();
   const { pending } = usePendingKeystore();
   const xpub = pending?.xpub ?? "";
   const handles = pending?.handles;
@@ -82,7 +81,7 @@ export default function () {
 
   return (
     <Layout
-      padTop
+      underHeader
       footer={
         <Button
           text="Verify seed phrase"
@@ -92,15 +91,14 @@ export default function () {
         />
       }
     >
-      <ScreenHeader
-        title={isNew ? "Confirm seed phrase" : "Enter seed phrase"}
-        subtitle={
-          isNew
-            ? "Enter your 12-word seed phrase to confirm you've saved it correctly."
-            : "Enter your 12-word seed phrase to confirm you have the private key associated with the keystore."
-        }
-        onBack={() => router.back()}
+      <Stack.Screen
+        options={{ title: isNew ? "Confirm seed phrase" : "Enter seed phrase" }}
       />
+      <ScreenSubtitle>
+        {isNew
+          ? "Enter your 12-word seed phrase to confirm you've saved it correctly."
+          : "Enter your 12-word seed phrase to confirm you have the private key associated with the keystore."}
+      </ScreenSubtitle>
 
       <View style={styles.inputContainer}>
         {inputWords.map((word, index) => (

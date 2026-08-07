@@ -38,13 +38,13 @@ export default function RegisterHub() {
       items: [
         {
           title: "Shop for a handle",
-          subtitle: "Browse and buy available handles",
+          subtitle: "Browse and buy",
           Icon: Storefront,
           go: () => router.navigate("/(main)/(tabs)/shop"),
         },
         {
           title: "Redeem a code",
-          subtitle: "Have a voucher or gift code",
+          subtitle: "Voucher or gift code",
           Icon: Ticket,
           go: () => router.push("/(main)/redeem"),
         },
@@ -72,7 +72,6 @@ export default function RegisterHub() {
   return (
     <View style={styles.sheet}>
       <Text style={styles.title}>Add a handle</Text>
-      <Text style={styles.subtitle}>Choose how you'd like to get one.</Text>
 
       {groups.map((group, gi) => (
         <View key={gi} style={styles.section}>
@@ -115,43 +114,32 @@ const makeStyles = (c: Colors) =>
       fontSize: 24,
       fontWeight: "700",
       color: c.text,
-    },
-    subtitle: {
-      fontSize: 15,
-      color: c.textSecondary,
-      marginTop: 4,
-      marginBottom: 20,
+      marginBottom: 8,
     },
     section: {
-      marginBottom: 8,
+      marginBottom: 4,
     },
     sectionLabel: {
       fontSize: 12,
       fontWeight: "600",
       letterSpacing: 0.6,
       color: c.textMuted,
-      marginTop: 12,
-      marginBottom: 8,
-      marginLeft: 4,
+      marginTop: 16,
+      marginBottom: 4,
     },
-    group: {
-      backgroundColor: c.card,
-      borderRadius: 16,
-      borderCurve: "continuous",
-      overflow: "hidden",
-    },
+    // Flat rows directly on the sheet (no card bg), separated by a hairline.
+    group: {},
     row: {
       flexDirection: "row",
       alignItems: "center",
       gap: 14,
-      paddingHorizontal: 16,
       paddingVertical: 14,
     },
     divider: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: c.border,
-      // Inset past the icon (paddingLeft 16 + icon 24 + gap 14).
-      marginLeft: 54,
+      // Inset past the icon (icon 24 + gap 14).
+      marginLeft: 38,
     },
     mid: {
       flex: 1,

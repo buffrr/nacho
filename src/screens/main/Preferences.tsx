@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { Colors, ThemeMode, useTheme } from "@/theme";
 import {
   getNetConfig,
@@ -15,7 +14,6 @@ import {
   NetConfig,
 } from "@/config";
 import { Layout } from "@/ui/Layout";
-import { ScreenHeader } from "@/ui/ScreenHeader";
 import { AlertCircle, X } from "@/ui/icons";
 
 
@@ -28,7 +26,6 @@ const MODES: { id: ThemeMode; label: string }[] = [
 type ListKey = "anchorRelays" | "seeds";
 
 export default function Preferences() {
-  const router = useRouter();
   const { colors, mode, setMode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -104,7 +101,7 @@ export default function Preferences() {
 
   return (
     <Layout
-      padTop
+      underHeader
       footer={
         <View style={styles.footerRow}>
           <TouchableOpacity onPress={onReset} hitSlop={8}>
@@ -116,8 +113,6 @@ export default function Preferences() {
         </View>
       }
     >
-      <ScreenHeader title="Settings" onBack={() => router.back()} />
-
       {/* APPEARANCE */}
       <Text style={styles.sectionLabel}>APPEARANCE</Text>
       <View style={styles.segment}>

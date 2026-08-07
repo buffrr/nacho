@@ -6,11 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { Colors, useTheme } from "@/theme";
 import { useRecordsDraft } from "@/RecordsDraft";
 import { Layout } from "@/ui/Layout";
-import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 
@@ -75,14 +74,13 @@ export default function EditRecord() {
 
   return (
     <Layout
-      padTop
+      underHeader
       footer={
         <Button text="Save record" onPress={save} type="main" />
       }
     >
-      <ScreenHeader
-        title={index !== undefined ? "Edit record" : "Add record"}
-        onBack={() => router.back()}
+      <Stack.Screen
+        options={{ title: index !== undefined ? "Edit record" : "Add record" }}
       />
 
       <Text style={styles.label}>TYPE</Text>

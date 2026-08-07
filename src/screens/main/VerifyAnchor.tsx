@@ -5,7 +5,8 @@ import * as Clipboard from "expo-clipboard";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
 import { Message } from "@/ui/Message";
-import { ArrowLeft, AlertCircle, Clipboard as ClipboardIcon } from "@/ui/icons";
+import { AlertCircle, Clipboard as ClipboardIcon } from "@/ui/icons";
+import { ScreenSubtitle } from "@/ui/ScreenSubtitle";
 import { QrScanner } from "@/ui/QrScanner";
 import { trustFromInput } from "@/fabric";
 
@@ -63,19 +64,10 @@ export default function VerifyAnchor() {
   };
 
   return (
-    <Layout scrollable={false} padTop>
-      <TouchableOpacity
-        onPress={() => router.back()}
-        hitSlop={8}
-        style={styles.back}
-        accessibilityLabel="Back"
-      >
-        <ArrowLeft size={22} color={colors.text} />
-      </TouchableOpacity>
-      <Text style={styles.title}>Scan</Text>
-      <Text style={styles.subtitle}>
+    <Layout scrollable={false} underHeader>
+      <ScreenSubtitle>
         Scan a Trust ID from a Veritas client running locally on your machine.
-      </Text>
+      </ScreenSubtitle>
 
       <View style={styles.banner}>
         <AlertCircle size={20} color={colors.statusAmberFg} />

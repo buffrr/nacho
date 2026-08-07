@@ -6,7 +6,7 @@ import { Colors, useTheme } from "@/theme";
 import { isValidHandle } from "@/handle";
 import { isValidPrivkeyHex } from "@/keys";
 import { Layout } from "@/ui/Layout";
-import { ScreenHeader } from "@/ui/ScreenHeader";
+import { ScreenSubtitle } from "@/ui/ScreenSubtitle";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 
@@ -48,7 +48,7 @@ export default function ImportKeypair() {
 
   return (
     <Layout
-      padTop
+      underHeader
       footer={
         <Button
           text={isLoading ? "Importing..." : "Import keypair"}
@@ -58,11 +58,10 @@ export default function ImportKeypair() {
         />
       }
     >
-      <ScreenHeader
-        title="Import keypair"
-        subtitle="Add a handle backed by an existing private key, not derived from your seed phrase."
-        onBack={() => router.back()}
-      />
+      <ScreenSubtitle>
+        Add a handle backed by an existing private key, not derived from your
+        seed phrase.
+      </ScreenSubtitle>
 
       <TextInput
         value={handle}
