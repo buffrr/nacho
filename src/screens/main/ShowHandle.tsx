@@ -526,8 +526,8 @@ export default function ShowHandle({ route, navigation }: Props) {
     try {
       await requestPurchase({
         request: {
-          ios: { sku: result.product_id },
-          android: { skus: [result.product_id] },
+          apple: { sku: result.product_id },
+          google: { skus: [result.product_id] },
         },
         type: "in-app",
       });

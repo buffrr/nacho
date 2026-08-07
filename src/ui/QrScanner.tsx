@@ -66,7 +66,7 @@ export function QrScanner({ active, onScan }: QrScannerProps) {
 
 const styles = StyleSheet.create({
   prompt: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,

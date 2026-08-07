@@ -2,6 +2,9 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // TS6 deprecates baseUrl (removed in TS7); silence until we drop it. paths
+    // still resolve relative to this tsconfig without it.
+    "ignoreDeprecations": "6.0",
     "baseUrl": "./",
     "paths": {
       "@/*": ["src/*"]

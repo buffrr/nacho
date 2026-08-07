@@ -170,7 +170,7 @@ const makeStyles = (c: Colors) =>
       justifyContent: "flex-end",
     },
     backdrop: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
     },
     sheet: {
       borderTopLeftRadius: 28,

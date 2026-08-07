@@ -166,7 +166,7 @@ const makeStyles = (c: Colors) =>
       justifyContent: "center",
     },
     camera: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       borderRadius: 24,
       overflow: "hidden",
       backgroundColor: c.tileNeutral,

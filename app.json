@@ -42,7 +42,8 @@
       ],
       "expo-iap",
       "expo-font",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-sharing"
     ],
     "extra": {
       "eas": {

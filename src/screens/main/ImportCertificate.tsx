@@ -198,7 +198,7 @@ const makeStyles = (c: Colors) =>
       marginTop: 4,
     },
     camera: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       borderRadius: 24,
       overflow: "hidden",
       backgroundColor: c.tileNeutral,
