@@ -1,10 +1,9 @@
 import React, { useState, useMemo } from "react";
-import { TextInput, StyleSheet } from "react-native";
+import { Text, TextInput, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
-import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 import { claimCode } from "@/api";
@@ -66,7 +65,7 @@ export default function Redeem() {
 
   return (
     <Layout
-      padTop
+      underHeader
       footer={
         <Button
           text={isLoading ? "Redeeming…" : "Redeem"}
@@ -76,11 +75,10 @@ export default function Redeem() {
         />
       }
     >
-      <ScreenHeader
-        title="Redeem code"
-        subtitle="Bought a handle on the web? Enter your claim code to bind it to a new key."
-        onBack={() => router.back()}
-      />
+      <Text style={styles.subtitle}>
+        Bought a handle on the web? Enter your claim code to bind it to a new
+        key.
+      </Text>
       <TextInput
         value={code}
         onChangeText={(text) => {
@@ -101,6 +99,12 @@ export default function Redeem() {
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
+    subtitle: {
+      fontSize: 15,
+      lineHeight: 21,
+      color: c.textSecondary,
+      marginBottom: 20,
+    },
     input: {
       backgroundColor: c.field,
       borderRadius: 14,

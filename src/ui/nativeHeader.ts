@@ -12,3 +12,17 @@ export function nativeHeader(colors: Colors) {
     headerTitleStyle: { color: colors.text },
   };
 }
+
+// Solid variant for detail screens: an opaque header the native stack lays
+// content BELOW (so no contentInsetAdjustmentBehavior is needed → no conflict
+// with the keyboard-aware scroll view on form screens).
+export function solidNativeHeader(colors: Colors) {
+  return {
+    headerLargeTitle: false,
+    headerTransparent: false,
+    headerShadowVisible: false,
+    headerStyle: { backgroundColor: colors.background },
+    headerTintColor: colors.text,
+    headerTitleStyle: { color: colors.text },
+  };
+}

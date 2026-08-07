@@ -17,9 +17,9 @@ interface LayoutProps {
   // scroll content via contentInsetAdjustmentBehavior; Android/web get an
   // explicit bottom pad so the last row clears the bar (intended under-glass scroll).
   tabBarInset?: boolean;
-  // The screen has a native (large-title/transparent) header above it, so the
-  // scroll content sits under it and the top inset is handled natively — skip the
-  // manual top padding and enable automatic content-inset adjustment.
+  // The screen has a native header above it (its top space is handled natively),
+  // so skip the manual top padding. Pair with tabBarInset on transparent tab
+  // headers to also enable automatic content-inset adjustment.
   underHeader?: boolean;
 }
 
@@ -43,7 +43,10 @@ export function Layout({
     : padTop
       ? Math.max(insets.top, 20)
       : insets.top;
-  const autoInset = tabBarInset || underHeader;
+  // Auto content-inset only for the transparent tab headers (content scrolls
+  // under them). Solid detail headers lay content below themselves, so it's off
+  // there — otherwise it fights the keyboard-aware scroll view on forms.
+  const autoInset = tabBarInset;
   const bottomPad =
     tabBarInset && Platform.OS !== "ios" ? insets.bottom + TAB_BAR_PAD : 0;
 

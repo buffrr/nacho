@@ -5,7 +5,7 @@ import React, {
   useState,
   ReactNode,
 } from "react";
-import { useColorScheme } from "react-native";
+import { useColorScheme, Appearance } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Semantic color tokens mirroring the Nacho v2 Figma variable system.
@@ -182,6 +182,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setModeState(next);
     AsyncStorage.setItem("themeMode", next);
   };
+
+  // Push the chosen appearance down to the native layer (the way Signal etc.
+  // do it): this overrides the app's UIUserInterfaceStyle so native components —
+  // sheets, headers, blur, tab bar — follow OUR theme rather than the system
+  // appearance. `"unspecified"` = follow the system (RN 0.86 reset value).
+  useEffect(() => {
+    Appearance.setColorScheme(mode === "system" ? "unspecified" : mode);
+  }, [mode]);
 
   const scheme: "light" | "dark" =
     mode === "system" ? (system === "light" ? "light" : "dark") : mode;
