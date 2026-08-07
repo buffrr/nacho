@@ -112,7 +112,7 @@ export default function Settings() {
     gap != null && gap > 0 ? colors.statusAmberFg : colors.statusGreenFg;
 
   return (
-    <Layout padTop>
+    <Layout padTop tabBarInset>
       <View style={styles.titleRow}>
         <Text style={styles.screenTitle}>Trust</Text>
         <TouchableOpacity

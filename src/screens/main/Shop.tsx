@@ -5,8 +5,10 @@ import {
   TextInput,
   FlatList,
   TouchableOpacity,
+  Platform,
   StyleSheet,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
@@ -17,6 +19,7 @@ import { searchHandles, formatPrice, SearchMatch } from "@/api";
 
 export default function Shop() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { handles } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -132,6 +135,10 @@ export default function Shop() {
         keyExtractor={(m) => m.handle}
         style={styles.list}
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{
+          paddingBottom: Platform.OS === "ios" ? 0 : insets.bottom + 64,
+        }}
         ListEmptyComponent={
           <Text style={styles.empty}>
             {!query

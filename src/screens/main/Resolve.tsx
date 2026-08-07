@@ -227,9 +227,7 @@ export default function Resolve() {
     );
 
   return (
-    <Layout
-      padTop
-    >
+    <Layout padTop tabBarInset>
       <Text style={styles.title}>Resolve</Text>
       <Text style={styles.subtitle}>Look up a handle to pay or verify.</Text>
 
