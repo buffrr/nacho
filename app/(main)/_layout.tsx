@@ -32,6 +32,9 @@ export default function MainLayout() {
             sheetGrabberVisible: true,
             sheetCornerRadius: 24,
             headerShown: false,
+            // Transparent container so the sheet's native (glass) material shows
+            // through — the Stack's opaque `contentStyle` would otherwise cover it.
+            contentStyle: { backgroundColor: "transparent" },
           }}
         />
         {/* show-handle + edit-record set their (dynamic) titles in-component. */}

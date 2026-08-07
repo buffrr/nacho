@@ -1,6 +1,11 @@
 import React from "react";
 import { Platform, View, StyleSheet } from "react-native";
-import { Stack } from "expo-router";
+import {
+  Stack,
+  ThemeProvider as NavThemeProvider,
+  DarkTheme as NavDarkTheme,
+  DefaultTheme as NavDefaultTheme,
+} from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StoreProvider, useStore } from "@/Store";
 import { ThemeProvider, useTheme } from "@/theme";
@@ -16,22 +21,47 @@ applyKarlaDefault();
 // Navigation.tsx RootStack conditional.
 function RootLayoutNav() {
   const { xpub, handles } = useStore();
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const isConfigured = xpub !== null && handles !== null;
+
+  // The navigator's own theme paints BEHIND screens during native transitions
+  // (the slide). Expo Router defaults to react-navigation's light theme (white
+  // bg) — that white is what flashed behind the header on the Handles→detail
+  // slide. Derive the nav theme from our app colors so the transition backdrop
+  // is the theme background. (ThemeProvider/DarkTheme are re-exported by
+  // expo-router; importing them from @react-navigation/native is guarded.)
+  const base = scheme === "light" ? NavDefaultTheme : NavDarkTheme;
+  const navTheme = React.useMemo(
+    () => ({
+      ...base,
+      colors: {
+        ...base.colors,
+        background: colors.background,
+        card: colors.background,
+        text: colors.text,
+        border: colors.border,
+        primary: colors.accent,
+      },
+    }),
+    [base, colors],
+  );
+
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
-      }}
-    >
-      <Stack.Protected guard={isConfigured}>
-        <Stack.Screen name="(main)" />
-      </Stack.Protected>
-      <Stack.Protected guard={!isConfigured}>
-        <Stack.Screen name="(onboarding)" />
-      </Stack.Protected>
-    </Stack>
+    <NavThemeProvider value={navTheme}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <Stack.Protected guard={isConfigured}>
+          <Stack.Screen name="(main)" />
+        </Stack.Protected>
+        <Stack.Protected guard={!isConfigured}>
+          <Stack.Screen name="(onboarding)" />
+        </Stack.Protected>
+      </Stack>
+    </NavThemeProvider>
   );
 }
 
