@@ -10,6 +10,7 @@ import { useTheme } from "@/theme";
 const TAB_ICONS = {
   handles: require("../../../assets/tabs/handles.png"),
   shop: require("../../../assets/tabs/shop.png"),
+  scan: require("../../../assets/tabs/scan.png"),
   resolve: require("../../../assets/tabs/resolve.png"),
   trust: require("../../../assets/tabs/trust.png"),
 };
@@ -25,6 +26,10 @@ export default function TabsLayout() {
       <NativeTabs.Trigger name="shop">
         <NativeTabs.Trigger.Icon src={TAB_ICONS.shop} renderingMode="template" />
         <NativeTabs.Trigger.Label>Shop</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="scan">
+        <NativeTabs.Trigger.Icon src={TAB_ICONS.scan} renderingMode="template" />
+        <NativeTabs.Trigger.Label>Scan</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="resolve">
         <NativeTabs.Trigger.Icon src={TAB_ICONS.resolve} renderingMode="template" />

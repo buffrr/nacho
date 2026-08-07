@@ -37,7 +37,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Camera access is required to scan QR codes",
+          "cameraPermission": "Camera access is required to scan QR codes and handles",
           "recordAudioAndroid": false
         }
       ],

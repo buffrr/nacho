@@ -35,3 +35,24 @@ export function interpret(raw: string): ScanInput {
 
   return { kind: "unknown", value: text };
 }
+
+// OCR grammar: recognized frames come back as noisy lines of text, so unlike a
+// checksum-validated QR payload we must find a token that strictly parses as a
+// handle. URIs are intentionally NOT accepted from OCR (a mis-read address/
+// invoice has no checksum feedback here); handles are self-correcting because
+// resolution confirms them, and the Scan screen additionally requires two
+// consecutive identical matches. Returns the first handle found, else null.
+export function matchOcrLines(lines: string[]): ScanInput | null {
+  for (const line of lines) {
+    for (const rawToken of line.split(/\s+/)) {
+      // Trim punctuation/quotes OCR often glues onto the token edges.
+      const token = rawToken
+        .replace(/^[^a-z0-9]+/i, "")
+        .replace(/[^a-z0-9._@-]+$/i, "");
+      if (!token.includes("@")) continue;
+      const res = interpret(token);
+      if (res.kind === "handle") return res;
+    }
+  }
+  return null;
+}

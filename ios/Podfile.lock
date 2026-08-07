@@ -112,6 +112,8 @@ PODS:
   - hermes-engine (250829098.0.16):
     - hermes-engine/Pre-built (= 250829098.0.16)
   - hermes-engine/Pre-built (250829098.0.16)
+  - Ocr (1.0.0):
+    - ExpoModulesCore
   - openiap (3.0.1)
   - RCTDeprecation (0.86.2)
   - RCTRequired (0.86.2)
@@ -2393,6 +2395,7 @@ DEPENDENCIES:
   - "ExpoUI (from `../node_modules/@expo/ui/ios`)"
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
+  - Ocr (from `../modules/ocr/ios`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
   - RCTRequired (from `../node_modules/react-native/Libraries/Required`)
   - RCTSwiftUI (from `../node_modules/react-native/ReactApple/RCTSwiftUI`)
@@ -2542,6 +2545,8 @@ EXTERNAL SOURCES:
   hermes-engine:
     :podspec: "../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-v250829098.0.16
+  Ocr:
+    :path: "../modules/ocr/ios"
   RCTDeprecation:
     :path: "../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation"
   RCTRequired:
@@ -2740,6 +2745,7 @@ SPEC CHECKSUMS:
   ExpoUI: 9d39a0371d8abff2b79394c8d81239dce4ad3298
   FBLazyVector: 3c3be9a019176b5699455f7f66c5444b78a411c6
   hermes-engine: b603cc1f8efaed08e24bcb54d6c7c9fd99c49f65
+  Ocr: a29e77104642f2ff0f37723585b47c165fcd6203
   openiap: 255962c723010b03d240326fb65f5b637ea312cf
   RCTDeprecation: bccb6545c26db881ecddfd83a3f9ea82aba1605f
   RCTRequired: b2f74764d596fc0051f00fee94b49bf41a6f7f5a
