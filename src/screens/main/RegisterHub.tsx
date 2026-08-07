@@ -95,18 +95,18 @@ export default function RegisterHub({ navigation }: Props) {
       go: () => navigation.navigate("Redeem", {}),
     },
     {
-      title: "Import private key",
-      subtitle: "Already own a handle elsewhere",
-      Icon: Key,
-      bg: colors.tileTealBg,
-      go: () => navigation.navigate("ImportKeypair", {}),
-    },
-    {
       title: "Create a request",
       subtitle: "Setup a key pair and create inclusion request",
       Icon: AtSign,
       bg: colors.tileGoldBg,
       go: () => navigation.navigate("CreateRequest", {}),
+    },
+    {
+      title: "Import private key",
+      subtitle: "Already own a handle elsewhere",
+      Icon: Key,
+      bg: colors.tileTealBg,
+      go: () => navigation.navigate("ImportKeypair", {}),
     },
   ];
 
