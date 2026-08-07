@@ -17,6 +17,9 @@ export default function MainLayout() {
           ...solidNativeHeader(colors),
           headerShown: true,
           headerBackButtonDisplayMode: "minimal",
+          // Native content bg = theme, so no white flashes behind the header
+          // during the push/slide (the native container defaults to white).
+          contentStyle: { backgroundColor: colors.background },
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

@@ -10,6 +10,9 @@ export function nativeHeader(colors: Colors) {
     headerShadowVisible: false,
     headerTintColor: colors.text,
     headerTitleStyle: { color: colors.text },
+    // Native content bg = theme, so no white flashes behind the (transparent)
+    // header during transitions (the native container defaults to white).
+    contentStyle: { backgroundColor: colors.background },
   };
 }
 
@@ -24,5 +27,6 @@ export function solidNativeHeader(colors: Colors) {
     headerStyle: { backgroundColor: colors.background },
     headerTintColor: colors.text,
     headerTitleStyle: { color: colors.text },
+    contentStyle: { backgroundColor: colors.background },
   };
 }

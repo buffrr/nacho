@@ -32,6 +32,7 @@ export default function HandlesTabLayout() {
       headerShadowVisible: false,
       headerTintColor: colors.text,
       headerTitleStyle: { color: colors.text },
+      contentStyle: { backgroundColor: colors.background },
       unstable_headerRightItems: () => rightItems,
     }),
     [colors.text, rightItems],
