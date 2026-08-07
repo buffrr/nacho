@@ -1,13 +1,10 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { HandlesStackParamList } from "@/Navigation";
+import { useRouter, useFocusEffect } from "expo-router";
 import { saveBinary } from "@/file";
 import { exportDbBytes } from "@/db";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
-import { BottomNav } from "@/ui/BottomNav";
 import { Message } from "@/ui/Message";
 import {
   Anchor,
@@ -46,8 +43,7 @@ function stalenessText(trustedHeight: number | null, tip: number | null): string
 }
 
 export default function Settings() {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<HandlesStackParamList>>();
+  const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [error, setError] = useState<string | null>(null);
@@ -116,11 +112,11 @@ export default function Settings() {
     gap != null && gap > 0 ? colors.statusAmberFg : colors.statusGreenFg;
 
   return (
-    <Layout padTop footer={<BottomNav active="trust" />}>
+    <Layout padTop>
       <View style={styles.titleRow}>
         <Text style={styles.screenTitle}>Trust</Text>
         <TouchableOpacity
-          onPress={() => navigation.navigate("Preferences")}
+          onPress={() => router.push("/(main)/preferences")}
           hitSlop={8}
           accessibilityLabel="Settings"
         >
@@ -191,7 +187,7 @@ export default function Settings() {
           </View>
           <TouchableOpacity
             style={styles.rescanRow}
-            onPress={() => navigation.navigate("VerifyAnchor")}
+            onPress={() => router.push("/(main)/verify-anchor")}
             activeOpacity={0.7}
           >
             <QrCode size={16} color={colors.accent} />
@@ -210,7 +206,7 @@ export default function Settings() {
           </Text>
           <TouchableOpacity
             style={styles.scanQr}
-            onPress={() => navigation.navigate("VerifyAnchor")}
+            onPress={() => router.push("/(main)/verify-anchor")}
             activeOpacity={0.85}
           >
             <QrCode size={17} color={colors.accentText} />
@@ -234,7 +230,7 @@ export default function Settings() {
         <View style={styles.divider} />
         <TouchableOpacity
           style={styles.cardRow}
-          onPress={() => navigation.navigate("RevealSeed")}
+          onPress={() => router.push("/(main)/reveal-seed")}
           activeOpacity={0.8}
         >
           <View style={[styles.iconTile, { backgroundColor: colors.tileOrangeBg }]}>

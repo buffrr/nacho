@@ -6,23 +6,23 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useRouter } from "expo-router";
 import {
   generateMnemonic,
   xpubFromMnemonic,
   xprvFromMnemonic,
 } from "@/keys";
 import { useStore } from "@/Store";
-import { OnboardingStackParamList } from "@/Navigation";
+import { usePendingKeystore } from "@/PendingKeystore";
 import { Button } from "@/ui/Button";
 import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Layout } from "@/ui/Layout";
 import { SvgXml } from "react-native-svg";
 import { Colors, useTheme } from "@/theme";
 
-type Props = NativeStackScreenProps<OnboardingStackParamList, "ShowMnemonic">;
-
-export default function ({ navigation }: Props) {
+export default function () {
+  const router = useRouter();
+  const { setPending } = usePendingKeystore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { setupKeystore } = useStore();
@@ -60,7 +60,8 @@ export default function ({ navigation }: Props) {
                   setMnemonic(generateMnemonic());
                 } else {
                   const xpub = xpubFromMnemonic(mnemonic);
-                  navigation.navigate("EnterMnemonic", { xpub });
+                  setPending({ xpub });
+                  router.push("/(onboarding)/enter-mnemonic");
                 }
                 setIsLoading(false);
               }, 5);
@@ -84,7 +85,7 @@ export default function ({ navigation }: Props) {
           <ScreenHeader
             title="Generate seed phrase"
             subtitle="Your seed phrase is the master key to your handles."
-            onBack={() => navigation.goBack()}
+            onBack={() => router.back()}
           />
 
           <View style={styles.warningsContainer}>

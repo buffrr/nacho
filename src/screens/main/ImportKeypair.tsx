@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { TextInput, StyleSheet } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { HandlesStackParamList } from "@/Navigation";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { isValidHandle } from "@/handle";
@@ -11,13 +10,13 @@ import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 
-type Props = NativeStackScreenProps<HandlesStackParamList, "ImportKeypair">;
-
-export default function ImportKeypair({ route, navigation }: Props) {
+export default function ImportKeypair() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ handle?: string }>();
   const { handles, importKeypair } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [handle, setHandle] = useState(route.params?.handle ?? "");
+  const [handle, setHandle] = useState(params.handle ?? "");
   const [privkey, setPrivkey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,7 +37,7 @@ export default function ImportKeypair({ route, navigation }: Props) {
     setIsLoading(true);
     try {
       await importKeypair(handle, privkey);
-      navigation.replace("ShowHandle", { handle });
+      router.replace({ pathname: "/(main)/show-handle", params: { handle } });
     } catch (err) {
       setIsLoading(false);
       setError(
@@ -62,7 +61,7 @@ export default function ImportKeypair({ route, navigation }: Props) {
       <ScreenHeader
         title="Import keypair"
         subtitle="Add a handle backed by an existing private key, not derived from your seed phrase."
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       <TextInput

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { HandlesStackParamList } from "@/Navigation";
+import { useRouter } from "expo-router";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
@@ -9,9 +8,8 @@ import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 
-type Props = NativeStackScreenProps<HandlesStackParamList, "RevealSeed">;
-
-export default function RevealSeed({ navigation }: Props) {
+export default function RevealSeed() {
+  const router = useRouter();
   const { getMnemonic } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -34,7 +32,7 @@ export default function RevealSeed({ navigation }: Props) {
         <ScreenHeader
           title="Seed phrase"
           subtitle="No seed phrase is stored on this device."
-          onBack={() => navigation.goBack()}
+          onBack={() => router.back()}
         />
         <Message
           message="This keystore was set up without saving its seed phrase. Back it up with the keystore file from Settings instead."
@@ -61,7 +59,7 @@ export default function RevealSeed({ navigation }: Props) {
       <ScreenHeader
         title="Seed phrase"
         subtitle="Write these 12 words down in order and keep them offline. Anyone with them controls your handles."
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       {revealed && words && (

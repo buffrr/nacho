@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { TextInput, StyleSheet } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { HandlesStackParamList } from "@/Navigation";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
@@ -10,13 +9,13 @@ import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 import { claimCode } from "@/api";
 
-type Props = NativeStackScreenProps<HandlesStackParamList, "Redeem">;
-
-export default function Redeem({ route, navigation }: Props) {
+export default function Redeem() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ code?: string }>();
   const { nextScriptPubkey, createHandle, setHandlePurchase } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [code, setCode] = useState(route.params?.code ?? "");
+  const [code, setCode] = useState(params.code ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -51,13 +50,13 @@ export default function Redeem({ route, navigation }: Props) {
       // Acquired through nacho (no paid amount here) → show the reassuring
       // "is yours / issuing certificate" state, not the plain "waiting" note.
       await setHandlePurchase(result.handle, {});
-      // Reset so Back lands on Your handles rather than the redeem/register flow.
-      navigation.reset({
-        index: 1,
-        routes: [
-          { name: "ListHandles" },
-          { name: "ShowHandle", params: { handle: result.handle } },
-        ],
+      // Rebuild the stack as [handles tab, this handle] so Back lands on Your
+      // handles rather than the redeem/register flow (Expo Router has no reset).
+      if (router.canDismiss()) router.dismissAll();
+      router.navigate("/(main)/(tabs)/handles");
+      router.push({
+        pathname: "/(main)/show-handle",
+        params: { handle: result.handle },
       });
     } catch (err) {
       setIsLoading(false);
@@ -80,7 +79,7 @@ export default function Redeem({ route, navigation }: Props) {
       <ScreenHeader
         title="Redeem code"
         subtitle="Bought a handle on the web? Enter your claim code to bind it to a new key."
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
       <TextInput
         value={code}

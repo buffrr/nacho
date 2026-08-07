@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { View, StyleSheet } from "react-native";
-import { useIsFocused } from "@react-navigation/native";
-import { RouteProp } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { HandlesStackParamList } from "@/Navigation";
+import { useLocalSearchParams, useRouter, useIsFocused } from "expo-router";
 import { open } from "@/file";
 import { useStore } from "@/Store";
 import { scriptForHandle } from "@/keys";
@@ -24,22 +21,9 @@ type ImportError =
   | "invalidHandle"
   | null;
 
-type ImportCertificateRouteProp = RouteProp<
-  HandlesStackParamList,
-  "ImportCertificate"
->;
-type ImportCertificateNavigationProp = NativeStackNavigationProp<
-  HandlesStackParamList,
-  "ImportCertificate"
->;
-
-interface Props {
-  route: ImportCertificateRouteProp;
-  navigation: ImportCertificateNavigationProp;
-}
-
-export default function ImportCertificate({ route, navigation }: Props) {
-  const { handle } = route.params;
+export default function ImportCertificate() {
+  const router = useRouter();
+  const { handle } = useLocalSearchParams<{ handle: string }>();
   const { xpub, handles, setHandleCertData } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -142,7 +126,7 @@ export default function ImportCertificate({ route, navigation }: Props) {
       return;
     }
     setHandleCertData(handle, certData).then(() =>
-      navigation.navigate("ShowHandle", { handle }),
+      router.replace({ pathname: "/(main)/show-handle", params: { handle } }),
     );
   };
 
@@ -160,7 +144,7 @@ export default function ImportCertificate({ route, navigation }: Props) {
       <ScreenHeader
         title="Import certificate"
         subtitle={`Scan a QR code or upload a file to add the certificate for ${handle}.`}
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       <View style={styles.frame}>

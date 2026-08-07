@@ -7,13 +7,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useLocalSearchParams } from "expo-router";
 import * as Clipboard from "expo-clipboard";
-import { HandlesStackParamList } from "@/Navigation";
 import { Colors, useTheme } from "@/theme";
 import { avatarColors } from "@/handleTile";
 import { Layout } from "@/ui/Layout";
-import { BottomNav } from "@/ui/BottomNav";
 import { Message } from "@/ui/Message";
 import {
   Search,
@@ -35,7 +33,6 @@ import {
 import { resolveHandle } from "@/fabric";
 import { ResolvedHandle } from "@/fabricResolver";
 
-type Props = NativeStackScreenProps<HandlesStackParamList, "Resolve">;
 
 type ResRow = {
   key: string;
@@ -147,7 +144,7 @@ function copyText(text: string) {
   Clipboard.setStringAsync(text);
 }
 
-export default function Resolve({ route }: Props) {
+export default function Resolve() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [handle, setHandle] = useState("");
@@ -177,7 +174,7 @@ export default function Resolve({ route }: Props) {
     }
   };
 
-  const prefill = route.params?.prefill;
+  const { prefill } = useLocalSearchParams<{ prefill?: string }>();
   useEffect(() => {
     if (prefill) {
       setHandle(prefill);
@@ -232,7 +229,6 @@ export default function Resolve({ route }: Props) {
   return (
     <Layout
       padTop
-      footer={<BottomNav active="resolve" />}
     >
       <Text style={styles.title}>Resolve</Text>
       <Text style={styles.subtitle}>Look up a handle to pay or verify.</Text>

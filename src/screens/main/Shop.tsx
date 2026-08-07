@@ -7,19 +7,16 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { HandlesStackParamList } from "@/Navigation";
+import { useRouter } from "expo-router";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { avatarColors } from "@/handleTile";
 import { Layout } from "@/ui/Layout";
-import { BottomNav } from "@/ui/BottomNav";
 import { AtSign, Search } from "@/ui/icons";
 import { searchHandles, formatPrice, SearchMatch } from "@/api";
 
-type Props = NativeStackScreenProps<HandlesStackParamList, "Shop">;
-
-export default function Shop({ navigation }: Props) {
+export default function Shop() {
+  const router = useRouter();
   const { handles } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -66,7 +63,7 @@ export default function Shop({ navigation }: Props) {
   // Don't persist the handle here — just open its detail in a prospective state.
   // It's committed to the keystore only once the purchase is reserved.
   const buy = (handle: string) => {
-    navigation.navigate("ShowHandle", { handle });
+    router.push({ pathname: "/(main)/show-handle", params: { handle } });
   };
 
   const renderItem = ({ item }: { item: SearchMatch }) => {
@@ -100,7 +97,7 @@ export default function Shop({ navigation }: Props) {
   };
 
   return (
-    <Layout scrollable={false} padTop footer={<BottomNav active="shop" />}>
+    <Layout scrollable={false} padTop>
       <Text style={styles.title}>Shop handles</Text>
 
       <View style={styles.searchWrap}>

@@ -3,6 +3,7 @@
     "name": "nacho",
     "slug": "nacho",
     "version": "0.0.2",
+    "scheme": "nacho",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -43,7 +44,8 @@
       "expo-iap",
       "expo-font",
       "expo-sqlite",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-router"
     ],
     "extra": {
       "eas": {

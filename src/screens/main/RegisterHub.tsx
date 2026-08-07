@@ -10,8 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { HandlesStackParamList } from "@/Navigation";
+import { useRouter } from "expo-router";
 import { Colors, useTheme } from "@/theme";
 import {
   Storefront,
@@ -23,9 +22,8 @@ import {
   IconProps,
 } from "@/ui/icons";
 
-type Props = NativeStackScreenProps<HandlesStackParamList, "RegisterHub">;
-
-export default function RegisterHub({ navigation }: Props) {
+export default function RegisterHub() {
+  const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
@@ -68,7 +66,7 @@ export default function RegisterHub({ navigation }: Props) {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      navigation.goBack();
+      router.back();
       after?.();
     });
   };
@@ -85,28 +83,28 @@ export default function RegisterHub({ navigation }: Props) {
       subtitle: "Browse and buy available handles",
       Icon: Storefront,
       bg: colors.tileOrangeBg,
-      go: () => navigation.navigate("Shop"),
+      go: () => router.navigate("/(main)/(tabs)/shop"),
     },
     {
       title: "Redeem a code",
       subtitle: "Have a voucher or gift code",
       Icon: Ticket,
       bg: colors.tileLavenderBg,
-      go: () => navigation.navigate("Redeem", {}),
+      go: () => router.push("/(main)/redeem"),
     },
     {
       title: "Create a request",
       subtitle: "Setup a key pair and create inclusion request",
       Icon: AtSign,
       bg: colors.tileGoldBg,
-      go: () => navigation.navigate("CreateRequest", {}),
+      go: () => router.push("/(main)/create-request"),
     },
     {
       title: "Import private key",
       subtitle: "Already own a handle elsewhere",
       Icon: Key,
       bg: colors.tileTealBg,
-      go: () => navigation.navigate("ImportKeypair", {}),
+      go: () => router.push("/(main)/import-keypair"),
     },
   ];
 

@@ -9,18 +9,18 @@ import {
 } from "react-native";
 import { openBinary } from "@/file";
 import { importDbBytes, readKeystoreFromBytes } from "@/db";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useRouter } from "expo-router";
 import { Keystore, isKeystore } from "@/Store";
+import { usePendingKeystore } from "@/PendingKeystore";
 import { Colors, useTheme } from "@/theme";
-import { OnboardingStackParamList } from "@/Navigation";
 import { Layout } from "@/ui/Layout";
 import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 
-type Props = NativeStackScreenProps<OnboardingStackParamList, "ImportKeystore">;
-
-export default function ImportKeystore({ navigation }: Props) {
+export default function ImportKeystore() {
+  const router = useRouter();
+  const { setPending } = usePendingKeystore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -68,7 +68,8 @@ export default function ImportKeystore({ navigation }: Props) {
       // Load the backup's certs + records + keystore into the live database,
       // then continue to the seed step to unlock signing.
       await importDbBytes(bytes);
-      navigation.navigate("EnterMnemonic", keystore);
+      setPending(keystore);
+      router.push("/(onboarding)/enter-mnemonic");
     } catch {
       setValidationError("Failed to restore the backup.");
     } finally {
@@ -102,7 +103,7 @@ export default function ImportKeystore({ navigation }: Props) {
       <ScreenHeader
         title="Restore from backup"
         subtitle="Select a Nacho backup (.sqlite) to restore your public key, handles, and certificates."
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       <View style={styles.fileSelectionContainer}>

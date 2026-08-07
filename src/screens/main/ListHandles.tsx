@@ -6,22 +6,18 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { HandlesStackParamList } from "@/Navigation";
+import { useFocusEffect, useRouter } from "expo-router";
 import { HandleData, useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { scriptForHandle } from "@/keys";
 import { handleTileInfo, avatarColors } from "@/handleTile";
 import { recordsCounts } from "@/db";
 import { Layout } from "@/ui/Layout";
-import { BottomNav } from "@/ui/BottomNav";
 import { HandleTile } from "@/ui/HandleTile";
 import { Plus, ShoppingBag } from "@/ui/icons";
 
-type Nav = NativeStackNavigationProp<HandlesStackParamList, "ListHandles">;
-
-export default function ListHandles({ navigation }: { navigation: Nav }) {
+export default function ListHandles() {
+  const router = useRouter();
   const { handles, xpub } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -68,18 +64,23 @@ export default function ListHandles({ navigation }: { navigation: Nav }) {
         handle={name}
         info={infoFor(name, handleData)}
         avatar={avatarColors(colors, name)}
-        onPress={() => navigation.navigate("ShowHandle", { handle: name })}
+        onPress={() =>
+          router.push({
+            pathname: "/(main)/show-handle",
+            params: { handle: name },
+          })
+        }
       />
     );
   };
 
   return (
-    <Layout scrollable={false} padTop footer={<BottomNav active="handles" />}>
+    <Layout scrollable={false} padTop>
       <View style={styles.header}>
         <Text style={styles.title}>Your handles</Text>
         <TouchableOpacity
           style={styles.add}
-          onPress={() => navigation.navigate("RegisterHub")}
+          onPress={() => router.push("/(main)/register-hub")}
           accessibilityLabel="Add handle"
         >
           <Plus size={20} color={colors.accentText} />
@@ -98,7 +99,7 @@ export default function ListHandles({ navigation }: { navigation: Nav }) {
         ListFooterComponent={
           <TouchableOpacity
             style={styles.shopButton}
-            onPress={() => navigation.navigate("Shop")}
+            onPress={() => router.navigate("/(main)/(tabs)/shop")}
           >
             <ShoppingBag size={18} color={colors.text} />
             <Text style={styles.shopText}>Shop handles</Text>

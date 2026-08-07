@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Text, TextInput, StyleSheet } from "react-native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { HandlesStackParamList } from "@/Navigation";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
-import { RouteProp } from "@react-navigation/native";
 import { Layout } from "@/ui/Layout";
 import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
@@ -18,22 +16,11 @@ import {
 import { resolveHandle } from "@/fabric";
 import { isValidHandle } from "@/handle";
 
-type CreateRequestNavigationProp = NativeStackNavigationProp<
-  HandlesStackParamList,
-  "CreateRequest"
->;
-
-type CreateRequestRouteProp = RouteProp<HandlesStackParamList, "CreateRequest">;
-
-interface Props {
-  navigation: CreateRequestNavigationProp;
-  route: CreateRequestRouteProp;
-}
-
 type CreateRequestError = "handleExists" | "handleTaken" | null;
 
-export default function CreateRequest({ route, navigation }: Props) {
-  const { initialHandle } = route.params;
+export default function CreateRequest() {
+  const router = useRouter();
+  const { initialHandle } = useLocalSearchParams<{ initialHandle?: string }>();
   const [handle, setHandle] = useState(initialHandle || "");
   const [error, setError] = useState<CreateRequestError>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -130,7 +117,7 @@ export default function CreateRequest({ route, navigation }: Props) {
 
     // Already on certrelay under a fixed key: don't derive a new one, import it.
     if (registered) {
-      navigation.navigate("ImportKeypair", { handle });
+      router.push({ pathname: "/(main)/import-keypair", params: { handle } });
       return;
     }
 
@@ -146,7 +133,7 @@ export default function CreateRequest({ route, navigation }: Props) {
     }
     try {
       await createHandle(handle);
-      navigation.replace("ShowHandle", { handle });
+      router.replace({ pathname: "/(main)/show-handle", params: { handle } });
     } catch (err) {
       setIsLoading(false);
       throw err;
@@ -170,7 +157,7 @@ export default function CreateRequest({ route, navigation }: Props) {
       <ScreenHeader
         title="Create a request"
         subtitle="Enter a handle to add it to your keystore and derive its key."
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
       <TextInput
         value={handle}

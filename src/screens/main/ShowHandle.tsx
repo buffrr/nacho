@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useFocusEffect } from "@react-navigation/native";
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+  Redirect,
+} from "expo-router";
 import {
   View,
   Text,
@@ -8,9 +13,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { RouteProp } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { HandlesStackParamList } from "@/Navigation";
 import { useStore } from "@/Store";
 import { pubkeyForHandle, p2trScriptFromPub } from "@/keys";
 import { extractCertData } from "@/cert";
@@ -58,17 +60,6 @@ import {
   formatPrice,
   HandleStatus,
 } from "@/api";
-
-type ShowHandleRouteProp = RouteProp<HandlesStackParamList, "ShowHandle">;
-type ShowHandleNavigationProp = NativeStackNavigationProp<
-  HandlesStackParamList,
-  "ShowHandle"
->;
-
-interface Props {
-  route: ShowHandleRouteProp;
-  navigation: ShowHandleNavigationProp;
-}
 
 type IAPHook = (typeof import("expo-iap"))["useIAP"];
 const iap = (() => {
@@ -119,8 +110,9 @@ function formatSeq(seq: number): string {
   return `Version ${seq}`;
 }
 
-export default function ShowHandle({ route, navigation }: Props) {
-  const { handle } = route.params;
+export default function ShowHandle() {
+  const router = useRouter();
+  const { handle } = useLocalSearchParams<{ handle: string }>();
   const {
     xpub,
     handles,
@@ -191,8 +183,7 @@ export default function ShowHandle({ route, navigation }: Props) {
   const isProspective = !persisted;
 
   if (!xpub || !handleData) {
-    navigation.replace("ListHandles");
-    return null;
+    return <Redirect href="/(main)/(tabs)/handles" />;
   }
 
   const pubkey = pubkeyForHandle(xpub, handleData);
@@ -331,13 +322,12 @@ export default function ShowHandle({ route, navigation }: Props) {
     // — otherwise the just-bought handle is newer than the pinned anchor.
     await refreshSemiTrust();
     await setHandlePurchase(handle, price !== null ? { amountCents: price } : {});
-    navigation.reset({
-      index: 1,
-      routes: [
-        { name: "ListHandles" },
-        { name: "ShowHandle", params: { handle } },
-      ],
-    });
+    // Rebuild the stack as [handles tab, this handle] so Back lands on Your
+    // handles (not the Shop/Redeem screen this was pushed from). Expo Router has
+    // no `reset`; dismiss the detail stack, switch to the handles tab, re-push.
+    if (router.canDismiss()) router.dismissAll();
+    router.navigate("/(main)/(tabs)/handles");
+    router.push({ pathname: "/(main)/show-handle", params: { handle } });
   };
 
   // `fresh` uses a throwaway Fabric client so the SDK's zone cache can't return
@@ -411,7 +401,7 @@ export default function ShowHandle({ route, navigation }: Props) {
 
   const handleImportCertificate = () => {
     setMenuOpen(false);
-    navigation.navigate("ImportCertificate", { handle });
+    router.push({ pathname: "/(main)/import-certificate", params: { handle } });
   };
 
   const handleExportCertificate = async () => {
@@ -444,7 +434,7 @@ export default function ShowHandle({ route, navigation }: Props) {
   const handleRemoveHandle = async () => {
     await deleteCert(handle);
     await removeHandle(handle);
-    navigation.replace("ListHandles");
+    router.replace("/(main)/(tabs)/handles");
   };
 
   const handleCopyRequest = async () => {
@@ -688,7 +678,7 @@ export default function ShowHandle({ route, navigation }: Props) {
 
   const replaceWithImport = async () => {
     await removeHandle(handle);
-    navigation.replace("ImportKeypair", { handle });
+    router.replace({ pathname: "/(main)/import-keypair", params: { handle } });
   };
 
   const records = getRecords(handle);
@@ -1010,7 +1000,7 @@ export default function ShowHandle({ route, navigation }: Props) {
     >
       <View style={styles.topbar}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          onPress={() => router.back()}
           hitSlop={8}
           accessibilityLabel="Back"
         >
@@ -1135,7 +1125,12 @@ export default function ShowHandle({ route, navigation }: Props) {
           <View style={styles.recordsHead}>
             <Text style={styles.recordsTitle}>Records</Text>
             <TouchableOpacity
-              onPress={() => navigation.navigate("EditRecord", { handle })}
+              onPress={() =>
+                router.push({
+                  pathname: "/(main)/edit-record",
+                  params: { handle },
+                })
+              }
             >
               <Text style={styles.addText}>+ Add</Text>
             </TouchableOpacity>
@@ -1148,7 +1143,10 @@ export default function ShowHandle({ route, navigation }: Props) {
                 {recordRow(r.type.toUpperCase(), r.key, {
                   sub: r.value.join(", "),
                   onPress: () =>
-                    navigation.navigate("EditRecord", { handle, index: i }),
+                    router.push({
+                      pathname: "/(main)/edit-record",
+                      params: { handle, index: String(i) },
+                    }),
                 })}
               </React.Fragment>
             ))}

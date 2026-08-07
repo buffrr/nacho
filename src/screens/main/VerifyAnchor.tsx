@@ -1,9 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useIsFocused } from "@react-navigation/native";
+import { useRouter, useIsFocused } from "expo-router";
 import * as Clipboard from "expo-clipboard";
-import { HandlesStackParamList } from "@/Navigation";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
 import { Message } from "@/ui/Message";
@@ -11,9 +9,8 @@ import { ArrowLeft, AlertCircle, Clipboard as ClipboardIcon } from "@/ui/icons";
 import { QrScanner } from "@/ui/QrScanner";
 import { trustFromInput } from "@/fabric";
 
-type Props = NativeStackScreenProps<HandlesStackParamList, "VerifyAnchor">;
-
-export default function VerifyAnchor({ navigation }: Props) {
+export default function VerifyAnchor() {
+  const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const isFocused = useIsFocused();
@@ -27,7 +24,7 @@ export default function VerifyAnchor({ navigation }: Props) {
     setError(null);
     try {
       await trustFromInput(data.trim());
-      navigation.goBack();
+      router.back();
     } catch {
       setError(
         "That isn't a valid Trust ID. Paste a veritas:// link or a 64-character anchor id, or scan the QR from a local Veritas client.",
@@ -68,7 +65,7 @@ export default function VerifyAnchor({ navigation }: Props) {
   return (
     <Layout scrollable={false} padTop>
       <TouchableOpacity
-        onPress={() => navigation.goBack()}
+        onPress={() => router.back()}
         hitSlop={8}
         style={styles.back}
         accessibilityLabel="Back"

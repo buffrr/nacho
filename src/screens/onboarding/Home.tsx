@@ -1,14 +1,12 @@
 import React, { useMemo } from "react";
 import { View, StyleSheet, Text } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { OnboardingStackParamList } from "@/Navigation";
+import { useRouter } from "expo-router";
 import { Button } from "@/ui/Button";
 import { Layout } from "@/ui/Layout";
 import { AtbitcoinLogo } from "@/ui/AtbitcoinLogo";
 import { SvgXml } from "react-native-svg";
 import { Colors, useTheme } from "@/theme";
 
-type Props = NativeStackScreenProps<OnboardingStackParamList, "Home">;
 
 const DARK_LOGO = `<svg width="245" height="140" viewBox="0 0 245 140" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M36.239 21.244C31.0838 9.82436 41.3339 -2.52292 53.5024 0.448335L179.208 31.1425C190.465 33.8911 194.511 47.8102 186.482 56.1681L110.391 135.379C103.02 143.052 90.2317 140.848 85.8535 131.149L36.239 21.244Z" fill="#FF7B00"/>
@@ -43,7 +41,8 @@ const LIGHT_LOGO = `<svg width="245" height="140" viewBox="0 0 245 140" fill="no
 </defs>
 </svg>`;
 
-export default function ({ navigation }: Props) {
+export default function () {
+  const router = useRouter();
   const { colors, scheme } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const logoXml = scheme === "light" ? LIGHT_LOGO : DARK_LOGO;
@@ -54,12 +53,12 @@ export default function ({ navigation }: Props) {
         <>
           <Button
             text="Create a new keystore"
-            onPress={() => navigation.navigate("ShowMnemonic")}
+            onPress={() => router.push("/(onboarding)/show-mnemonic")}
             type="main"
           />
           <Button
             text="Restore from backup"
-            onPress={() => navigation.navigate("ImportKeystore")}
+            onPress={() => router.push("/(onboarding)/import-keystore")}
             type="secondary"
           />
         </>

@@ -6,20 +6,21 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useRouter, Redirect } from "expo-router";
 import { useStore } from "@/Store";
 import { validateMnemonic, xprvFromMnemonic, xpubFromXprv } from "@/keys";
-import { OnboardingStackParamList } from "@/Navigation";
+import { usePendingKeystore } from "@/PendingKeystore";
 import { Button } from "@/ui/Button";
 import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Layout } from "@/ui/Layout";
 import { Message } from "@/ui/Message";
 import { Colors, useTheme } from "@/theme";
 
-type Props = NativeStackScreenProps<OnboardingStackParamList, "EnterMnemonic">;
-
-export default function ({ navigation, route }: Props) {
-  const { xpub, handles } = route.params;
+export default function () {
+  const router = useRouter();
+  const { pending } = usePendingKeystore();
+  const xpub = pending?.xpub ?? "";
+  const handles = pending?.handles;
   const isNew = handles === undefined;
   type ValidationError = "invalid" | "mismatch" | null;
 
@@ -75,6 +76,10 @@ export default function ({ navigation, route }: Props) {
 
   const isComplete = inputWords.every((word) => word.length > 0);
 
+  // No pending keystore (e.g. a direct deep-link / web reload) → nothing to
+  // confirm; bounce back to the start of onboarding.
+  if (!pending) return <Redirect href="/(onboarding)" />;
+
   return (
     <Layout
       padTop
@@ -94,7 +99,7 @@ export default function ({ navigation, route }: Props) {
             ? "Enter your 12-word seed phrase to confirm you've saved it correctly."
             : "Enter your 12-word seed phrase to confirm you have the private key associated with the keystore."
         }
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       <View style={styles.inputContainer}>

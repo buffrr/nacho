@@ -6,8 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { HandlesStackParamList } from "@/Navigation";
+import { useRouter } from "expo-router";
 import { Colors, ThemeMode, useTheme } from "@/theme";
 import {
   getNetConfig,
@@ -19,7 +18,6 @@ import { Layout } from "@/ui/Layout";
 import { ScreenHeader } from "@/ui/ScreenHeader";
 import { AlertCircle, X } from "@/ui/icons";
 
-type Props = NativeStackScreenProps<HandlesStackParamList, "Preferences">;
 
 const MODES: { id: ThemeMode; label: string }[] = [
   { id: "system", label: "System" },
@@ -29,7 +27,8 @@ const MODES: { id: ThemeMode; label: string }[] = [
 
 type ListKey = "anchorRelays" | "seeds";
 
-export default function Preferences({ navigation }: Props) {
+export default function Preferences() {
+  const router = useRouter();
   const { colors, mode, setMode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -117,7 +116,7 @@ export default function Preferences({ navigation }: Props) {
         </View>
       }
     >
-      <ScreenHeader title="Settings" onBack={() => navigation.goBack()} />
+      <ScreenHeader title="Settings" onBack={() => router.back()} />
 
       {/* APPEARANCE */}
       <Text style={styles.sectionLabel}>APPEARANCE</Text>

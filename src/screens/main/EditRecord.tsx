@@ -6,8 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { HandlesStackParamList } from "@/Navigation";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Colors, useTheme } from "@/theme";
 import { useRecordsDraft } from "@/RecordsDraft";
 import { Layout } from "@/ui/Layout";
@@ -15,12 +14,18 @@ import { ScreenHeader } from "@/ui/ScreenHeader";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
 
-type Props = NativeStackScreenProps<HandlesStackParamList, "EditRecord">;
-
 const TYPES = ["ADDR", "TXT", "BLOB"] as const;
 
-export default function EditRecord({ route, navigation }: Props) {
-  const { handle, index } = route.params;
+export default function EditRecord() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ handle: string; index?: string }>();
+  const handle = params.handle;
+  // useLocalSearchParams returns strings; parse the record index back to a
+  // number (absent/empty → "append new record").
+  const index =
+    params.index !== undefined && params.index !== ""
+      ? Number(params.index)
+      : undefined;
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { getRecords, setRecord, deleteRecord } = useRecordsDraft();
@@ -58,14 +63,14 @@ export default function EditRecord({ route, navigation }: Props) {
       key: cleanKey,
       value: cleanValues,
     });
-    navigation.goBack();
+    router.back();
   };
 
   const remove = () => {
     if (index !== undefined) {
       deleteRecord(handle, index);
     }
-    navigation.goBack();
+    router.back();
   };
 
   return (
@@ -77,7 +82,7 @@ export default function EditRecord({ route, navigation }: Props) {
     >
       <ScreenHeader
         title={index !== undefined ? "Edit record" : "Add record"}
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       <Text style={styles.label}>TYPE</Text>
