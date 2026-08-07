@@ -100,35 +100,7 @@ export default function Shop() {
   };
 
   return (
-    <Layout scrollable={false} padTop>
-      <Text style={styles.title}>Shop handles</Text>
-
-      <View style={styles.searchWrap}>
-        <TextInput
-          value={query}
-          onChangeText={(t) =>
-            setQuery(t.toLowerCase().replace(/[^a-z0-9@.\-]/g, ""))
-          }
-          placeholder="Search a name"
-          placeholderTextColor={colors.placeholder}
-          style={styles.search}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        <View style={styles.searchIcon}>
-          <Search size={18} color={colors.textMuted} />
-        </View>
-      </View>
-
-      {shown.length > 0 && (
-        <Text style={styles.sectionLabel}>
-          AVAILABLE HANDLES{"   "}
-          <Text style={styles.count}>
-            {openCount} open · {takenCount} taken
-          </Text>
-        </Text>
-      )}
-
+    <Layout scrollable={false} underHeader>
       <FlatList
         data={shown}
         renderItem={renderItem}
@@ -139,6 +111,34 @@ export default function Shop() {
         contentContainerStyle={{
           paddingBottom: Platform.OS === "ios" ? 0 : insets.bottom + 64,
         }}
+        ListHeaderComponent={
+          <>
+            <View style={styles.searchWrap}>
+              <TextInput
+                value={query}
+                onChangeText={(t) =>
+                  setQuery(t.toLowerCase().replace(/[^a-z0-9@.\-]/g, ""))
+                }
+                placeholder="Search a name"
+                placeholderTextColor={colors.placeholder}
+                style={styles.search}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <View style={styles.searchIcon}>
+                <Search size={18} color={colors.textMuted} />
+              </View>
+            </View>
+            {shown.length > 0 && (
+              <Text style={styles.sectionLabel}>
+                AVAILABLE HANDLES{"   "}
+                <Text style={styles.count}>
+                  {openCount} open · {takenCount} taken
+                </Text>
+              </Text>
+            )}
+          </>
+        }
         ListEmptyComponent={
           <Text style={styles.empty}>
             {!query

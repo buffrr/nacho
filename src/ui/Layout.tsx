@@ -17,6 +17,10 @@ interface LayoutProps {
   // scroll content via contentInsetAdjustmentBehavior; Android/web get an
   // explicit bottom pad so the last row clears the bar (intended under-glass scroll).
   tabBarInset?: boolean;
+  // The screen has a native (large-title/transparent) header above it, so the
+  // scroll content sits under it and the top inset is handled natively — skip the
+  // manual top padding and enable automatic content-inset adjustment.
+  underHeader?: boolean;
 }
 
 // Bottom padding for tab screens on platforms without automatic content-inset
@@ -30,10 +34,16 @@ export function Layout({
   scrollable = true,
   padTop = false,
   tabBarInset = false,
+  underHeader = false,
 }: LayoutProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const topInset = padTop ? Math.max(insets.top, 20) : insets.top;
+  const topInset = underHeader
+    ? 0
+    : padTop
+      ? Math.max(insets.top, 20)
+      : insets.top;
+  const autoInset = tabBarInset || underHeader;
   const bottomPad =
     tabBarInset && Platform.OS !== "ios" ? insets.bottom + TAB_BAR_PAD : 0;
 
@@ -47,7 +57,7 @@ export function Layout({
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid={true}
-      contentInsetAdjustmentBehavior={tabBarInset ? "automatic" : "never"}
+      contentInsetAdjustmentBehavior={autoInset ? "automatic" : "never"}
     >
       {children}
     </KeyboardAwareScrollView>

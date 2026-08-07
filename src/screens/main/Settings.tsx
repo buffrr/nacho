@@ -13,7 +13,6 @@ import {
   Download,
   Eye,
   ChevronRight,
-  Settings as SettingsIcon,
 } from "@/ui/icons";
 import {
   ensureSemiTrust,
@@ -112,18 +111,7 @@ export default function Settings() {
     gap != null && gap > 0 ? colors.statusAmberFg : colors.statusGreenFg;
 
   return (
-    <Layout padTop tabBarInset>
-      <View style={styles.titleRow}>
-        <Text style={styles.screenTitle}>Trust</Text>
-        <TouchableOpacity
-          onPress={() => router.push("/(main)/preferences")}
-          hitSlop={8}
-          accessibilityLabel="Settings"
-        >
-          <SettingsIcon size={22} color={colors.text} />
-        </TouchableOpacity>
-      </View>
-
+    <Layout tabBarInset underHeader>
       {/* SEMI-TRUSTED — the default anchor we fetch from public relays. */}
       <Text style={styles.sectionLabel}>SEMI-TRUSTED</Text>
 

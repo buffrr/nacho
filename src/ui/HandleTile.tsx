@@ -42,12 +42,12 @@ export function HandleTile({
 
   return (
     <TouchableOpacity
-      style={[styles.card, info.attention && styles.cardAttention]}
+      style={[styles.row, info.attention && styles.rowAttention]}
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={0.6}
     >
       <View style={[styles.avatar, { backgroundColor: avatar.bg }]}>
-        <AtSign size={24} color={avatar.fg} />
+        <AtSign size={28} color={avatar.fg} />
       </View>
       <View style={styles.mid}>
         <View style={styles.nameRow}>
@@ -73,31 +73,24 @@ export function HandleTile({
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    card: {
+    // Plain full-width row (no card/divider); content aligned to the standard
+    // 20px content margin, press highlight spans the full width.
+    row: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 12,
-      backgroundColor: c.card,
-      // Fill, not border; continuous (squircle) corners read as native on iOS.
-      borderRadius: 16,
-      borderCurve: "continuous",
-      paddingHorizontal: 14,
-      paddingVertical: 11,
-      marginBottom: 10,
-      shadowColor: "#000",
-      shadowOpacity: 0.05,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 1,
+      gap: 14,
+      paddingHorizontal: 20,
+      paddingVertical: 14,
     },
-    cardAttention: {
-      borderWidth: 1,
-      borderColor: c.accent,
+    // Needs-action rows get a subtle amber wash rather than a border.
+    rowAttention: {
+      backgroundColor: c.statusAmberBg,
     },
     avatar: {
-      width: 48,
-      height: 48,
-      borderRadius: 14,
+      width: 52,
+      height: 52,
+      borderRadius: 15,
+      borderCurve: "continuous",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -111,13 +104,13 @@ const makeStyles = (c: Colors) =>
       gap: 6,
     },
     name: {
-      fontSize: 16,
+      fontSize: 17,
       fontWeight: "500",
       color: c.text,
       flexShrink: 1,
     },
     subtitle: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: "400",
       color: c.textMuted,
     },

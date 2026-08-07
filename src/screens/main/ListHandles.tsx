@@ -1,15 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Pressable,
-  Platform,
-  StyleSheet,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { HandleData, useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
@@ -18,11 +8,10 @@ import { handleTileInfo, avatarColors } from "@/handleTile";
 import { recordsCounts } from "@/db";
 import { Layout } from "@/ui/Layout";
 import { HandleTile } from "@/ui/HandleTile";
-import { Plus, ShoppingBag } from "@/ui/icons";
+import { ShoppingBag } from "@/ui/icons";
 
 export default function ListHandles() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { handles, xpub } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -62,108 +51,48 @@ export default function ListHandles() {
     });
   };
 
-  const renderItem = ({ item }: { item: [string, HandleData] }) => {
-    const [name, handleData] = item;
-    return (
-      <HandleTile
-        handle={name}
-        info={infoFor(name, handleData)}
-        avatar={avatarColors(colors, name)}
-        onPress={() =>
-          router.push({
-            pathname: "/(main)/show-handle",
-            params: { handle: name },
-          })
-        }
-      />
-    );
-  };
-
   return (
-    <Layout scrollable={false} padTop>
-      <View style={styles.header}>
-        <Text style={styles.title}>Your handles</Text>
-        {isLiquidGlassAvailable() ? (
-          // iOS 26 Liquid Glass button, accent-tinted (matches the tab bar).
-          <Pressable
-            onPress={() => router.push("/(main)/register-hub")}
-            accessibilityLabel="Add handle"
-          >
-            <GlassView
-              style={styles.add}
-              glassEffectStyle="regular"
-              isInteractive
-              tintColor={colors.accent}
-            >
-              <Plus size={20} color={colors.accentText} />
-            </GlassView>
-          </Pressable>
-        ) : (
-          // Fallback (web / pre-iOS-26): solid accent circle.
-          <TouchableOpacity
-            style={[styles.add, { backgroundColor: colors.accent }]}
-            onPress={() => router.push("/(main)/register-hub")}
-            accessibilityLabel="Add handle"
-          >
-            <Plus size={20} color={colors.accentText} />
-          </TouchableOpacity>
-        )}
-      </View>
+    <Layout scrollable tabBarInset underHeader>
+      {handlesList.length === 0 ? (
+        <Text style={styles.empty}>No handles yet. Tap + to add one.</Text>
+      ) : (
+        // Plain edge-to-edge list: no card, no dividers — just rows.
+        <View style={styles.list}>
+          {handlesList.map(([name, handleData]) => (
+            <HandleTile
+              key={name}
+              handle={name}
+              info={infoFor(name, handleData)}
+              avatar={avatarColors(colors, name)}
+              onPress={() =>
+                router.push({
+                  pathname: "/(main)/show-handle",
+                  params: { handle: name },
+                })
+              }
+            />
+          ))}
+        </View>
+      )}
 
-      <FlatList
-        data={handlesList}
-        renderItem={renderItem}
-        keyExtractor={(item) => item[0]}
-        showsVerticalScrollIndicator={false}
-        style={styles.list}
-        // Let content scroll under the floating native tab bar (iOS auto-insets;
-        // Android/web get an explicit bottom pad).
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{
-          paddingBottom: Platform.OS === "ios" ? 0 : insets.bottom + 64,
-        }}
-        ListEmptyComponent={
-          <Text style={styles.empty}>No handles yet. Tap + to add one.</Text>
-        }
-        ListFooterComponent={
-          <TouchableOpacity
-            style={styles.shopButton}
-            onPress={() => router.navigate("/(main)/(tabs)/shop")}
-          >
-            <ShoppingBag size={18} color={colors.text} />
-            <Text style={styles.shopText}>Shop handles</Text>
-          </TouchableOpacity>
-        }
-      />
+      <TouchableOpacity
+        style={styles.shopButton}
+        onPress={() => router.navigate("/(main)/(tabs)/shop")}
+      >
+        <ShoppingBag size={18} color={colors.text} />
+        <Text style={styles.shopText}>Shop handles</Text>
+      </TouchableOpacity>
     </Layout>
   );
 }
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginTop: 4,
-      marginBottom: 20,
-    },
-    title: {
-      flex: 1,
-      fontSize: 24,
-      fontWeight: "700",
-      color: c.text,
-    },
-    add: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: "center",
-      justifyContent: "center",
-      overflow: "hidden",
-    },
     list: {
-      flex: 1,
+      // Break out of the Layout's horizontal padding so rows span full width
+      // (their own paddingHorizontal aligns content to the standard margin).
+      marginHorizontal: -20,
+      marginBottom: 12,
     },
     empty: {
       color: c.textMuted,

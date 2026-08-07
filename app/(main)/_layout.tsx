@@ -14,9 +14,13 @@ export default function MainLayout() {
         <Stack.Screen
           name="register-hub"
           options={{
-            presentation: "transparentModal",
-            animation: "none",
-            contentStyle: { backgroundColor: "transparent" },
+            // Native iOS sheet (UISheetPresentationController): grabber, drag-to-
+            // dismiss, rounded corners — sized to its content.
+            presentation: "formSheet",
+            sheetAllowedDetents: "fitToContents",
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 24,
+            headerShown: false,
           }}
         />
       </Stack>
