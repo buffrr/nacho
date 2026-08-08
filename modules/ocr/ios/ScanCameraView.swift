@@ -8,6 +8,9 @@ import Vision
 // — no photo capture, no disk, no JS round-trip, so the preview never stutters.
 // Recognized QR strings / OCR line arrays are emitted to JS, which owns the
 // accept grammar + single-lock arbitration (see src/scanInput.ts + Scan.tsx).
+// The view also draws live highlight boxes: around a detected QR, and around any
+// handle-looking text (a loose native heuristic — the authoritative accept still
+// happens in JS).
 class ScanCameraView: ExpoView,
   AVCaptureMetadataOutputObjectsDelegate,
   AVCaptureVideoDataOutputSampleBufferDelegate {
@@ -17,10 +20,26 @@ class ScanCameraView: ExpoView,
 
   private let session = AVCaptureSession()
   private var previewLayer: AVCaptureVideoPreviewLayer?
+  private let qrHighlight = CALayer()
+  private let textHighlight = CALayer()
   private let sessionQueue = DispatchQueue(label: "nacho.scan.session")
   private let videoQueue = DispatchQueue(label: "nacho.scan.video")
 
-  var scanning = true
+  private static let highlightColor = UIColor(red: 1.0, green: 0.482, blue: 0.0, alpha: 1.0) // #FF7B00
+  // Loose "looks like a handle" heuristic for the highlight only (not the lock).
+  private static let handleRegex = try! NSRegularExpression(
+    pattern: "[a-z0-9._-]+@[a-z0-9._-]+", options: [.caseInsensitive])
+
+  var scanning = true {
+    didSet {
+      if !scanning {
+        DispatchQueue.main.async { [weak self] in
+          self?.drawBoxes(in: self?.qrHighlight, rects: [])
+          self?.drawBoxes(in: self?.textHighlight, rects: [])
+        }
+      }
+    }
+  }
   private var configured = false
   private var lastOCR = Date.distantPast
   private let ocrMinInterval: TimeInterval = 0.1 // floor between OCR passes
@@ -30,12 +49,16 @@ class ScanCameraView: ExpoView,
     let preview = AVCaptureVideoPreviewLayer(session: session)
     preview.videoGravity = .resizeAspectFill
     layer.addSublayer(preview)
+    layer.addSublayer(qrHighlight)
+    layer.addSublayer(textHighlight)
     previewLayer = preview
   }
 
   override func layoutSubviews() {
     super.layoutSubviews()
     previewLayer?.frame = bounds
+    qrHighlight.frame = bounds
+    textHighlight.frame = bounds
   }
 
   func setActive(_ active: Bool) {
@@ -94,13 +117,16 @@ class ScanCameraView: ExpoView,
                       didOutput metadataObjects: [AVMetadataObject],
                       from connection: AVCaptureConnection) {
     guard scanning else { return }
+
+    var boxes: [CGRect] = []
+    var payload: String?
     for obj in metadataObjects {
-      if let code = obj as? AVMetadataMachineReadableCodeObject,
-         code.type == .qr, let value = code.stringValue {
-        onBarcode(["data": value])
-        return
-      }
+      guard let code = obj as? AVMetadataMachineReadableCodeObject, code.type == .qr else { continue }
+      if let t = previewLayer?.transformedMetadataObject(for: code) { boxes.append(t.bounds) }
+      if payload == nil, let value = code.stringValue { payload = value }
     }
+    drawBoxes(in: qrHighlight, rects: boxes)
+    if let value = payload { onBarcode(["data": value]) }
   }
 
   // MARK: - OCR (throttled video frames)
@@ -113,12 +139,34 @@ class ScanCameraView: ExpoView,
     lastOCR = now
     guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
+    // With orientation .right the upright (portrait) image swaps buffer W/H.
+    let imageW = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
+    let imageH = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
+
     let request = VNRecognizeTextRequest { [weak self] req, _ in
       guard let self = self, self.scanning else { return }
       let observations = req.results as? [VNRecognizedTextObservation] ?? []
-      let lines = observations.compactMap { $0.topCandidates(1).first?.string }
-      if !lines.isEmpty {
-        DispatchQueue.main.async { self.onText(["lines": lines]) }
+
+      var lines: [String] = []
+      var handleRects: [CGRect] = [] // image-point space (top-left origin)
+      for obs in observations {
+        guard let candidate = obs.topCandidates(1).first?.string else { continue }
+        lines.append(candidate)
+        let range = NSRange(candidate.startIndex..., in: candidate)
+        if Self.handleRegex.firstMatch(in: candidate, options: [], range: range) != nil {
+          let bb = obs.boundingBox // normalized, origin bottom-left
+          handleRects.append(CGRect(
+            x: bb.minX * imageW,
+            y: (1 - bb.maxY) * imageH,
+            width: bb.width * imageW,
+            height: bb.height * imageH))
+        }
+      }
+
+      DispatchQueue.main.async {
+        self.drawBoxes(in: self.textHighlight,
+                       rects: self.viewRects(fromImageRects: handleRects, imageW: imageW, imageH: imageH))
+        if !lines.isEmpty { self.onText(["lines": lines]) }
       }
     }
     request.recognitionLevel = .accurate
@@ -131,5 +179,39 @@ class ScanCameraView: ExpoView,
     // perform() is synchronous on videoQueue; alwaysDiscardsLateVideoFrames drops
     // any frames that pile up while a (slow, .accurate) pass is running.
     try? handler.perform([request])
+  }
+
+  // MARK: - Highlight drawing
+
+  // Map image-point rects (upright portrait image, top-left origin) into preview
+  // view coords, accounting for the .resizeAspectFill scale + centering crop.
+  private func viewRects(fromImageRects rects: [CGRect], imageW: CGFloat, imageH: CGFloat) -> [CGRect] {
+    guard imageW > 0, imageH > 0, let pv = previewLayer else { return [] }
+    let vs = pv.bounds.size
+    let scale = max(vs.width / imageW, vs.height / imageH)
+    let dx = (vs.width - imageW * scale) / 2
+    let dy = (vs.height - imageH * scale) / 2
+    return rects.map {
+      CGRect(x: $0.origin.x * scale + dx,
+             y: $0.origin.y * scale + dy,
+             width: $0.width * scale,
+             height: $0.height * scale)
+    }
+  }
+
+  private func drawBoxes(in container: CALayer?, rects: [CGRect]) {
+    guard let container = container else { return }
+    CATransaction.begin()
+    CATransaction.setDisableActions(true) // no implicit fade/move animation
+    container.sublayers?.forEach { $0.removeFromSuperlayer() }
+    for rect in rects {
+      let box = CAShapeLayer()
+      box.path = UIBezierPath(roundedRect: rect.insetBy(dx: -6, dy: -6), cornerRadius: 10).cgPath
+      box.strokeColor = Self.highlightColor.cgColor
+      box.fillColor = Self.highlightColor.withAlphaComponent(0.12).cgColor
+      box.lineWidth = 2.5
+      container.addSublayer(box)
+    }
+    CATransaction.commit()
   }
 }
