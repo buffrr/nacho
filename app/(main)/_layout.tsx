@@ -45,6 +45,7 @@ export default function MainLayout() {
           options={{ title: "Import certificate" }}
         />
         <Stack.Screen name="redeem" options={{ title: "Redeem code" }} />
+        <Stack.Screen name="sign" options={{ title: "Approve request" }} />
         <Stack.Screen name="preferences" options={{ title: "Settings" }} />
         <Stack.Screen name="verify-anchor" options={{ title: "Verify anchor" }} />
         <Stack.Screen name="reveal-seed" options={{ title: "Seed phrase" }} />

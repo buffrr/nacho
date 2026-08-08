@@ -1,9 +1,14 @@
+import { isSignRequestUrl } from "@/signRequest";
+
 // Interpret text coming from a QR scan or the clipboard. It may be a handle
-// (satoshi@bitcoin), a payment URI (bitcoin:/lightning:), or a raw BOLT11
-// invoice. The Scan screen routes handles to Resolve and opens URIs directly.
+// (satoshi@bitcoin), a payment URI (bitcoin:/lightning:), a raw BOLT11 invoice,
+// or a nacho signing request (nacho://sign / https://<domain>/sign). The Scan
+// screen routes handles to Resolve, opens URIs, and sends sign requests to the
+// confirmation screen.
 export type ScanInput =
   | { kind: "handle"; value: string }
   | { kind: "uri"; value: string }
+  | { kind: "sign"; value: string }
   | { kind: "unknown"; value: string };
 
 const HANDLE_RE = /^[a-z0-9._-]+@[a-z0-9._-]+$/i;
@@ -11,6 +16,10 @@ const HANDLE_RE = /^[a-z0-9._-]+@[a-z0-9._-]+$/i;
 export function interpret(raw: string): ScanInput {
   const text = raw.trim();
   if (!text) return { kind: "unknown", value: text };
+
+  // A signing request (checked first — its URL would otherwise fall through as
+  // "unknown"). The envelope is validated later, on the confirmation screen.
+  if (isSignRequestUrl(text)) return { kind: "sign", value: text };
 
   const lower = text.toLowerCase();
   if (

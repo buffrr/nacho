@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors, useTheme } from "@/theme";
 import { AtSign, Zap, ScanIcon } from "@/ui/icons";
 import { interpret, matchOcrLines, ScanInput } from "@/scanInput";
+import { extractReqParam } from "@/signRequest";
 import { ScanView } from "@/ScanView";
 
 const NOTICE_THROTTLE = 2000; // ms between "not a payment code" notices
@@ -76,7 +77,11 @@ export default function Scan() {
       const data = e.nativeEvent?.data;
       if (lockedRef.current || !data) return;
       const parsed = interpret(data);
-      if (parsed.kind === "handle" || parsed.kind === "uri") {
+      if (
+        parsed.kind === "handle" ||
+        parsed.kind === "uri" ||
+        parsed.kind === "sign"
+      ) {
         lock(parsed);
       } else {
         const now = Date.now();
@@ -129,6 +134,17 @@ export default function Scan() {
     }
   };
 
+  // A signing request goes straight to its confirmation screen (which is the
+  // real gate) rather than through the result card. Returning to this tab
+  // re-arms scanning via the focus effect above.
+  useEffect(() => {
+    if (result?.kind === "sign") {
+      const req = extractReqParam(result.value);
+      router.push({ pathname: "/(main)/sign", params: { req: req ?? "" } });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
+
   if (!permission) {
     return <View style={styles.root} />;
   }
@@ -159,14 +175,6 @@ export default function Scan() {
         onText={onText}
       />
 
-      {/* Viewfinder brackets */}
-      <View style={styles.viewfinder} pointerEvents="none">
-        <View style={[styles.corner, styles.tl]} />
-        <View style={[styles.corner, styles.tr]} />
-        <View style={[styles.corner, styles.bl]} />
-        <View style={[styles.corner, styles.br]} />
-      </View>
-
       {/* Instruction hint */}
       {!result && (
         <View
@@ -189,8 +197,8 @@ export default function Scan() {
         </View>
       )}
 
-      {/* Locked result */}
-      {result && (
+      {/* Locked result (sign requests navigate away instead of showing a card) */}
+      {result && result.kind !== "sign" && (
         <View style={[styles.card, { paddingBottom: insets.bottom + 24 }]}>
           <View style={styles.cardRow}>
             <View style={styles.cardIcon}>
@@ -224,10 +232,6 @@ export default function Scan() {
   );
 }
 
-const BRACKET = 40;
-const THICK = 4;
-const FRAME = 250;
-
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
     root: {
@@ -256,57 +260,6 @@ const makeStyles = (c: Colors) =>
       color: "#FFFFFF",
       fontSize: 15,
       fontWeight: "600",
-    },
-    viewfinder: {
-      position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    corner: {
-      position: "absolute",
-      width: BRACKET,
-      height: BRACKET,
-      borderColor: "#FFFFFF",
-    },
-    tl: {
-      top: `50%`,
-      left: `50%`,
-      marginTop: -FRAME / 2,
-      marginLeft: -FRAME / 2,
-      borderTopWidth: THICK,
-      borderLeftWidth: THICK,
-      borderTopLeftRadius: 18,
-    },
-    tr: {
-      top: `50%`,
-      right: `50%`,
-      marginTop: -FRAME / 2,
-      marginRight: -FRAME / 2,
-      borderTopWidth: THICK,
-      borderRightWidth: THICK,
-      borderTopRightRadius: 18,
-    },
-    bl: {
-      bottom: `50%`,
-      left: `50%`,
-      marginBottom: -FRAME / 2,
-      marginLeft: -FRAME / 2,
-      borderBottomWidth: THICK,
-      borderLeftWidth: THICK,
-      borderBottomLeftRadius: 18,
-    },
-    br: {
-      bottom: `50%`,
-      right: `50%`,
-      marginBottom: -FRAME / 2,
-      marginRight: -FRAME / 2,
-      borderBottomWidth: THICK,
-      borderRightWidth: THICK,
-      borderBottomRightRadius: 18,
     },
     hint: {
       position: "absolute",

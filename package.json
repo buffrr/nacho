@@ -18,6 +18,7 @@
     "@react-navigation/native-stack": "^7.3.21",
     "@scure/bip32": "^1.7.0",
     "@scure/bip39": "^1.6.0",
+    "@scure/btc-signer": "^2.2.0",
     "@spacesprotocol/fabric-core": "^0.2.7",
     "@spacesprotocol/fabric-react-native": "^0.2.7",
     "@spacesprotocol/fabric-web": "^0.2.7",
