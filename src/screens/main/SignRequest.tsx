@@ -18,7 +18,6 @@ import {
   Check,
   AlertCircle,
   Plus,
-  Pencil,
   Trash,
   Bitcoin,
   ChevronRight,
@@ -26,7 +25,6 @@ import {
 import {
   decodeSignRequest,
   applyOps,
-  RecordDiff,
   RecordsRequest,
   PsbtRequest,
   SignRequest as SignReq,
@@ -91,10 +89,9 @@ function RecordsConfirm({
     [handles],
   );
   const [handle, setHandle] = useState<string | null>(request.handle ?? null);
-  const [diff, setDiff] = useState<RecordDiff | null>(null);
   const [phase, setPhase] = useState<
-    "picking" | "loading" | "confirm" | "publishing" | "done"
-  >(request.handle ? "loading" : "picking");
+    "picking" | "confirm" | "publishing" | "done"
+  >(request.handle ? "confirm" : "picking");
   const [error, setError] = useState<string | null>(null);
 
   // Validate a requested handle is one we own.
@@ -106,35 +103,29 @@ function RecordsConfirm({
     }
   }, [request.handle, handles]);
 
-  // Load the live zone for the chosen handle and compute the diff.
-  useEffect(() => {
-    if (!handle || phase !== "loading") return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const resolved = await resolveHandle(handle);
-        const current: EditableRecord[] = resolved
-          ? editableFromZone(resolved.zone).records
-          : [];
-        if (cancelled) return;
-        setDiff(applyOps(current, request.ops));
-        setPhase("confirm");
-      } catch (e) {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Failed to load the handle's records.");
-        setPhase("confirm");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [handle, phase, request.ops]);
-
+  // Approve: only NOW resolve the live zone, merge the requested ops into the
+  // current records (publish is a full replacement, so we combine rather than
+  // clobber), and republish. Deferring the resolve to here keeps the
+  // confirmation instant; the button shows a spinner while it runs.
   const publish = useCallback(async () => {
-    if (!handle || !diff) return;
+    if (!handle) return;
     setError(null);
     setPhase("publishing");
     try {
+      const resolved = await Promise.race([
+        resolveHandle(handle),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Timed out loading current records.")),
+            20000,
+          ),
+        ),
+      ]);
+      const current: EditableRecord[] = resolved
+        ? editableFromZone(resolved.zone).records
+        : [];
+      const { next } = applyOps(current, request.ops);
+
       const secretKey = await getSigningKey(handle);
       if (!secretKey) throw new Error("No private key available for this handle.");
       let cert = await loadCert(handle);
@@ -143,13 +134,13 @@ function RecordsConfirm({
         await saveCert(handle, cert);
       }
       const seq = Math.floor(Date.now() / 1000);
-      await publishRecords(cert, diff.next, seq, secretKey);
+      await publishRecords(cert, next, seq, secretKey);
       setPhase("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to publish records.");
       setPhase("confirm");
     }
-  }, [handle, diff, getSigningKey]);
+  }, [handle, request.ops, getSigningKey]);
 
   const finish = () => router.back();
   const returnToApp = () => {
@@ -174,7 +165,7 @@ function RecordsConfirm({
                 onPress={() => {
                   setError(null);
                   setHandle(h);
-                  setPhase("loading");
+                  setPhase("confirm");
                 }}
               >
                 <View style={styles.pickIcon}>
@@ -186,15 +177,6 @@ function RecordsConfirm({
             </React.Fragment>
           ))}
         </View>
-      </Layout>
-    );
-  }
-
-  if (phase === "loading") {
-    return (
-      <Layout underHeader>
-        <Stack.Screen options={{ title: "Sign in" }} />
-        <ActivityIndicator color={colors.accent} size="large" style={styles.loader} />
       </Layout>
     );
   }
@@ -240,7 +222,12 @@ function RecordsConfirm({
         <Text style={styles.targetName}>{handle}</Text>
       </View>
 
-      {diff && <RecordDiffView diff={diff} styles={styles} colors={colors} />}
+      <Text style={styles.prompt}>
+        These changes will be published to your handle. Your existing records are
+        kept.
+      </Text>
+
+      <OpsPreview ops={request.ops} styles={styles} colors={colors} />
 
       {error && <View style={styles.mt}><Message message={error} type="error" /></View>}
 
@@ -266,51 +253,42 @@ function RecordsConfirm({
   );
 }
 
-function RecordDiffView({
-  diff,
+// Renders the requested ops directly (no live-zone resolve needed). Whether a
+// `set` ends up an add or a replace is only known after the on-approve resolve;
+// here we just show what the request asks for.
+function OpsPreview({
+  ops,
   styles,
   colors,
 }: {
-  diff: RecordDiff;
+  ops: RecordsRequest["ops"];
   styles: Styles;
   colors: Colors;
 }) {
-  const recLine = (r: EditableRecord) => `${r.type} · ${r.key}`;
   return (
     <View style={styles.card}>
-      {diff.added.map((r, i) => (
-        <DiffRow
-          key={`a${i}`}
-          Icon={Plus}
-          color={colors.statusGreenFg}
-          label={recLine(r)}
-          value={r.value.join(", ")}
-          styles={styles}
-        />
+      {ops.map((op, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && <View style={styles.divider} />}
+          {op.op === "set" ? (
+            <DiffRow
+              Icon={Plus}
+              color={colors.statusGreenFg}
+              label={`${op.rtype} · ${op.key}`}
+              value={op.value.join(", ")}
+              styles={styles}
+            />
+          ) : (
+            <DiffRow
+              Icon={Trash}
+              color="#DC2626"
+              label={`${op.rtype ? op.rtype + " · " : ""}${op.key}`}
+              value="Remove this record"
+              styles={styles}
+            />
+          )}
+        </React.Fragment>
       ))}
-      {diff.replaced.map((r, i) => (
-        <DiffRow
-          key={`r${i}`}
-          Icon={Pencil}
-          color={colors.accent}
-          label={recLine(r.after)}
-          value={`${r.before.value.join(", ")}  →  ${r.after.value.join(", ")}`}
-          styles={styles}
-        />
-      ))}
-      {diff.removed.map((r, i) => (
-        <DiffRow
-          key={`d${i}`}
-          Icon={Trash}
-          color="#DC2626"
-          label={recLine(r)}
-          value={r.value.join(", ")}
-          styles={styles}
-        />
-      ))}
-      {diff.added.length + diff.replaced.length + diff.removed.length === 0 && (
-        <Text style={styles.emptyNote}>This request makes no changes.</Text>
-      )}
     </View>
   );
 }
@@ -557,7 +535,6 @@ const makeStyles = (c: Colors) =>
     errorWrap: { marginTop: 20 },
     mt: { marginTop: 16 },
     mb: { marginBottom: 16 },
-    loader: { marginTop: 40 },
     prompt: {
       fontSize: 15,
       color: c.textSecondary,
@@ -629,7 +606,6 @@ const makeStyles = (c: Colors) =>
     diffMid: { flex: 1, gap: 2 },
     diffLabel: { fontSize: 15, fontWeight: "600", color: c.text },
     diffValue: { fontSize: 13, color: c.textSecondary, fontFamily: "monospace" },
-    emptyNote: { padding: 16, fontSize: 14, color: c.textSecondary },
     // psbt
     psbtRow: { paddingHorizontal: 14, paddingVertical: 12 },
     psbtLine: { flexDirection: "row", alignItems: "center", gap: 12 },
