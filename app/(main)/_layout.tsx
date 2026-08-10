@@ -38,6 +38,8 @@ export default function MainLayout() {
           }}
         />
         {/* show-handle + edit-record set their (dynamic) titles in-component. */}
+        <Stack.Screen name="shop" options={{ title: "Shop" }} />
+        <Stack.Screen name="trust" options={{ title: "Trust" }} />
         <Stack.Screen name="create-request" options={{ title: "Create a request" }} />
         <Stack.Screen name="import-keypair" options={{ title: "Import keypair" }} />
         <Stack.Screen

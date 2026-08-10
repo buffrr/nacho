@@ -40,7 +40,7 @@ export default function RegisterHub() {
           title: "Shop for a handle",
           subtitle: "Browse and buy",
           Icon: Storefront,
-          go: () => router.navigate("/(main)/(tabs)/shop"),
+          go: () => router.push("/(main)/shop"),
         },
         {
           title: "Redeem a code",

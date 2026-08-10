@@ -77,7 +77,7 @@ export default function ListHandles() {
 
       <TouchableOpacity
         style={styles.shopButton}
-        onPress={() => router.navigate("/(main)/(tabs)/shop")}
+        onPress={() => router.push("/(main)/shop")}
       >
         <ShoppingBag size={18} color={colors.text} />
         <Text style={styles.shopText}>Shop handles</Text>

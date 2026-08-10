@@ -2,6 +2,7 @@ import React from "react";
 import { Stack, router } from "expo-router";
 import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
 import { useTheme } from "@/theme";
+import { appMenuLeftItems } from "@/ui/appMenu";
 
 // The "+" (Register a handle) as a native bar-button item (SF Symbol), memoized
 // with stable deps + the imported `router` singleton so its identity doesn't
@@ -24,6 +25,11 @@ export default function HandlesTabLayout() {
     [colors.accent],
   );
 
+  const leftItems = React.useMemo(
+    () => appMenuLeftItems(colors.text),
+    [colors.text],
+  );
+
   const options = React.useMemo(
     () => ({
       title: "Handles",
@@ -33,9 +39,10 @@ export default function HandlesTabLayout() {
       headerTintColor: colors.text,
       headerTitleStyle: { color: colors.text },
       contentStyle: { backgroundColor: colors.background },
+      unstable_headerLeftItems: () => leftItems,
       unstable_headerRightItems: () => rightItems,
     }),
-    [colors.text, rightItems],
+    [colors.text, colors.background, leftItems, rightItems],
   );
 
   return (

@@ -1,18 +1,18 @@
 import React from "react";
+import { Platform } from "react-native";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useTheme } from "@/theme";
 
-// Native OS tab bar (iOS 26 Liquid Glass). `tintColor` sets the active tab to
-// the nacho accent. Icons are custom nacho glyphs shipped as template PNGs
-// (black-on-transparent), so the OS tints them (accent when selected, grey
-// otherwise) — and unlike SF Symbols, `src` renders on iOS + Android + web.
-// Trigger `name` must match the route filenames in this dir.
-const TAB_ICONS = {
+// Native OS tab bar (iOS 26 Liquid Glass), `tintColor` = the nacho accent for
+// the active tab. iOS uses crisp SF Symbols (they render + animate natively);
+// Android/web fall back to the custom nacho glyph PNGs (template-tinted). Trust
+// + Settings live in the header hamburger (src/ui/appMenu); Shop is reached from
+// the Handles list + the "+" sheet — so the bar is just Handles / Resolve / Scan.
+const isIOS = Platform.OS === "ios";
+const PNG = {
   handles: require("../../../assets/tabs/handles.png"),
-  shop: require("../../../assets/tabs/shop.png"),
-  scan: require("../../../assets/tabs/scan.png"),
   resolve: require("../../../assets/tabs/resolve.png"),
-  trust: require("../../../assets/tabs/trust.png"),
+  scan: require("../../../assets/tabs/scan.png"),
 };
 
 export default function TabsLayout() {
@@ -20,24 +20,28 @@ export default function TabsLayout() {
   return (
     <NativeTabs tintColor={colors.accent}>
       <NativeTabs.Trigger name="handles">
-        <NativeTabs.Trigger.Icon src={TAB_ICONS.handles} renderingMode="template" />
+        {isIOS ? (
+          <NativeTabs.Trigger.Icon sf="at" />
+        ) : (
+          <NativeTabs.Trigger.Icon src={PNG.handles} renderingMode="template" />
+        )}
         <NativeTabs.Trigger.Label>Handles</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="shop">
-        <NativeTabs.Trigger.Icon src={TAB_ICONS.shop} renderingMode="template" />
-        <NativeTabs.Trigger.Label>Shop</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="scan">
-        <NativeTabs.Trigger.Icon src={TAB_ICONS.scan} renderingMode="template" />
-        <NativeTabs.Trigger.Label>Scan</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="resolve">
-        <NativeTabs.Trigger.Icon src={TAB_ICONS.resolve} renderingMode="template" />
+        {isIOS ? (
+          <NativeTabs.Trigger.Icon sf="magnifyingglass" />
+        ) : (
+          <NativeTabs.Trigger.Icon src={PNG.resolve} renderingMode="template" />
+        )}
         <NativeTabs.Trigger.Label>Resolve</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="trust">
-        <NativeTabs.Trigger.Icon src={TAB_ICONS.trust} renderingMode="template" />
-        <NativeTabs.Trigger.Label>Trust</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="scan">
+        {isIOS ? (
+          <NativeTabs.Trigger.Icon sf="qrcode.viewfinder" />
+        ) : (
+          <NativeTabs.Trigger.Icon src={PNG.scan} renderingMode="template" />
+        )}
+        <NativeTabs.Trigger.Label>Scan</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
