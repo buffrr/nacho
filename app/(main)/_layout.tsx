@@ -48,6 +48,8 @@ export default function MainLayout() {
         />
         <Stack.Screen name="redeem" options={{ title: "Redeem code" }} />
         <Stack.Screen name="sign" options={{ title: "Approve request" }} />
+        <Stack.Screen name="handle-action" options={{ title: "Handle" }} />
+        <Stack.Screen name="cancel-offers" options={{ title: "Cancel offers" }} />
         <Stack.Screen name="preferences" options={{ title: "Settings" }} />
         <Stack.Screen name="verify-anchor" options={{ title: "Verify anchor" }} />
         <Stack.Screen name="reveal-seed" options={{ title: "Seed phrase" }} />

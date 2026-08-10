@@ -978,6 +978,29 @@ export default function ShowHandle() {
       onPress: handleExportCertificate,
     });
   }
+  // Handle transactions (user-initiated). Each collects the current outpoint via
+  // the manual-entry form (we have no chain view); Cancel uses saved offers.
+  menuActions.push({
+    type: "action",
+    label: "Sell handle",
+    icon: { type: "sfSymbol", name: "tag" },
+    onPress: () =>
+      router.push({ pathname: "/(main)/handle-action", params: { handle, action: "sale" } }),
+  });
+  menuActions.push({
+    type: "action",
+    label: "Transfer handle",
+    icon: { type: "sfSymbol", name: "arrow.right" },
+    onPress: () =>
+      router.push({ pathname: "/(main)/handle-action", params: { handle, action: "transfer" } }),
+  });
+  menuActions.push({
+    type: "action",
+    label: "Cancel offers",
+    icon: { type: "sfSymbol", name: "xmark.circle" },
+    onPress: () =>
+      router.push({ pathname: "/(main)/cancel-offers", params: { handle } }),
+  });
   menuActions.push({
     type: "action",
     label: "Remove handle",
