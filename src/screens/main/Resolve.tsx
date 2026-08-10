@@ -2,19 +2,17 @@ import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { Colors, useTheme } from "@/theme";
 import { avatarColors } from "@/handleTile";
 import { Layout } from "@/ui/Layout";
 import { Message } from "@/ui/Message";
 import {
-  Search,
   Copy,
   Check,
   AtSign,
@@ -227,29 +225,28 @@ export default function Resolve() {
     );
 
   return (
-    <Layout tabBarInset underHeader>
-      <Text style={styles.subtitle}>Look up a handle to pay or verify.</Text>
+    <Layout tabBarInset underHeader keyboardAware={false}>
+      {/* Native UISearchController field in the nav bar — no in-content input,
+          so no keyboard/scroll conflict. Typing updates the handle; the keyboard
+          "Search" key resolves. */}
+      <Stack.Screen
+        options={{
+          headerSearchBarOptions: {
+            placeholder: "satoshi@bitcoin",
+            autoCapitalize: "none",
+            hideWhenScrolling: false,
+            textColor: colors.text,
+            tintColor: colors.accent,
+            onChangeText: (e) =>
+              setHandle(e.nativeEvent.text.trim().toLowerCase()),
+            onSearchButtonPress: (e) => onResolve(e.nativeEvent.text),
+          },
+        }}
+      />
 
-      <View style={styles.lookup}>
-        <Search size={20} color={colors.textMuted} />
-        <TextInput
-          value={handle}
-          onChangeText={(text) => setHandle(text.trim().toLowerCase())}
-          onSubmitEditing={() => onResolve()}
-          placeholder="satoshi@bitcoin"
-          placeholderTextColor={colors.placeholder}
-          style={styles.lookupInput}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!isLoading}
-          returnKeyType="search"
-        />
-        {handle.trim().includes("@") && !isLoading && (
-          <TouchableOpacity onPress={() => onResolve()} hitSlop={8}>
-            <Text style={styles.go}>Resolve</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {!result && !isLoading && !error && !notFound && (
+        <Text style={styles.subtitle}>Look up a handle to pay or verify.</Text>
+      )}
 
       {isLoading && (
         <ActivityIndicator color={colors.accent} style={styles.loader} size="large" />
@@ -324,29 +321,6 @@ const makeStyles = (c: Colors) =>
       color: c.textSecondary,
       marginTop: 6,
       marginBottom: 20,
-    },
-    lookup: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      height: 50,
-      backgroundColor: c.field,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-    },
-    lookupInput: {
-      flex: 1,
-      fontSize: 16,
-      color: c.text,
-      // @ts-ignore web-only
-      outlineStyle: "none",
-    } as any,
-    go: {
-      fontSize: 14,
-      fontWeight: "600",
-      color: c.accent,
     },
     loader: {
       marginTop: 28,

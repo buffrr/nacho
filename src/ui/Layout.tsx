@@ -1,5 +1,5 @@
 import React, { ReactNode } from "react";
-import { View, StyleSheet, Platform } from "react-native";
+import { View, StyleSheet, Platform, ScrollView } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme";
@@ -21,6 +21,13 @@ interface LayoutProps {
   // so skip the manual top padding. Pair with tabBarInset on transparent tab
   // headers to also enable automatic content-inset adjustment.
   underHeader?: boolean;
+  // Use the keyboard-aware scroll view (default) — needed for forms whose inputs
+  // sit lower in the view. Set false for screens whose input is at the top (e.g.
+  // Resolve): the keyboard-aware library's manual inset fights the automatic
+  // content-inset adjustment on transparent tab headers and leaves the content
+  // pushed up after the keyboard hides. A plain ScrollView + the native
+  // automaticallyAdjustKeyboardInsets behaves correctly there.
+  keyboardAware?: boolean;
 }
 
 // Bottom padding for tab screens on platforms without automatic content-inset
@@ -35,6 +42,7 @@ export function Layout({
   padTop = false,
   tabBarInset = false,
   underHeader = false,
+  keyboardAware = true,
 }: LayoutProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -50,25 +58,45 @@ export function Layout({
   const bottomPad =
     tabBarInset && Platform.OS !== "ios" ? insets.bottom + TAB_BAR_PAD : 0;
 
-  const content = scrollable ? (
-    <KeyboardAwareScrollView
-      style={styles.scrollView}
-      contentContainerStyle={[
-        styles.scrollContent,
-        bottomPad ? { paddingBottom: bottomPad } : null,
-      ]}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      enableOnAndroid={true}
-      contentInsetAdjustmentBehavior={autoInset ? "automatic" : "never"}
-    >
-      {children}
-    </KeyboardAwareScrollView>
-  ) : (
-    <View style={[styles.content, bottomPad ? { paddingBottom: bottomPad } : null]}>
-      {children}
-    </View>
-  );
+  const scrollContentStyle = [
+    styles.scrollContent,
+    bottomPad ? { paddingBottom: bottomPad } : null,
+  ];
+
+  let content: ReactNode;
+  if (!scrollable) {
+    content = (
+      <View style={[styles.content, bottomPad ? { paddingBottom: bottomPad } : null]}>
+        {children}
+      </View>
+    );
+  } else if (keyboardAware) {
+    content = (
+      <KeyboardAwareScrollView
+        style={styles.scrollView}
+        contentContainerStyle={scrollContentStyle}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid={true}
+        contentInsetAdjustmentBehavior={autoInset ? "automatic" : "never"}
+      >
+        {children}
+      </KeyboardAwareScrollView>
+    );
+  } else {
+    content = (
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={scrollContentStyle}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentInsetAdjustmentBehavior={autoInset ? "automatic" : "never"}
+        automaticallyAdjustKeyboardInsets
+      >
+        {children}
+      </ScrollView>
+    );
+  }
 
   return (
     <View
