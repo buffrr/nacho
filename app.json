@@ -45,7 +45,13 @@
       "expo-font",
       "expo-sqlite",
       "expo-sharing",
-      "expo-router"
+      "expo-router",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Authenticate to sign a handle sale or transfer"
+        }
+      ]
     ],
     "extra": {
       "eas": {

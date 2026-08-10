@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -28,6 +29,8 @@ import {
   RecordDiff,
   MessageRequest,
   RecordsRequest,
+  TransferRequest,
+  SaleRequest,
   SignRequest as SignReq,
 } from "@/signRequest";
 import { editableFromZone, EditableRecord } from "@/fabricResolver";
@@ -35,8 +38,16 @@ import { resolveHandle, exportCert, publishRecords } from "@/fabric";
 import { loadCert, saveCert } from "@/certStore";
 import { recordsGet } from "@/db";
 import { tierFor, warningLine, needsAck } from "@/recordTiers";
-import { remainingValidity } from "@/format";
+import { remainingValidity, formatBtc } from "@/format";
 import { signMessage } from "@/messageSign";
+import { scriptForHandle } from "@/keys";
+import {
+  signSingleAnyonecanpay,
+  addressToScriptHex,
+  DUST_LIMIT,
+} from "@/psbtSign";
+import { addOffer } from "@/offers";
+import { authenticate } from "@/auth";
 
 // Confirmation screens for a signing request (design-notes.md / mockups.html).
 // Decodes the untrusted envelope and shows the exact effect before approval. No
@@ -73,8 +84,12 @@ export default function SignRequest() {
       return <MessageConfirm request={r} styles={styles} colors={colors} />;
     case "records":
       return <RecordsConfirm request={r} styles={styles} colors={colors} />;
+    case "transfer":
+      return <TransferConfirm request={r} styles={styles} colors={colors} />;
+    case "sale":
+      return <SaleConfirm request={r} styles={styles} colors={colors} />;
     default:
-      // transfer / sale / rotate — next implementation slice.
+      // rotate — next implementation slice (needs new-key generation + store state).
       return (
         <Layout underHeader>
           <Stack.Screen options={{ title: "Request" }} />
@@ -708,6 +723,329 @@ function RecordDiffView({
   );
 }
 
+// ---- transfer ---------------------------------------------------------------
+
+function TransferConfirm({
+  request,
+  styles,
+  colors,
+}: {
+  request: TransferRequest;
+  styles: Styles;
+  colors: Colors;
+}) {
+  const router = useRouter();
+  const { handles, xpub, getSigningKey } = useStore();
+  const [ack, setAck] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [response, setResponse] = useState<string | null>(null);
+
+  const data = handles?.[request.handle];
+  const inputScript = data && xpub ? scriptForHandle(xpub, data) : null;
+  const toMine = useMemo(
+    () =>
+      !!(
+        xpub &&
+        handles &&
+        Object.values(handles).some(
+          (d) => scriptForHandle(xpub, d).toLowerCase() === request.to.toLowerCase(),
+        )
+      ),
+    [xpub, handles, request.to],
+  );
+
+  const sign = useCallback(async () => {
+    if (!data || !xpub || !inputScript) {
+      setError("You don't own this handle.");
+      return;
+    }
+    setSigning(true);
+    setError(null);
+    try {
+      const key = await getSigningKey(request.handle);
+      if (!key) throw new Error("No private key available for this handle.");
+      const psbt = signSingleAnyonecanpay(
+        { ...request.outpoint, script: inputScript },
+        { script: request.to, amount: request.outpoint.amount }, // equal value = ownership move
+        key,
+      );
+      await addOffer({
+        id: request.ref ?? String(Date.now()),
+        handle: request.handle,
+        kind: "transfer",
+        outpoint: request.outpoint,
+        to: request.to,
+        psbtB64: psbt,
+        createdAt: Date.now(),
+        status: "live",
+      });
+      setResponse(psbt);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to sign.");
+    } finally {
+      setSigning(false);
+    }
+  }, [data, xpub, inputScript, request, getSigningKey]);
+
+  if (response) {
+    return (
+      <ResultView
+        heading="Transfer signed"
+        sub="Broadcast this to move the handle"
+        blob={response}
+        response={response}
+        endpoint={request.endpoint}
+        styles={styles}
+        colors={colors}
+      />
+    );
+  }
+
+  return (
+    <Layout underHeader>
+      <Stack.Screen options={{ title: "Transfer handle" }} />
+      <View style={styles.hero}>
+        <Text style={styles.heroH}>Give away {request.handle}</Text>
+        <Text style={styles.heroS}>You will no longer control this handle</Text>
+      </View>
+
+      <View style={styles.lblRow}>
+        <Text style={styles.lbl}>Recipient</Text>
+        <View style={[styles.tag, toMine ? styles.tagMine : styles.tagExt]}>
+          <Text style={styles.tagText}>{toMine ? "your key" : "external"}</Text>
+        </View>
+      </View>
+      <View style={styles.recBlock}>
+        <ChunkedValue value={request.to} style={styles.recChunk} />
+      </View>
+
+      {!toMine && (
+        <TouchableOpacity style={styles.ackRow} onPress={() => setAck((a) => !a)}>
+          <View style={[styles.checkbox, ack && styles.checkboxOn]}>
+            {ack && <Check size={14} color="#FFFFFF" />}
+          </View>
+          <Text style={styles.ackText}>This matches the key the recipient gave me</Text>
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.noteDot}>
+        <Text style={styles.noteText}>
+          Once this transaction is broadcast, the handle is theirs. There is no way
+          to undo it.
+        </Text>
+      </View>
+
+      {error && (
+        <View style={styles.mt}>
+          <Message message={error} type="error" />
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={[styles.dangerBtn, (signing || (!toMine && !ack)) && styles.btnDisabled]}
+        onPress={sign}
+        disabled={signing || (!toMine && !ack)}
+      >
+        {signing ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.dangerBtnText}>Sign transfer</Text>
+        )}
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
+        <Text style={styles.secondaryBtnText}>Cancel</Text>
+      </TouchableOpacity>
+    </Layout>
+  );
+}
+
+// ---- sale -------------------------------------------------------------------
+
+function SaleConfirm({
+  request,
+  styles,
+  colors,
+}: {
+  request: SaleRequest;
+  styles: Styles;
+  colors: Colors;
+}) {
+  const router = useRouter();
+  const { handles, xpub, getSigningKey } = useStore();
+  const [payout, setPayout] = useState("");
+  const [payoutSource, setPayoutSource] = useState<string | null>(null);
+  const [signing, setSigning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [response, setResponse] = useState<string | null>(null);
+
+  const data = handles?.[request.handle];
+  const inputScript = data && xpub ? scriptForHandle(xpub, data) : null;
+
+  // Prefill the payout from the user's own addr:btc record (re-read live at sign).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await resolveHandle(request.handle);
+        if (r && !cancelled) {
+          const btc = editableFromZone(r.zone).records.find(
+            (x) => x.type === "addr" && x.key.toLowerCase() === "btc",
+          );
+          if (btc?.value[0]) {
+            setPayout(btc.value[0]);
+            setPayoutSource("addr · btc");
+          }
+        }
+      } catch {
+        // leave payout empty → user enters one
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [request.handle]);
+
+  const sign = useCallback(async () => {
+    if (!data || !xpub || !inputScript) {
+      setError("You don't own this handle.");
+      return;
+    }
+    if (!payout.trim()) {
+      setError("Enter a payout address.");
+      return;
+    }
+    setError(null);
+    let outScript: string;
+    try {
+      outScript = addressToScriptHex(payout);
+    } catch {
+      setError("That payout address isn't valid.");
+      return;
+    }
+    const outAmount = request.outpoint.amount + request.price; // input + price
+    if (outAmount < DUST_LIMIT) {
+      setError("The payout would be below the dust limit.");
+      return;
+    }
+    // Highest-consequence action — gate behind device auth (proceeds if none enrolled).
+    const ok = await authenticate("Sign offer");
+    if (!ok) {
+      setError("Authentication failed.");
+      return;
+    }
+    setSigning(true);
+    try {
+      const key = await getSigningKey(request.handle);
+      if (!key) throw new Error("No private key available for this handle.");
+      const psbt = signSingleAnyonecanpay(
+        { ...request.outpoint, script: inputScript },
+        { script: outScript, amount: outAmount },
+        key,
+      );
+      await addOffer({
+        id: request.ref ?? String(Date.now()),
+        handle: request.handle,
+        kind: "sale",
+        outpoint: request.outpoint,
+        price: request.price,
+        psbtB64: psbt,
+        createdAt: Date.now(),
+        status: "live",
+      });
+      setResponse(psbt);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to sign.");
+    } finally {
+      setSigning(false);
+    }
+  }, [data, xpub, inputScript, payout, request, getSigningKey]);
+
+  if (response) {
+    return (
+      <ResultView
+        heading="Offer signed"
+        sub="This offer stays valid until you cancel it"
+        blob={response}
+        response={response}
+        endpoint={request.endpoint}
+        styles={styles}
+        colors={colors}
+      />
+    );
+  }
+
+  return (
+    <Layout underHeader>
+      <Stack.Screen options={{ title: "Sell handle" }} />
+      <View style={styles.hero}>
+        <Text style={styles.lbl}>Asking price</Text>
+        <Text style={styles.bigPrice}>{formatBtc(request.price)}</Text>
+        <Text style={styles.heroS}>for {request.handle}</Text>
+      </View>
+
+      <Text style={styles.lbl}>You get paid to</Text>
+      <View style={styles.card}>
+        <TextInput
+          value={payout}
+          onChangeText={setPayout}
+          placeholder="bc1…"
+          placeholderTextColor={colors.placeholder}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.payoutInput}
+        />
+        {payoutSource && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.kv}>
+              <Text style={styles.kvK}>From your record</Text>
+              <Text style={[styles.kvV, { fontFamily: "monospace" }]}>{payoutSource}</Text>
+            </View>
+          </>
+        )}
+      </View>
+
+      <View style={styles.noteDot}>
+        <Text style={styles.noteText}>
+          <Text style={styles.noteStrong}>
+            Anyone who pays {formatBtc(request.price)} can take ownership of this
+            handle.
+          </Text>
+        </Text>
+      </View>
+      <View style={styles.noteWarn}>
+        <AlertCircle size={16} color={colors.statusAmberFg} />
+        <Text style={styles.noteText}>
+          This offer stays valid until you cancel it. Cancelling means moving the
+          handle to yourself.
+        </Text>
+      </View>
+
+      {error && (
+        <View style={styles.mt}>
+          <Message message={error} type="error" />
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={[styles.dangerBtn, signing && styles.btnDisabled]}
+        onPress={sign}
+        disabled={signing}
+      >
+        {signing ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.dangerBtnText}>Sign offer</Text>
+        )}
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
+        <Text style={styles.secondaryBtnText}>Cancel</Text>
+      </TouchableOpacity>
+    </Layout>
+  );
+}
+
 type Styles = ReturnType<typeof makeStyles>;
 
 const makeStyles = (c: Colors) =>
@@ -745,6 +1083,39 @@ const makeStyles = (c: Colors) =>
     },
     heroH: { fontSize: 15, color: c.textSecondary },
     heroS: { fontSize: 20, fontWeight: "700", color: c.text },
+    bigPrice: { fontSize: 40, fontWeight: "800", color: c.text, letterSpacing: -0.5 },
+    lblRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 8,
+    },
+    tag: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+      marginBottom: 8,
+    },
+    tagExt: { backgroundColor: "#DC262622" },
+    tagMine: { backgroundColor: c.statusGreenBg },
+    tagText: { fontSize: 11, fontWeight: "700", color: c.textSecondary, textTransform: "uppercase" },
+    payoutInput: {
+      fontFamily: "monospace",
+      fontSize: 13,
+      color: c.text,
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+      // @ts-ignore web-only
+      outlineStyle: "none",
+    } as any,
+    noteDot: {
+      backgroundColor: c.statusAmberBg,
+      borderWidth: 1,
+      borderColor: c.borderWarm,
+      borderRadius: 12,
+      padding: 13,
+      marginTop: 12,
+    },
     card: {
       backgroundColor: c.card,
       borderWidth: 1,
@@ -868,6 +1239,14 @@ const makeStyles = (c: Colors) =>
       marginTop: 20,
     },
     primaryBtnText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
+    dangerBtn: {
+      backgroundColor: "#DC2626",
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: "center",
+      marginTop: 20,
+    },
+    dangerBtnText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
     btnDisabled: { opacity: 0.5 },
     secondaryBtn: { paddingVertical: 14, alignItems: "center", marginTop: 4 },
     secondaryBtnText: { color: c.textSecondary, fontSize: 15, fontWeight: "500" },

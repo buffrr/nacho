@@ -1,6 +1,17 @@
-import { Transaction, SigHash } from "@scure/btc-signer";
+import { Transaction, SigHash, Address, OutScript } from "@scure/btc-signer";
 import { schnorr } from "@noble/secp256k1";
-import { hexToBytes } from "@noble/hashes/utils.js";
+import { hexToBytes, bytesToHex } from "@noble/hashes/utils.js";
+
+// A Bitcoin address → scriptPubKey hex (for the sale payout output). Throws on an
+// address that doesn't decode for the network.
+export function addressToScriptHex(address: string): string {
+  const decoded = Address().decode(address.trim());
+  if (!decoded) throw new Error("Invalid payout address.");
+  return bytesToHex(OutScript.encode(decoded));
+}
+
+// Minimum non-dust output value (P2TR/P2WPKH-ish); validate before signing.
+export const DUST_LIMIT = 546;
 
 // Generic SIGHASH_SINGLE|ANYONECANPAY signer for handle transactions (transfer,
 // sale, cancel, rotate). Signs ONE owned input committing to ONE output; the
