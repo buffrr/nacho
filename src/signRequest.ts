@@ -1,58 +1,69 @@
 import type { EditableRecord } from "@/fabricResolver";
 
-// Parses and validates the base64url-JSON envelope carried by a signing request
-// (see docs/signing-requests.md). Requests arrive as `nacho://sign?req=…` or
-// `https://<domain>/sign?req=…`, delivered by a QR scan or a (universal) link.
-// Everything here is UNTRUSTED input — validation is strict and the UI must
-// still show the exact effect before the user approves.
+// Parses + validates the base64url-JSON envelope carried by a signing request
+// (see design-notes.md / docs/signing-v2-plan.md). Requests arrive as
+// `nacho://sign?req=…` or `https://<domain>/sign?req=…` via QR or (universal)
+// link. Everything here is UNTRUSTED — validation is strict and the UI still
+// shows the exact effect before the user approves.
+
+// ---- shared shapes ----------------------------------------------------------
+
+export type Outpoint = { txid: string; vout: number; amount: number };
+
+type CommonFields = {
+  v: 1;
+  exp: number; // unix seconds — required; rejected when past
+  ref?: string; // opaque caller reference — echoed back, NEVER displayed
+  endpoint?: string; // https only — host derived from here is the only nameable one
+  return?: string; // https only
+};
 
 export type RecordOp =
   | { op: "set"; rtype: "txt" | "addr"; key: string; value: string[] }
   | { op: "delete"; key: string; rtype?: "txt" | "addr" };
 
-export type RecordsRequest = {
-  v: 1;
+export type MessageRequest = CommonFields & {
+  type: "message";
+  handle?: string;
+  challenge: string;
+};
+export type RecordsRequest = CommonFields & {
   type: "records";
   handle?: string;
   ops: RecordOp[];
-  origin?: string;
-  nonce?: string;
-  return?: string;
+};
+export type TransferRequest = CommonFields & {
+  type: "transfer";
+  handle: string;
+  to: string; // recipient spk (hex)
+  outpoint: Outpoint;
+};
+export type SaleRequest = CommonFields & {
+  type: "sale";
+  handle: string;
+  price: number; // base units (₿); output = input + price
+  outpoint: Outpoint;
+};
+export type RotateRequest = CommonFields & {
+  type: "rotate";
+  handle: string;
+  outpoint: Outpoint;
 };
 
-export type PsbtInput = {
-  txid: string;
-  vout: number;
-  amount: number; // sats — committed by the taproot sighash, shown to the user
-  script: string; // hex spk; must equal an owned handle's 5120<xonly>
-};
-export type PsbtOutput = {
-  amount: number; // sats
-  script: string; // hex spk
-};
-export type PsbtRequest = {
-  v: 1;
-  type: "psbt";
-  sign: PsbtInput[];
-  outputs: PsbtOutput[];
-  version?: number;
-  locktime?: number;
-  origin?: string;
-  nonce?: string;
-};
+export type SignRequest =
+  | MessageRequest
+  | RecordsRequest
+  | TransferRequest
+  | SaleRequest
+  | RotateRequest;
 
-export type SignRequest = RecordsRequest | PsbtRequest;
+// ---- URL detection + payload extraction ------------------------------------
 
-// A QR/deeplink whose shape could be a signing request. The envelope is still
-// validated on decode, so a false positive here just yields a clear error.
 export function isSignRequestUrl(raw: string): boolean {
   const s = raw.trim();
-  return (
-    /^nacho:\/\/sign\b/i.test(s) || /^https?:\/\/[^/]+\/sign\b/i.test(s)
-  );
+  return /^nacho:\/\/sign\b/i.test(s) || /^https?:\/\/[^/]+\/sign\b/i.test(s);
 }
 
-// Pull the `req=` payload out of a sign URL (already URL-decoded).
 export function extractReqParam(raw: string): string | null {
   const m = raw.match(/[?&]req=([^&#]+)/);
   return m ? decodeURIComponent(m[1]) : null;
@@ -63,11 +74,9 @@ function base64urlToUtf8(b64url: string): string {
   return Buffer.from(b64, "base64").toString("utf8");
 }
 
-// Encode an envelope back to a `nacho://sign?req=…` URL (for the test generator
-// and for round-trip tests).
+// For the test generator / round-trip tests.
 export function encodeSignRequest(req: SignRequest, base = "nacho://sign"): string {
-  const json = JSON.stringify(req);
-  const b64url = Buffer.from(json, "utf8")
+  const b64url = Buffer.from(JSON.stringify(req), "utf8")
     .toString("base64")
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
@@ -75,7 +84,45 @@ export function encodeSignRequest(req: SignRequest, base = "nacho://sign"): stri
   return `${base}?req=${b64url}`;
 }
 
-// Decode + validate a `req` payload (the base64url string, not the whole URL).
+// ---- endpoint / return URL validation --------------------------------------
+
+// Returns the display host if valid, else throws. https-only in production;
+// `http://localhost[:port]` tolerated only in dev builds. Rejects private /
+// loopback / link-local hosts and non-standard ports — an arbitrary scheme or a
+// LAN address lets a QR pivot into another app or an internal service.
+export function validateEndpointUrl(raw: string): string {
+  const m = raw.match(/^([a-z][a-z0-9+.-]*):\/\/([^/:?#]+)(?::(\d+))?/i);
+  if (!m) throw new Error("Invalid endpoint URL.");
+  const scheme = m[1].toLowerCase();
+  const host = m[2].toLowerCase();
+  const port = m[3] ? Number(m[3]) : undefined;
+
+  const isLocalhost = host === "localhost" || host === "127.0.0.1" || host === "::1";
+  const devLocal = __DEV__ && scheme === "http" && isLocalhost;
+
+  if (scheme !== "https" && !devLocal) {
+    throw new Error("Endpoint must be https.");
+  }
+  if (!devLocal) {
+    if (isLocalhost) throw new Error("Endpoint host not allowed.");
+    if (
+      /^(10\.|127\.|0\.)/.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+      /^169\.254\./.test(host) ||
+      host.endsWith(".local")
+    ) {
+      throw new Error("Endpoint host not allowed.");
+    }
+    if (port !== undefined && port !== 443) {
+      throw new Error("Endpoint port not allowed.");
+    }
+  }
+  return host;
+}
+
+// ---- decode + validate ------------------------------------------------------
+
 export function decodeSignRequest(req: string): SignRequest {
   let json: unknown;
   try {
@@ -90,35 +137,128 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === "string");
 }
 
-export function validateSignRequest(json: unknown): SignRequest {
-  if (!json || typeof json !== "object") {
-    throw new Error("Malformed request.");
-  }
-  const o = json as Record<string, unknown>;
-  if (o.v !== 1) {
-    throw new Error(`Unsupported request version (${String(o.v)}).`);
-  }
-  if (o.type === "records") return validateRecordsRequest(o);
-  if (o.type === "psbt") return validatePsbtRequest(o);
-  throw new Error(`Unknown request type (${String(o.type)}).`);
+function nowSeconds(): number {
+  return Math.floor(Date.now() / 1000);
 }
 
-function validateRecordsRequest(o: Record<string, unknown>): RecordsRequest {
-  if (!Array.isArray(o.ops) || o.ops.length === 0) {
-    throw new Error("Request has no record operations.");
+// Validate the fields common to every type; returns them normalized.
+function validateCommon(o: Record<string, unknown>): CommonFields {
+  if (o.v !== 1) throw new Error(`Unsupported request version (${String(o.v)}).`);
+  if (typeof o.exp !== "number" || !Number.isFinite(o.exp)) {
+    throw new Error("Request is missing an expiry.");
   }
+  if (o.exp <= nowSeconds()) throw new Error("This request has expired.");
+  const common: CommonFields = { v: 1, exp: o.exp };
+  if (typeof o.ref === "string") common.ref = o.ref; // echoed, never shown
+  if (typeof o.endpoint === "string") {
+    validateEndpointUrl(o.endpoint); // throws if invalid
+    common.endpoint = o.endpoint;
+  }
+  if (typeof o.return === "string") {
+    validateEndpointUrl(o.return);
+    common.return = o.return;
+  }
+  return common;
+}
+
+function validateOutpoint(raw: unknown): Outpoint {
+  const x = raw as Record<string, unknown>;
+  if (!x || typeof x !== "object") throw new Error("Missing outpoint.");
+  if (typeof x.txid !== "string" || !/^[0-9a-fA-F]{64}$/.test(x.txid))
+    throw new Error("Invalid outpoint txid.");
+  if (typeof x.vout !== "number" || x.vout < 0 || !Number.isInteger(x.vout))
+    throw new Error("Invalid outpoint vout.");
+  if (typeof x.amount !== "number" || x.amount <= 0 || !Number.isInteger(x.amount))
+    throw new Error("Invalid outpoint amount.");
+  return { txid: x.txid.toLowerCase(), vout: x.vout, amount: x.amount };
+}
+
+function requireHexScript(v: unknown, label: string): string {
+  if (typeof v !== "string" || !/^[0-9a-fA-F]+$/.test(v))
+    throw new Error(`Invalid ${label}.`);
+  return v.toLowerCase();
+}
+
+export function validateSignRequest(json: unknown): SignRequest {
+  if (!json || typeof json !== "object") throw new Error("Malformed request.");
+  const o = json as Record<string, unknown>;
+  const common = validateCommon(o);
+
+  switch (o.type) {
+    case "message": {
+      if (typeof o.challenge !== "string" || o.challenge.length === 0)
+        throw new Error("Request has no challenge.");
+      return {
+        ...common,
+        type: "message",
+        challenge: o.challenge,
+        ...(typeof o.handle === "string" ? { handle: o.handle } : {}),
+      };
+    }
+    case "records":
+      return { ...common, ...validateRecordsBody(o) };
+    case "transfer":
+      return {
+        ...common,
+        type: "transfer",
+        handle: requireHandle(o),
+        to: requireHexScript(o.to, "recipient key"),
+        outpoint: validateOutpoint(o.outpoint),
+      };
+    case "sale":
+      return {
+        ...common,
+        type: "sale",
+        handle: requireHandle(o),
+        price: requirePositiveInt(o.price, "price"),
+        outpoint: validateOutpoint(o.outpoint),
+      };
+    case "rotate":
+      return {
+        ...common,
+        type: "rotate",
+        handle: requireHandle(o),
+        outpoint: validateOutpoint(o.outpoint),
+      };
+    default:
+      throw new Error(`Unknown request type (${String(o.type)}).`);
+  }
+}
+
+function requireHandle(o: Record<string, unknown>): string {
+  if (typeof o.handle !== "string" || o.handle.length === 0)
+    throw new Error("Request is missing a handle.");
+  return o.handle;
+}
+
+function requirePositiveInt(v: unknown, label: string): number {
+  const n = typeof v === "string" ? Number(v) : v;
+  if (typeof n !== "number" || !Number.isInteger(n) || n <= 0)
+    throw new Error(`Invalid ${label}.`);
+  return n;
+}
+
+const MAX_OPS = 20; // a request that can't be reviewed can't be consented to
+
+function validateRecordsBody(
+  o: Record<string, unknown>,
+): Omit<RecordsRequest, keyof CommonFields> {
+  if (!Array.isArray(o.ops) || o.ops.length === 0)
+    throw new Error("Request has no record operations.");
+  if (o.ops.length > MAX_OPS)
+    throw new Error(`Too many operations (max ${MAX_OPS}).`);
+
+  const seen = new Set<string>();
   const ops: RecordOp[] = o.ops.map((raw, i) => {
-    if (!raw || typeof raw !== "object") {
+    if (!raw || typeof raw !== "object")
       throw new Error(`Operation ${i + 1} is malformed.`);
-    }
     const op = raw as Record<string, unknown>;
-    if (typeof op.key !== "string" || op.key.length === 0) {
+    if (typeof op.key !== "string" || op.key.length === 0)
       throw new Error(`Operation ${i + 1} is missing a key.`);
-    }
+
     if (op.op === "delete") {
-      if (op.rtype !== undefined && op.rtype !== "txt" && op.rtype !== "addr") {
+      if (op.rtype !== undefined && op.rtype !== "txt" && op.rtype !== "addr")
         throw new Error(`Operation ${i + 1} has an invalid record type.`);
-      }
       return {
         op: "delete",
         key: op.key,
@@ -126,76 +266,28 @@ function validateRecordsRequest(o: Record<string, unknown>): RecordsRequest {
       };
     }
     if (op.op === "set") {
-      if (op.rtype !== "txt" && op.rtype !== "addr") {
+      if (op.rtype !== "txt" && op.rtype !== "addr")
         throw new Error(`Operation ${i + 1} has an invalid record type.`);
-      }
-      if (!isStringArray(op.value) || op.value.length === 0) {
+      if (!isStringArray(op.value) || op.value.length === 0)
         throw new Error(`Operation ${i + 1} is missing a value.`);
-      }
+      const dupKey = `${op.rtype}:${op.key}`;
+      if (seen.has(dupKey))
+        throw new Error(`Duplicate ${op.rtype} record "${op.key}".`);
+      seen.add(dupKey);
       return { op: "set", rtype: op.rtype, key: op.key, value: op.value };
     }
     throw new Error(`Operation ${i + 1} has an unknown op (${String(op.op)}).`);
   });
 
   return {
-    v: 1,
     type: "records",
     ops,
     ...(typeof o.handle === "string" ? { handle: o.handle } : {}),
-    ...(typeof o.origin === "string" ? { origin: o.origin } : {}),
-    ...(typeof o.nonce === "string" ? { nonce: o.nonce } : {}),
-    ...(typeof o.return === "string" ? { return: o.return } : {}),
   };
 }
 
-function validatePsbtRequest(o: Record<string, unknown>): PsbtRequest {
-  const parseInput = (raw: unknown, i: number): PsbtInput => {
-    const x = raw as Record<string, unknown>;
-    if (!x || typeof x !== "object") throw new Error(`Input ${i + 1} is malformed.`);
-    if (typeof x.txid !== "string" || !/^[0-9a-fA-F]{64}$/.test(x.txid))
-      throw new Error(`Input ${i + 1} has an invalid txid.`);
-    if (typeof x.vout !== "number" || x.vout < 0)
-      throw new Error(`Input ${i + 1} has an invalid vout.`);
-    if (typeof x.amount !== "number" || x.amount <= 0)
-      throw new Error(`Input ${i + 1} has an invalid amount.`);
-    if (typeof x.script !== "string" || !/^[0-9a-fA-F]+$/.test(x.script))
-      throw new Error(`Input ${i + 1} has an invalid script.`);
-    return { txid: x.txid, vout: x.vout, amount: x.amount, script: x.script.toLowerCase() };
-  };
-  const parseOutput = (raw: unknown, i: number): PsbtOutput => {
-    const x = raw as Record<string, unknown>;
-    if (!x || typeof x !== "object") throw new Error(`Output ${i + 1} is malformed.`);
-    if (typeof x.amount !== "number" || x.amount < 0)
-      throw new Error(`Output ${i + 1} has an invalid amount.`);
-    if (typeof x.script !== "string" || !/^[0-9a-fA-F]+$/.test(x.script))
-      throw new Error(`Output ${i + 1} has an invalid script.`);
-    return { amount: x.amount, script: x.script.toLowerCase() };
-  };
+// ---- record diff (records flow) --------------------------------------------
 
-  if (!Array.isArray(o.sign) || o.sign.length === 0)
-    throw new Error("Request has no inputs to sign.");
-  if (!Array.isArray(o.outputs) || o.outputs.length === 0)
-    throw new Error("Request has no outputs.");
-  const sign = o.sign.map(parseInput);
-  const outputs = o.outputs.map(parseOutput);
-  // SIGHASH_SINGLE binds input i to output i, so there must be an output per input.
-  if (outputs.length < sign.length)
-    throw new Error("Each signed input needs a matching output (SIGHASH_SINGLE).");
-
-  return {
-    v: 1,
-    type: "psbt",
-    sign,
-    outputs,
-    ...(typeof o.version === "number" ? { version: o.version } : {}),
-    ...(typeof o.locktime === "number" ? { locktime: o.locktime } : {}),
-    ...(typeof o.origin === "string" ? { origin: o.origin } : {}),
-    ...(typeof o.nonce === "string" ? { nonce: o.nonce } : {}),
-  };
-}
-
-// The diff produced by applying record ops to the current zone, for the
-// confirmation UI and to compute the record set to publish.
 export type RecordDiff = {
   next: EditableRecord[];
   added: EditableRecord[];
@@ -203,8 +295,8 @@ export type RecordDiff = {
   removed: EditableRecord[];
 };
 
-// Apply `ops` to the live record set (matched by type+key). `set` upserts;
-// `delete` removes by key (and type if given). Pure — returns the new set + diff.
+// Apply ops to the live record set (matched by type+key). `set` upserts;
+// `delete` removes by key (and type if given). Pure — returns new set + diff.
 export function applyOps(current: EditableRecord[], ops: RecordOp[]): RecordDiff {
   const next = current.map((r) => ({ ...r, value: [...r.value] }));
   const added: EditableRecord[] = [];

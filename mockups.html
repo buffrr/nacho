@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nacho — signing request screens</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;450;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --ink:#0B0A0A;
+            --paper:#12100F;
+            --sheet:#1A1817;
+            --rule:rgba(255,255,255,.09);
+            --rule-strong:rgba(255,255,255,.16);
+            --fg:#F4F1ED;
+            --fg-2:#A5A09A;
+            --fg-3:#6E6862;
+            --amber:#E08A2E;
+            --amber-deep:#BA7517;
+            --amber-ink:#FAEEDA;
+            --green:#4BB77B;
+            --red:#E0645A;
+            --violet:#8B5CF6;
+            --sans:"IBM Plex Sans",system-ui,sans-serif;
+            --mono:"IBM Plex Mono",ui-monospace,monospace;
+            --serif:"Instrument Serif",Georgia,serif;
+        }
+        *{box-sizing:border-box}
+        html{-webkit-text-size-adjust:100%}
+        body{
+            margin:0;background:var(--ink);color:var(--fg);
+            font-family:var(--sans);font-size:15px;line-height:1.6;
+            background-image:radial-gradient(circle at 15% -10%,rgba(224,138,46,.10),transparent 55%),
+            radial-gradient(circle at 85% 5%,rgba(139,92,246,.07),transparent 50%);
+            background-repeat:no-repeat;
+        }
+        body::after{
+            content:"";position:fixed;inset:0;pointer-events:none;z-index:99;opacity:.16;
+            background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E");
+        }
+        .wrap{max-width:1180px;margin:0 auto;padding:0 28px 120px}
+
+        /* ---------- masthead ---------- */
+        header.mast{padding:72px 0 40px;border-bottom:1px solid var(--rule-strong);margin-bottom:56px}
+        .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);margin:0 0 18px}
+        h1{font-family:var(--serif);font-weight:400;font-size:clamp(40px,7vw,76px);line-height:.98;margin:0 0 20px;letter-spacing:-.015em}
+        h1 em{font-style:italic;color:var(--amber)}
+        .standfirst{max-width:52ch;color:var(--fg-2);font-size:16px;margin:0}
+        .meta{display:flex;flex-wrap:wrap;gap:26px;margin-top:32px;font-family:var(--mono);font-size:11px;color:var(--fg-3);letter-spacing:.05em}
+        .meta b{color:var(--fg-2);font-weight:500}
+
+        /* ---------- sections ---------- */
+        section{margin-bottom:76px;scroll-margin-top:24px}
+        .sec-head{display:flex;align-items:baseline;gap:16px;border-bottom:1px solid var(--rule);padding-bottom:14px;margin-bottom:12px}
+        .sec-num{font-family:var(--mono);font-size:11px;color:var(--amber);letter-spacing:.14em;flex-shrink:0}
+        h2{font-family:var(--serif);font-weight:400;font-size:32px;margin:0;letter-spacing:-.01em}
+        .sec-note{color:var(--fg-2);font-size:15px;max-width:62ch;margin:0 0 32px}
+        .sec-note code{font-family:var(--mono);font-size:.86em;color:var(--amber);background:rgba(224,138,46,.08);padding:1px 5px;border-radius:3px}
+
+        .row{display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start}
+        .col{flex:1 1 330px;min-width:300px;max-width:420px}
+        .cap{font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-3);margin:0 0 12px 4px}
+        .cap b{color:var(--amber);font-weight:500}
+        .why{margin:16px 4px 0;font-size:13.5px;color:var(--fg-2);line-height:1.62;max-width:44ch}
+        .why strong{color:var(--fg);font-weight:500}
+
+        /* ---------- phone ---------- */
+        .phone{
+            width:100%;max-width:360px;background:var(--paper);
+            border:1px solid var(--rule-strong);border-radius:30px;overflow:hidden;
+            box-shadow:0 28px 60px -22px rgba(0,0,0,.9),0 0 0 1px rgba(255,255,255,.03) inset;
+        }
+        .status{display:flex;justify-content:space-between;align-items:center;padding:12px 20px 4px;font-size:12px;color:var(--fg-3);font-family:var(--mono)}
+        .nav{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 14px;gap:10px}
+        .nav-t{font-size:15px;font-weight:500;color:var(--fg)}
+        .nav-i{font-size:17px;color:var(--fg-2);width:20px;text-align:center}
+        .body{padding:0 16px 20px}
+
+        .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3);margin:0 0 7px 3px}
+        .card{background:var(--sheet);border-radius:13px;overflow:hidden}
+        .pad{padding:13px 15px}
+        .kv{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 15px}
+        .kv+.kv{border-top:.5px solid var(--rule)}
+        .k{font-size:13px;color:var(--fg-2);flex-shrink:0}
+        .v{font-size:13px;color:var(--fg);text-align:right;word-break:break-all}
+        .v.mono{font-family:var(--mono);font-size:12px}
+        .v.pos{color:var(--green)}
+        .v.warn{color:var(--amber)}
+
+        .rec{border-left:2px solid var(--green);background:var(--sheet);padding:12px 14px;margin-bottom:8px}
+        .rec.del{border-left-color:var(--red)}
+        .rec.old{border-left-color:var(--fg-3);opacity:.72}
+        .rec-h{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+        .rec-op{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+        .rec-op.add{color:var(--green)}
+        .rec-op.rem{color:var(--red)}
+        .rec-op.was{color:var(--fg-3)}
+        .rec-k{font-family:var(--mono);font-size:12px;color:var(--fg-2)}
+        .rec-v{font-family:var(--mono);font-size:12.5px;color:var(--fg);word-break:break-all;line-height:1.5;margin:0}
+        .rec.old .rec-v{color:var(--fg-3);text-decoration:line-through}
+
+        .btn{display:block;text-align:center;border-radius:11px;padding:14px;font-size:15px;font-weight:500;margin-top:16px}
+        .btn.pri{background:var(--amber-deep);color:var(--amber-ink)}
+        .btn.dngr{background:#8E3A32;color:#FBE8E5}
+        .btn.sec{border:.5px solid var(--rule-strong);color:var(--fg)}
+        .btn.ghost{color:var(--fg-2);font-weight:400;font-size:14px;padding:11px}
+
+        .note{display:flex;gap:9px;align-items:flex-start;border-radius:11px;padding:11px 13px;font-size:12.5px;line-height:1.55}
+        .note.plain{background:var(--sheet);color:var(--fg-2)}
+        .note.warn{background:rgba(224,138,46,.10);color:#E8B276}
+        .note.dot{background:rgba(224,100,90,.10);color:#EC9990}
+        .note i{flex-shrink:0;font-size:15px;margin-top:1px}
+
+        .chk{width:19px;height:19px;border-radius:5px;border:1.5px solid var(--rule-strong);flex-shrink:0;margin-top:1px}
+        .chk.on{background:var(--amber-deep);border-color:var(--amber-deep);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--amber-ink)}
+
+        .hero{text-align:center;padding:18px 4px 20px}
+        .hero-ico{width:54px;height:54px;border-radius:999px;margin:0 auto 13px;display:flex;align-items:center;justify-content:center;font-size:26px}
+        .hero-ico.g{background:rgba(75,183,123,.15);color:var(--green)}
+        .hero-ico.a{background:rgba(224,138,46,.15);color:var(--amber)}
+        .hero-h{font-size:20px;font-weight:600;margin:0}
+        .hero-s{font-size:14px;color:var(--fg-2);margin:5px 0 0}
+        .big{font-family:var(--mono);font-size:26px;color:var(--fg);margin:0;letter-spacing:-.01em}
+
+        .frag{background:var(--sheet);border-radius:11px;padding:12px 14px;font-family:var(--mono);font-size:12.5px;color:var(--fg);word-break:break-all;line-height:1.6}
+        .frag .hi{background:rgba(224,138,46,.22);color:#F3C088;padding:1px 2px;border-radius:2px}
+
+        .tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 8px;border-radius:999px}
+        .tag.mine{background:rgba(75,183,123,.14);color:var(--green)}
+        .tag.ext{background:rgba(224,138,46,.13);color:var(--amber)}
+
+        /* ---------- rules block ---------- */
+        .rules{border-top:1px solid var(--rule-strong);margin-top:90px;padding-top:44px}
+        .rules h2{margin-bottom:26px}
+        .rlist{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:2px}
+        .rlist li{padding:18px 20px;background:rgba(255,255,255,.022);border-radius:4px}
+        .rlist b{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:7px;font-weight:500}
+        .rlist span{font-size:13.5px;color:var(--fg-2);line-height:1.6}
+        .payload{margin:16px 4px 0;background:rgba(255,255,255,.03);border:1px solid var(--rule);border-radius:9px;overflow:hidden}
+        .payload-h{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-3)}
+        .payload-h b{color:var(--amber);font-weight:500}
+        .payload pre{margin:0;padding:12px 13px;font-family:var(--mono);font-size:11.5px;line-height:1.72;color:var(--fg-2);overflow-x:auto;white-space:pre;-webkit-overflow-scrolling:touch}
+        .payload .kk{color:#8FB8D8}
+        .payload .ss{color:#C7A87A}
+        .payload .nn{color:#9FCBA0}
+        .payload .cc{color:var(--fg-3);font-style:italic}
+        .payload .ux{color:var(--amber)}
+        footer{margin-top:70px;padding-top:22px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:11px;color:var(--fg-3);letter-spacing:.05em}
+        @media(max-width:620px){.wrap{padding:0 18px 70px}header.mast{padding:44px 0 30px}.col{min-width:0}}
+    </style>
+</head>
+<body>
+<div class="wrap">
+
+    <header class="mast">
+        <p class="eyebrow">Nacho · design reference</p>
+        <h1>Signing request<br><em>screens</em></h1>
+        <p class="standfirst">Confirmation UI for the four request types. Each screen leads with what is about to happen, states what cannot be verified, and never renders attacker-supplied text as if it were attested.</p>
+        <div class="meta">
+            <span><b>Types</b> message · records · transfer · sale</span>
+            <span><b>Transport</b> QR, nacho://, universal link</span>
+            <span><b>Companion</b> nacho-signing-design-notes.md</span>
+            <span><b style="color:var(--amber)">Amber</b> in payloads = attacker-controlled</span>
+        </div>
+    </header>
+
+    <!-- 1 -->
+    <section>
+        <div class="sec-head"><span class="sec-num">01</span><h2>Sign in</h2></div>
+        <p class="sec-note">Type <code>message</code>. Signs a challenge, publishes nothing. The only host shown is the one derived from <code>endpoint</code> — never a payload-supplied name.</p>
+        <div class="row">
+            <div class="col">
+                <p class="cap">Confirmation · <b>endpoint present</b></p>
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i">‹</span><span class="nav-t">Sign in</span><span class="nav-i"></span></div>
+                    <div class="body">
+                        <div class="hero">
+                            <div class="hero-ico a">⌾</div>
+                            <p class="hero-h">Prove you own</p>
+                            <p class="hero-s">nzjsk@test10000</p>
+                        </div>
+                        <div class="card" style="margin-bottom:12px">
+                            <div class="kv"><span class="k">Signs</span><span class="v">A one-time challenge</span></div>
+                            <div class="kv"><span class="k">Expires</span><span class="v">in 4m 12s</span></div>
+                        </div>
+                        <div class="note plain"><i>↗</i><span>Your signature will be sent to <b style="color:var(--fg)">demo.nacho.app</b> when you tap below. Nothing is sent before that.</span></div>
+                        <div class="btn pri">Sign &amp; send to demo.nacho.app</div>
+                        <div class="btn ghost">Cancel</div>
+                    </div>
+                </div>
+                <div class="payload"><div class="payload-h"><span>Payload</span><b>message</b><span style="margin-left:auto;text-transform:none;letter-spacing:0;font-style:italic">endpoint sets the host shown</span></div><pre>{
+  <span class="kk">"v"</span>: <span class="nn">1</span>,
+  <span class="kk">"type"</span>: <span class="ss">"message"</span>,
+  <span class="kk">"handle"</span>: <span class="ss">"nzjsk@test10000"</span>,
+  <span class="kk">"challenge"</span>: <span class="ux">"a7f3…9c21"</span>,   <span class="cc">// untrusted</span>
+  <span class="kk">"ref"</span>: <span class="ss">"k92mQ1"</span>,
+  <span class="kk">"exp"</span>: <span class="nn">1786290252</span>,
+  <span class="kk">"endpoint"</span>: <span class="ss">"https://demo.nacho.app/cb"</span>
+}</pre></div>
+                <p class="why"><code style="font-family:var(--mono);font-size:.88em;color:var(--amber)">ref</code> is echoed back untouched and <strong>never displayed</strong>. A requester-controlled string rendered as a label is spoofable text on a confirmation screen — the mistake <code style="font-family:var(--mono);font-size:.88em;color:var(--amber)">origin</code> was making.</p>
+                <p class="why"><strong>Host comes from the endpoint URL</strong>, not from an <code>origin</code> field. It's the only domain we can name honestly, because it's where the data actually goes.</p>
+            </div>
+            <div class="col">
+                <p class="cap">Confirmation · <b>no endpoint</b></p>
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i">‹</span><span class="nav-t">Sign in</span><span class="nav-i"></span></div>
+                    <div class="body">
+                        <div class="hero">
+                            <div class="hero-ico a">⌾</div>
+                            <p class="hero-h">Prove you own</p>
+                            <p class="hero-s">nzjsk@test10000</p>
+                        </div>
+                        <div class="card" style="margin-bottom:12px">
+                            <div class="kv"><span class="k">Signs</span><span class="v">A one-time challenge</span></div>
+                            <div class="kv"><span class="k">Expires</span><span class="v">in 4m 12s</span></div>
+                        </div>
+                        <div class="btn pri">Sign</div>
+                        <div class="btn ghost">Cancel</div>
+                    </div>
+                </div>
+                <div class="payload"><div class="payload-h"><span>Payload</span><b>message</b><span style="margin-left:auto;text-transform:none;letter-spacing:0;font-style:italic">no endpoint → copy only</span></div><pre>{
+  <span class="kk">"v"</span>: <span class="nn">1</span>,
+  <span class="kk">"type"</span>: <span class="ss">"message"</span>,
+  <span class="kk">"handle"</span>: <span class="ss">"nzjsk@test10000"</span>,
+  <span class="kk">"challenge"</span>: <span class="ux">"a7f3…9c21"</span>,
+  <span class="kk">"exp"</span>: <span class="nn">1786290252</span>
+}
+
+<span class="cc">// No ref — the caller can mark the
+// challenge instead, since they choose it.</span></pre></div>
+                <p class="why"><code style="font-family:var(--mono);font-size:.88em;color:var(--amber)">exp</code> exists to make stale failures <strong>legible</strong>, not to stop replay. A QR left on screen while the user wanders off has a dead session behind it — "this request expired, refresh the page" beats an unexplained failure.</p>
+                <p class="why">No endpoint means the requester can't consume a POST. <strong>Don't show a Send button that will 404</strong> — the result screen offers copy only. No domain, no source row, nothing to spoof.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2 -->
+    <section>
+        <div class="sec-head"><span class="sec-num">02</span><h2>Add a record</h2></div>
+        <p class="sec-note">The payload is the thing being judged, so it's the largest element. No amber banner: a warning on every request stops being read within a week.</p>
+        <div class="row">
+            <div class="col">
+                <p class="cap">Inert key · <b>no extra friction</b></p>
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i">‹</span><span class="nav-t">Approve record change</span><span class="nav-i"></span></div>
+                    <div class="body">
+                        <p class="lbl">A request asks to add</p>
+                        <div class="rec">
+                            <div class="rec-h"><span class="rec-op add">＋ add</span><span class="rec-k">txt · _app.demo</span></div>
+                            <p class="rec-v">hello from a scan</p>
+                        </div>
+                        <div class="card" style="margin-top:14px">
+                            <div class="kv"><span class="k">Publishing to</span><span class="v">nzjsk@test10000</span></div>
+                            <div class="kv"><span class="k">Existing records</span><span class="v">Kept (1)</span></div>
+                            <div class="kv"><span class="k">Expires</span><span class="v">in 9m 40s</span></div>
+                        </div>
+                        <div class="btn pri">Approve &amp; publish</div>
+                        <div class="btn ghost">Cancel</div>
+                    </div>
+                </div>
+                <div class="payload"><div class="payload-h"><span>Payload</span><b>records</b><span style="margin-left:auto;text-transform:none;letter-spacing:0;font-style:italic">generic tier, no acknowledgement</span></div><pre>{
+  <span class="kk">"v"</span>: <span class="nn">1</span>, <span class="kk">"type"</span>: <span class="ss">"records"</span>,
+  <span class="kk">"handle"</span>: <span class="ss">"nzjsk@test10000"</span>,
+  <span class="kk">"ops"</span>: [{
+    <span class="kk">"op"</span>: <span class="ss">"set"</span>,
+    <span class="kk">"rtype"</span>: <span class="ux">"txt"</span>,
+    <span class="kk">"key"</span>: <span class="ux">"_app.demo"</span>,
+    <span class="kk">"value"</span>: [<span class="ux">"hello from a scan"</span>]
+  }],
+  <span class="kk">"ref"</span>: <span class="ss">"p04xZ8"</span>, <span class="kk">"exp"</span>: <span class="nn">1786290840</span>
+}</pre></div>
+                <p class="why"><strong>Framed as an incoming request, not a settings action.</strong> "Add a record" reads as something the user opened themselves. "A request asks to add" names that an outside party is instructing — which is the untrustedness, expressed without a banner.</p>
+            </div>
+            <div class="col">
+                <p class="cap">Value-bearing key · <b>recognition step</b></p>
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i">‹</span><span class="nav-t">Approve record change</span><span class="nav-i"></span></div>
+                    <div class="body">
+                        <p class="lbl">A request asks to add</p>
+                        <div class="rec">
+                            <div class="rec-h"><span class="rec-op add">＋ add</span><span class="rec-k">addr · btc</span></div>
+                            <p class="rec-v">bc1q ar0s rrr7 xfkv<br>y5l6 43ly dnw9 re59<br>gtzz <span class="hi">wf5m dq</span></p>
+                        </div>
+                        <div class="note warn" style="margin-top:10px"><i>◈</i><span>Payments sent to your handle will go to this address.</span></div>
+                        <div style="display:flex;gap:10px;align-items:flex-start;padding:13px 3px 2px">
+                            <div class="chk on">✓</div>
+                            <span style="font-size:13px;color:var(--fg-2);line-height:1.5">I've read this address and it's the one I meant to add</span>
+                        </div>
+                        <div class="btn pri">Approve &amp; publish</div>
+                        <div class="btn ghost">Cancel</div>
+                    </div>
+                </div>
+                <div class="payload"><div class="payload-h"><span>Payload</span><b>records</b><span style="margin-left:auto;text-transform:none;letter-spacing:0;font-style:italic"><b style="color:var(--amber)">destination</b> tier from key registry</span></div><pre>{
+  <span class="kk">"v"</span>: <span class="nn">1</span>, <span class="kk">"type"</span>: <span class="ss">"records"</span>,
+  <span class="kk">"handle"</span>: <span class="ss">"nzjsk@test10000"</span>,
+  <span class="kk">"ops"</span>: [{
+    <span class="kk">"op"</span>: <span class="ss">"set"</span>,
+    <span class="kk">"rtype"</span>: <span class="ux">"addr"</span>,
+    <span class="kk">"key"</span>: <span class="ux">"btc"</span>,        <span class="cc">// registry → destination</span>
+    <span class="kk">"value"</span>: [<span class="ux">"bc1qar0s…wf5mdq"</span>]
+  }],
+  <span class="kk">"ref"</span>: <span class="ss">"t71bW3"</span>, <span class="kk">"exp"</span>: <span class="nn">1786290840</span>
+}</pre></div>
+                <p class="why">A first add to an <strong>empty</strong> key is the worst case, not the safest — nothing looks missing, and the handle now carries an authoritative address under the user's name.</p>
+                <p class="why"><strong>Full value, chunked — no suffix matching.</strong> Matching the last few characters is a comparison aid, and it only works when there's a known-good address on another screen. Here the user is seeing it for the first time, so they need the whole thing.</p>
+            </div>
+            <div class="col">
+                <p class="cap">Replace · <b>show both values</b></p>
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i">‹</span><span class="nav-t">Approve record change</span><span class="nav-i"></span></div>
+                    <div class="body">
+                        <p class="lbl">A request asks to replace</p>
+                        <div class="rec old">
+                            <div class="rec-h"><span class="rec-op was">was</span><span class="rec-k">addr · btc</span></div>
+                            <p class="rec-v">bc1qxy2kgdygjrsqtzq2n0yrf249</p>
+                        </div>
+                        <div class="rec">
+                            <div class="rec-h"><span class="rec-op add">now</span><span class="rec-k">addr · btc</span></div>
+                            <p class="rec-v">bc1qar0srrr7xfkvy5l643lydnw9re59</p>
+                        </div>
+                        <div class="note dot" style="margin-top:10px"><i>◆</i><span>Your current address will stop receiving payments.</span></div>
+                        <div class="btn pri">Approve &amp; publish</div>
+                        <div class="btn ghost">Cancel</div>
+                    </div>
+                </div>
+                <div class="payload"><div class="payload-h"><span>Payload</span><b>records</b><span style="margin-left:auto;text-transform:none;letter-spacing:0;font-style:italic">identical shape — replace is <i>discovered</i></span></div><pre>{
+  <span class="kk">"v"</span>: <span class="nn">1</span>, <span class="kk">"type"</span>: <span class="ss">"records"</span>,
+  <span class="kk">"handle"</span>: <span class="ss">"nzjsk@test10000"</span>,
+  <span class="kk">"ops"</span>: [{
+    <span class="kk">"op"</span>: <span class="ss">"set"</span>,   <span class="cc">// upsert</span>
+    <span class="kk">"rtype"</span>: <span class="ux">"addr"</span>, <span class="kk">"key"</span>: <span class="ux">"btc"</span>,
+    <span class="kk">"value"</span>: [<span class="ux">"bc1qar0s…wf5mdq"</span>]
+  }],
+  <span class="kk">"ref"</span>: <span class="ss">"t71bW3"</span>, <span class="kk">"exp"</span>: <span class="nn">1786290840</span>
+}
+
+<span class="cc">// A prior value under (addr, btc) is what makes
+// this a replace. The request never says so.</span></pre></div>
+                <p class="why"><strong>Never render "1 record" for a replace</strong> — a count hides the destruction. Seeing your own address disappear is a stronger warning than any prose.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3 -->
+    <section>
+        <div class="sec-head"><span class="sec-num">03</span><h2>Zone changed at approval</h2></div>
+        <p class="sec-note">We resolve on approve, not on scan — so the diff shown was computed against a cached zone. If the live zone differs, re-show and require a second tap.</p>
+        <div class="row">
+            <div class="col">
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i">‹</span><span class="nav-t">Records changed</span><span class="nav-i"></span></div>
+                    <div class="body">
+                        <div class="note warn" style="margin-bottom:14px"><i>↻</i><span>This handle changed since we showed you the last screen. Here's what would actually happen now.</span></div>
+                        <p class="lbl">A request asks to replace</p>
+                        <div class="rec old">
+                            <div class="rec-h"><span class="rec-op was">was</span><span class="rec-k">addr · btc</span></div>
+                            <p class="rec-v">bc1q9dfp0s2m7yqm4l0ke34xxa2</p>
+                        </div>
+                        <div class="rec">
+                            <div class="rec-h"><span class="rec-op add">now</span><span class="rec-k">addr · btc</span></div>
+                            <p class="rec-v">bc1qar0srrr7xfkvy5l643lydnw9re59</p>
+                        </div>
+                        <div class="btn pri">Publish anyway</div>
+                        <div class="btn ghost">Cancel</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <p class="why" style="max-width:52ch;margin-top:34px"><strong>The gap is user-controlled and can be minutes.</strong> Without this step a stale request silently clobbers a change made from another device — and the case where it matters most is exactly the case where the user was already editing that record.</p>
+                <p class="why" style="max-width:52ch">Costs one extra tap in the rare case. In the common case the recomputed diff matches and this screen never appears.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4 -->
+    <section>
+        <div class="sec-head"><span class="sec-num">04</span><h2>Transfer</h2></div>
+        <p class="sec-note">Type <code>transfer</code>. The destination is committed by the signature, so we can state exactly where the handle goes. <code>to</code> is the only untrusted field.</p>
+        <div class="row">
+            <div class="col">
+                <p class="cap">To an external key</p>
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i">‹</span><span class="nav-t">Transfer handle</span><span class="nav-i"></span></div>
+                    <div class="body">
+                        <div class="hero" style="padding-bottom:14px">
+                            <div class="hero-ico a">→</div>
+                            <p class="hero-h">Give away nzjsk@test10000</p>
+                            <p class="hero-s">You will no longer control this handle</p>
+                        </div>
+                        <p class="lbl">Recipient <span class="tag ext">external</span></p>
+                        <div class="frag">5120 a3f8 91cc 4b02 7d1e<br>66aa 04f9 2e73 bd15<br>0c88 ff21 <span class="hi">7a4e 9d30</span></div>
+                        <div style="display:flex;gap:10px;align-items:flex-start;padding:13px 3px 0">
+                            <div class="chk on">✓</div>
+                            <span style="font-size:13px;color:var(--fg-2);line-height:1.5">This matches the key the recipient gave me</span>
+                        </div>
+                        <div class="note dot" style="margin-top:12px"><i>◆</i><span>Once this transaction is broadcast, the handle is theirs. There is no way to undo it.</span></div>
+                        <div class="btn dngr">Sign transfer</div>
+                        <div class="btn ghost">Cancel</div>
+                    </div>
+                </div>
+                <div class="payload"><div class="payload-h"><span>Payload</span><b>transfer</b><span style="margin-left:auto;text-transform:none;letter-spacing:0;font-style:italic"><code style="color:var(--amber)">to</code> is the only untrusted field</span></div><pre>{
+  <span class="kk">"v"</span>: <span class="nn">1</span>,
+  <span class="kk">"type"</span>: <span class="ss">"transfer"</span>,
+  <span class="kk">"handle"</span>: <span class="ss">"nzjsk@test10000"</span>,
+  <span class="kk">"to"</span>: <span class="ux">"5120a3f891cc…7a4e9d30"</span>,
+  <span class="kk">"outpoint"</span>: {
+    <span class="kk">"txid"</span>: <span class="ux">"9b2c…41ff"</span>,
+    <span class="kk">"vout"</span>: <span class="nn">0</span>,
+    <span class="kk">"amount"</span>: <span class="nn">100000000</span>   <span class="cc">// self-checking</span>
+  },
+  <span class="kk">"ref"</span>: <span class="ss">"r55nD9"</span>, <span class="kk">"exp"</span>: <span class="nn">1786291400</span>
+}
+
+<span class="cc">// Output amount is computed from the input.
+// Never taken from the payload.</span></pre></div>
+                <p class="why"><strong>Chunked, never raw hex.</strong> The recipient key is the one field a user must actually verify, so make verifying it possible.</p>
+                <p class="why">Signing doesn't move the handle — <strong>broadcasting does</strong>. The signature is a bearer instrument, so the warning is about the broadcast, not the tap.</p>
+            </div>
+            <div class="col">
+                <p class="cap">Cancel offers · <b>same key</b></p>
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i">‹</span><span class="nav-t">Cancel offers</span><span class="nav-i"></span></div>
+                    <div class="body">
+                        <div class="hero" style="padding-bottom:14px">
+                            <div class="hero-ico g">⊘</div>
+                            <p class="hero-h">Invalidate 2 live offers</p>
+                            <p class="hero-s">nzjsk@test10000 stays on the same key</p>
+                        </div>
+                        <p class="lbl">Moves to <span class="tag mine">your current key</span></p>
+                        <div class="frag">5120 ae07 725a 33b1 c9f0<br>1d4e 8802 6fab 5c37<br>90de 41a8 <span class="hi">5d75 02c1</span></div>
+                        <div class="note plain" style="margin-top:12px"><i>◇</i><span>Copy this to your own wallet and broadcast it. The offers stay valid until it confirms, and can take up to a day to clear here.</span></div>
+                        <div class="btn pri">Sign &amp; copy</div>
+                        <div class="btn ghost">Cancel</div>
+                    </div>
+                </div>
+                <div class="payload"><div class="payload-h"><span>Payload</span><b>none</b><span style="margin-left:auto;text-transform:none;letter-spacing:0;font-style:italic">user-initiated</span></div><pre><span class="cc">// No request. Started from the handle screen,
+// destination is the user’s own key, nothing
+// untrusted enters the flow.</span></pre></div>
+                <p class="why">Spending the UTXO is the <strong>only</strong> way to invalidate a signed offer. Nothing else about the handle changes.</p>
+            </div>
+            <div class="col">
+                <p class="cap">Rotate key · <b>fresh key</b></p>
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i">‹</span><span class="nav-t">Rotate key</span><span class="nav-i"></span></div>
+                    <div class="body">
+                        <div class="hero" style="padding-bottom:14px">
+                            <div class="hero-ico a">⟳</div>
+                            <p class="hero-h">Move to a new key</p>
+                            <p class="hero-s">nzjsk@test10000 stays yours</p>
+                        </div>
+                        <p class="lbl">New key <span class="tag mine">generated now</span></p>
+                        <div class="frag">5120 f2b9 08d4 71ae 3c65<br>9a07 ee12 45bf 8031<br>c6d8 5a29 <span class="hi">b7e4 10fa</span></div>
+                        <div class="card" style="margin-top:12px">
+                            <div class="kv"><span class="k">Handle</span><span class="v pos">Stays sovereign</span></div>
+                            <div class="kv"><span class="k">Live offers</span><span class="v warn">Invalidated (2)</span></div>
+                            <div class="kv"><span class="k">Records</span><span class="v">Kept</span></div>
+                        </div>
+                        <div class="btn pri">Sign &amp; copy</div>
+                        <div class="btn ghost">Cancel</div>
+                    </div>
+                </div>
+                <p class="why">No certificate re-issuance — the old genesis key becomes a tombstone linked to the new one, so <strong>the handle never drops back to waiting-for-certificate</strong>. Don't invent a scary confirmation for it.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 5 -->
+    <section>
+        <div class="sec-head"><span class="sec-num">05</span><h2>Sale</h2></div>
+        <p class="sec-note">Type <code>sale</code>. Payload carries only the price. Payout address is prefilled from the user's own <code>addr:btc</code> record and never taken from the request.</p>
+        <div class="row">
+            <div class="col">
+                <p class="cap">Confirmation · <b>biometric prompt on approve</b></p>
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i">‹</span><span class="nav-t">Sell handle</span><span class="nav-i"></span></div>
+                    <div class="body">
+                        <div class="hero" style="padding-bottom:12px">
+                            <p class="lbl" style="margin-bottom:8px">Asking price</p>
+                            <p class="big">₿500,000</p>
+                            <p class="hero-s" style="margin-top:6px">≈ $312 · for nzjsk@test10000</p>
+                        </div>
+                        <p class="lbl">You get paid to</p>
+                        <div class="card" style="margin-bottom:12px">
+                            <div class="pad" style="font-family:var(--mono);font-size:12.5px;word-break:break-all">bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq</div>
+                            <div class="kv" style="border-top:.5px solid var(--rule)"><span class="k">From your record</span><span class="v mono">addr · btc</span></div>
+                        </div>
+                        <div class="note dot" style="margin-bottom:10px"><i>◆</i><span><b>Anyone who pays ₿500,000 can take ownership of this handle.</b></span></div>
+                        <div class="note warn"><i>∞</i><span>This offer stays valid until you cancel it. Cancelling means moving the handle to yourself.</span></div>
+                        <div class="btn dngr">Sign offer</div>
+                        <div class="btn ghost">Cancel</div>
+                    </div>
+                </div>
+                <div class="payload"><div class="payload-h"><span>Payload</span><b>sale</b><span style="margin-left:auto;text-transform:none;letter-spacing:0;font-style:italic">only <code style="color:var(--amber)">price</code> comes from the requester</span></div><pre>{
+  <span class="kk">"v"</span>: <span class="nn">1</span>,
+  <span class="kk">"type"</span>: <span class="ss">"sale"</span>,
+  <span class="kk">"handle"</span>: <span class="ss">"nzjsk@test10000"</span>,
+  <span class="kk">"price"</span>: <span class="ux">"500000"</span>,        <span class="cc">// ₿500,000</span>
+  <span class="kk">"outpoint"</span>: {
+    <span class="kk">"txid"</span>: <span class="ux">"9b2c…41ff"</span>,
+    <span class="kk">"vout"</span>: <span class="nn">0</span>,
+    <span class="kk">"amount"</span>: <span class="nn">100000000</span>
+  },
+  <span class="kk">"ref"</span>: <span class="ss">"v18kL2"</span>, <span class="kk">"exp"</span>: <span class="nn">1786291400</span>
+}
+
+<span class="cc">// Payout address is NOT in the payload.
+// Prefilled from the user’s own addr:btc record.</span></pre></div>
+                <p class="why">Name the amount <strong>inline</strong>. "Whoever completes this transaction" is vaguer and buries the number that makes the sentence concrete.</p>
+                <p class="why"><strong>Don't name the auth method on the button.</strong> Face ID, Touch ID, fingerprint, face unlock, and PIN all vary by platform, device, and what the user enrolled. The system prompt already says which one it is.</p>
+                <p class="why"><strong>₿-only format</strong> per BIP-177 — integers, no decimals, no "sats". <code style="font-family:var(--mono);font-size:.88em;color:var(--amber)">₿500,000</code> reads instantly where <code style="font-family:var(--mono);font-size:.88em;color:var(--amber)">0.00500000 BTC</code> does not.</p>
+                <p class="why">The payment output is <code style="font-family:var(--mono);font-size:.88em;color:var(--amber)">input + price</code>, so a ₿100,000,000 handle sold for ₿1 pays out ₿100,000,001. <strong>Never show that as what the user receives</strong> — the price is the headline number.</p>
+            </div>
+            <div class="col">
+                <p class="cap">Handle screen · <b>live offers</b> <span style="color:var(--fg-3)">(post-launch)</span></p>
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i">‹</span><span class="nav-t">nzjsk@test10000</span><span class="nav-i">⋮</span></div>
+                    <div class="body">
+                        <p class="lbl">Live offers</p>
+                        <div class="card" style="margin-bottom:12px">
+                            <div class="kv"><span class="k mono" style="font-family:var(--mono);color:var(--fg)">₿500,000</span><span class="v mono">2 Aug</span></div>
+                            <div class="kv"><span class="k mono" style="font-family:var(--mono);color:var(--fg)">₿300,000</span><span class="v mono">8 Aug</span></div>
+                        </div>
+                        <div class="note plain" style="margin-bottom:12px"><i>◇</i><span>Any of these can still be completed by whoever holds the signature. Descending prices work as a Dutch auction.</span></div>
+                        <div class="btn sec">Cancel all offers</div>
+                        <div class="note plain" style="margin-top:12px"><i>⊘</i><span>Cancelling gives you a transaction to broadcast from your own wallet. Offers stay valid until it confirms, and can take up to a day to clear here.</span></div>
+                    </div>
+                </div>
+                <p class="why">Multiple offers are a <strong>feature, not a hazard</strong> — first to broadcast wins, no double-spend risk. What the seller needs is visibility, not a warning.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6 -->
+    <section>
+        <div class="sec-head"><span class="sec-num">06</span><h2>Result</h2></div>
+        <p class="sec-note">One screen for every type. Send appears only when the request carried a valid <code>endpoint</code>; copy is always available.</p>
+        <div class="row">
+            <div class="col">
+                <p class="cap">Endpoint present</p>
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i"></span><span class="nav-t">Signed</span><span class="nav-i">✕</span></div>
+                    <div class="body">
+                        <div class="hero">
+                            <div class="hero-ico g">✓</div>
+                            <p class="hero-h">Signed</p>
+                            <p class="hero-s">Nothing has been sent yet</p>
+                        </div>
+                        <div class="frag" style="max-height:96px;overflow:hidden">70736274ff0100710200000001a3f891cc4b027d1e66aa04f92e73bd150c88ff217a4e9d30…</div>
+                        <div class="btn pri">Send to demo.nacho.app</div>
+                        <div class="btn sec">Copy response</div>
+                    </div>
+                </div>
+                <p class="why">Sending is a <strong>separate, explicit tap</strong>. The button names the host it will contact, which makes it self-defending — <code>Send to evil.com</code> reads wrong in a way "Continue" never does.</p>
+            </div>
+            <div class="col">
+                <p class="cap">No endpoint</p>
+                <div class="phone">
+                    <div class="status"><span>9:41</span><span>▮▮▮</span></div>
+                    <div class="nav"><span class="nav-i"></span><span class="nav-t">Signed</span><span class="nav-i">✕</span></div>
+                    <div class="body">
+                        <div class="hero">
+                            <div class="hero-ico g">✓</div>
+                            <p class="hero-h">Signed</p>
+                            <p class="hero-s">Paste this back where you started</p>
+                        </div>
+                        <div class="frag" style="max-height:96px;overflow:hidden">70736274ff0100710200000001a3f891cc4b027d1e66aa04f92e73bd150c88ff217a4e9d30…</div>
+                        <div class="btn pri">Copy response</div>
+                        <div class="btn ghost">Done</div>
+                    </div>
+                </div>
+                <p class="why">Copy is the universal fallback — no infrastructure, works offline. A response QR covers the desktop-and-phone case with no shared clipboard, but that's a later addition.</p>
+            </div>
+        </div>
+    </section>
+
+    <div class="rules">
+        <h2>Rules the screens encode</h2>
+        <ul class="rlist">
+            <li><b>Never render a claim as a fact</b><span>Payload-supplied names are free for an attacker to set. Only the host derived from an endpoint URL is nameable, because it's where data will actually go.</span></li>
+            <li><b>Warn about exceptions, not norms</b><span>An amber banner on every request stops being read within a week. Inert records get no warning so that value-bearing ones still land.</span></li>
+            <li><b>Show the payload, not a summary</b><span>The thing being judged is the largest element on screen, in monospace, in full. Counts hide destruction — replaces show both values.</span></li>
+            <li><b>Warn about consequences, not infrastructure</b><span>"We can't verify the outpoint" explains our gap, not the user's situation. What matters is that broadcasting is irreversible — say that instead.</span></li>
+            <li><b>Consequence sets the friction</b><span>Inert record: one tap. Address record: recognition checkbox. Sale: full-screen confirmation plus device authentication.</span></li>
+            <li><b>No protocol vocabulary</b><span>"Transfer handle", "Sell handle", "Sign in". PSBT appears only as the label of the copyable blob and in dev docs.</span></li>
+        </ul>
+    </div>
+
+    <footer>Companion to nacho-signing-design-notes.md · screens are reference layouts, not final visual spec</footer>
+
+</div>
+</body>
+</html>

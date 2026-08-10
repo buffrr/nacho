@@ -12,6 +12,7 @@ import * as Clipboard from "expo-clipboard";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
 import { Message } from "@/ui/Message";
+import { ChunkedValue } from "@/ui/ChunkedValue";
 import { useStore } from "@/Store";
 import {
   AtSign,
@@ -19,32 +20,35 @@ import {
   AlertCircle,
   Plus,
   Trash,
-  Bitcoin,
   ChevronRight,
 } from "@/ui/icons";
 import {
   decodeSignRequest,
   applyOps,
+  RecordDiff,
+  MessageRequest,
   RecordsRequest,
-  PsbtRequest,
   SignRequest as SignReq,
 } from "@/signRequest";
 import { editableFromZone, EditableRecord } from "@/fabricResolver";
 import { resolveHandle, exportCert, publishRecords } from "@/fabric";
 import { loadCert, saveCert } from "@/certStore";
-import { scriptForHandle } from "@/keys";
-import { signPsbtRequest, SignedInputInfo } from "@/psbtSign";
+import { recordsGet } from "@/db";
+import { tierFor, warningLine, needsAck } from "@/recordTiers";
+import { remainingValidity } from "@/format";
+import { signMessage } from "@/messageSign";
 
-// Confirmation screen for a signing request (nacho://sign — see
-// docs/signing-requests.md). Decodes the untrusted envelope and shows the EXACT
-// effect before the user approves: a record diff (which is then published), or a
-// PSBT input→output binding (which is then signed and offered as a copyable PSBT).
+// Confirmation screens for a signing request (design-notes.md / mockups.html).
+// Decodes the untrusted envelope and shows the exact effect before approval. No
+// `origin` is ever shown — only an endpoint-derived host, and only at send time.
 export default function SignRequest() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { req } = useLocalSearchParams<{ req?: string }>();
 
-  const decoded = useMemo((): { ok: true; value: SignReq } | { ok: false; error: string } => {
+  const decoded = useMemo(():
+    | { ok: true; value: SignReq }
+    | { ok: false; error: string } => {
     try {
       return { ok: true, value: decodeSignRequest(req ?? "") };
     } catch (e) {
@@ -56,21 +60,277 @@ export default function SignRequest() {
     return (
       <Layout underHeader>
         <Stack.Screen options={{ title: "Request" }} />
-        <View style={styles.errorWrap}>
+        <View style={styles.mt}>
           <Message message={decoded.error} type="error" />
         </View>
       </Layout>
     );
   }
 
-  return decoded.value.type === "records" ? (
-    <RecordsConfirm request={decoded.value} styles={styles} colors={colors} />
-  ) : (
-    <PsbtConfirm request={decoded.value} styles={styles} colors={colors} />
+  const r = decoded.value;
+  switch (r.type) {
+    case "message":
+      return <MessageConfirm request={r} styles={styles} colors={colors} />;
+    case "records":
+      return <RecordsConfirm request={r} styles={styles} colors={colors} />;
+    default:
+      // transfer / sale / rotate — next implementation slice.
+      return (
+        <Layout underHeader>
+          <Stack.Screen options={{ title: "Request" }} />
+          <View style={styles.mt}>
+            <Message
+              message="This request type isn't available in this build yet."
+              type="error"
+            />
+          </View>
+        </Layout>
+      );
+  }
+}
+
+// ---- endpoint helpers -------------------------------------------------------
+
+function hostOf(url: string): string {
+  const m = url.match(/^[a-z]+:\/\/([^/:?#]+)/i);
+  return m ? m[1] : url;
+}
+
+async function postToEndpoint(endpoint: string, body: string): Promise<void> {
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+  if (!res.ok) throw new Error(`Send failed (${res.status}).`);
+}
+
+// ---- shared result ----------------------------------------------------------
+
+function ResultView({
+  heading,
+  sub,
+  blob,
+  response,
+  endpoint,
+  styles,
+  colors,
+}: {
+  heading: string;
+  sub: string;
+  blob: string;
+  response: string;
+  endpoint?: string;
+  styles: Styles;
+  colors: Colors;
+}) {
+  const router = useRouter();
+  const [copied, setCopied] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const host = endpoint ? hostOf(endpoint) : null;
+
+  const copy = async () => {
+    await Clipboard.setStringAsync(response);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  const send = async () => {
+    if (!endpoint) return;
+    setSending(true);
+    setError(null);
+    try {
+      await postToEndpoint(endpoint, response);
+      setSent(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Send failed.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Layout underHeader>
+      <Stack.Screen options={{ title: "Signed" }} />
+      <View style={styles.hero}>
+        <View style={styles.heroIcon}>
+          <Check size={30} color={colors.statusGreenFg} />
+        </View>
+        <Text style={styles.heroH}>{heading}</Text>
+        <Text style={styles.heroS}>{sent ? `Sent to ${host}` : sub}</Text>
+      </View>
+      <View style={styles.blob}>
+        <Text style={styles.blobText} numberOfLines={4}>
+          {blob}
+        </Text>
+      </View>
+      {error && (
+        <View style={styles.mt}>
+          <Message message={error} type="error" />
+        </View>
+      )}
+      {host && !sent ? (
+        <>
+          <TouchableOpacity
+            style={[styles.primaryBtn, sending && styles.btnDisabled]}
+            onPress={send}
+            disabled={sending}
+          >
+            {sending ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.primaryBtnText}>Send to {host}</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={copy}>
+            <Text style={styles.secondaryBtnText}>
+              {copied ? "Copied ✓" : "Copy response"}
+            </Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <>
+          <TouchableOpacity style={styles.primaryBtn} onPress={copy}>
+            <Text style={styles.primaryBtnText}>
+              {copied ? "Copied ✓" : "Copy response"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
+            <Text style={styles.secondaryBtnText}>Done</Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </Layout>
   );
 }
 
-// ---------------------------------------------------------------- Records flow
+// ---- message (sign-in) ------------------------------------------------------
+
+function MessageConfirm({
+  request,
+  styles,
+  colors,
+}: {
+  request: MessageRequest;
+  styles: Styles;
+  colors: Colors;
+}) {
+  const router = useRouter();
+  const { handles, getSigningKey } = useStore();
+  const owned = useMemo(() => (handles ? Object.keys(handles) : []), [handles]);
+  const [handle, setHandle] = useState<string | null>(request.handle ?? null);
+  const [error, setError] = useState<string | null>(null);
+  const [signing, setSigning] = useState(false);
+  const [response, setResponse] = useState<string | null>(null);
+  const host = request.endpoint ? hostOf(request.endpoint) : null;
+
+  const sign = useCallback(async () => {
+    if (!handle) return;
+    setSigning(true);
+    setError(null);
+    try {
+      const key = await getSigningKey(handle);
+      if (!key) throw new Error("No private key available for this handle.");
+      const res = signMessage(handle, request.challenge, key, request.ref);
+      setResponse(JSON.stringify(res));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to sign.");
+    } finally {
+      setSigning(false);
+    }
+  }, [handle, request, getSigningKey]);
+
+  if (response) {
+    return (
+      <ResultView
+        heading="Signed"
+        sub={host ? "Nothing has been sent yet" : "Paste this back where you started"}
+        blob={response}
+        response={response}
+        endpoint={request.endpoint}
+        styles={styles}
+        colors={colors}
+      />
+    );
+  }
+
+  if (!handle) {
+    return (
+      <Layout underHeader>
+        <Stack.Screen options={{ title: "Sign in" }} />
+        <Text style={styles.prompt}>Choose the handle to prove you own:</Text>
+        {owned.map((h, i) => (
+          <React.Fragment key={h}>
+            {i > 0 && <View style={styles.divider} />}
+            <TouchableOpacity style={styles.pickRow} onPress={() => setHandle(h)}>
+              <View style={styles.pickIcon}>
+                <AtSign size={18} color={colors.accent} />
+              </View>
+              <Text style={styles.pickName}>{h}</Text>
+              <ChevronRight size={18} color={colors.iconDefault} />
+            </TouchableOpacity>
+          </React.Fragment>
+        ))}
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout underHeader>
+      <Stack.Screen options={{ title: "Sign in" }} />
+      <View style={styles.hero}>
+        <View style={styles.heroIconAccent}>
+          <AtSign size={26} color={colors.accent} />
+        </View>
+        <Text style={styles.heroH}>Prove you own</Text>
+        <Text style={styles.heroS}>{handle}</Text>
+      </View>
+      <View style={styles.card}>
+        <View style={styles.kv}>
+          <Text style={styles.kvK}>Signs</Text>
+          <Text style={styles.kvV}>A one-time challenge</Text>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.kv}>
+          <Text style={styles.kvK}>Expires</Text>
+          <Text style={styles.kvV}>{remainingValidity(request.exp)}</Text>
+        </View>
+      </View>
+      {host && (
+        <View style={styles.notePlain}>
+          <Text style={styles.noteText}>
+            Your signature will be sent to <Text style={styles.noteStrong}>{host}</Text>{" "}
+            when you tap below. Nothing is sent before that.
+          </Text>
+        </View>
+      )}
+      {error && (
+        <View style={styles.mt}>
+          <Message message={error} type="error" />
+        </View>
+      )}
+      <TouchableOpacity
+        style={[styles.primaryBtn, signing && styles.btnDisabled]}
+        onPress={sign}
+        disabled={signing}
+      >
+        {signing ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.primaryBtnText}>
+            {host ? `Sign & send to ${host}` : "Sign"}
+          </Text>
+        )}
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
+        <Text style={styles.secondaryBtnText}>Cancel</Text>
+      </TouchableOpacity>
+    </Layout>
+  );
+}
+
+// ---- records ----------------------------------------------------------------
 
 function RecordsConfirm({
   request,
@@ -83,100 +343,148 @@ function RecordsConfirm({
 }) {
   const router = useRouter();
   const { handles, getSigningKey } = useStore();
-
-  const owned = useMemo(
-    () => (handles ? Object.keys(handles) : []),
-    [handles],
-  );
+  const owned = useMemo(() => (handles ? Object.keys(handles) : []), [handles]);
   const [handle, setHandle] = useState<string | null>(request.handle ?? null);
   const [phase, setPhase] = useState<
-    "picking" | "confirm" | "publishing" | "done"
-  >(request.handle ? "confirm" : "picking");
+    "picking" | "review" | "publishing" | "changed" | "done"
+  >(request.handle ? "review" : "picking");
   const [error, setError] = useState<string | null>(null);
+  // Diff shown to the user: computed from the CACHED zone at review, or the live
+  // zone on the "changed" screen.
+  const [diff, setDiff] = useState<RecordDiff | null>(null);
+  const [acks, setAcks] = useState<Record<number, boolean>>({});
 
-  // Validate a requested handle is one we own.
+  // Ownership check for a requested handle.
   useEffect(() => {
     if (request.handle && handles && !handles[request.handle]) {
       setError(`You don't own ${request.handle}.`);
-      setPhase("picking");
       setHandle(null);
+      setPhase("picking");
     }
   }, [request.handle, handles]);
 
-  // Approve: only NOW resolve the live zone, merge the requested ops into the
-  // current records (publish is a full replacement, so we combine rather than
-  // clobber), and republish. Deferring the resolve to here keeps the
-  // confirmation instant; the button shows a spinner while it runs.
-  const publish = useCallback(async () => {
-    if (!handle) return;
+  // Compute the displayed diff from the cached zone (no network) once a handle is set.
+  useEffect(() => {
+    if (!handle || phase !== "review") return;
+    let cancelled = false;
+    (async () => {
+      let current: EditableRecord[] = [];
+      try {
+        const json = await recordsGet(handle);
+        if (json) {
+          const parsed = JSON.parse(json);
+          current = Array.isArray(parsed.records) ? parsed.records : [];
+        }
+      } catch {
+        current = [];
+      }
+      if (cancelled) return;
+      setDiff(applyOps(current, request.ops));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [handle, phase, request.ops]);
+
+  // Ack gating: destination/identity ADDS need a recognition tap.
+  const ackable = useMemo(() => {
+    if (!diff) return [] as number[];
+    return diff.added
+      .map((r, i) => ({ r, i }))
+      .filter(({ r }) => needsAck(tierFor(r.type, r.key)))
+      .map(({ i }) => i);
+  }, [diff]);
+  const allAcked = ackable.every((i) => acks[i]);
+
+  const resolveLive = async (): Promise<{ records: EditableRecord[]; seq: number }> => {
+    const resolved = await Promise.race([
+      resolveHandle(handle!),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timed out loading current records.")), 20000),
+      ),
+    ]);
+    return resolved ? editableFromZone(resolved.zone) : { records: [], seq: 0 };
+  };
+
+  const publishDiff = async (d: RecordDiff, lastSeq: number) => {
+    const key = await getSigningKey(handle!);
+    if (!key) throw new Error("No private key available for this handle.");
+    let cert = await loadCert(handle!);
+    if (!cert) {
+      cert = await exportCert(handle!);
+      await saveCert(handle!, cert);
+    }
+    // Monotonic seq: unix seconds, but never collide/regress against the last one.
+    const seq = Math.max(Math.floor(Date.now() / 1000), lastSeq + 1);
+    await publishRecords(cert, d.next, seq, key);
+  };
+
+  const approve = useCallback(async () => {
+    if (!handle || !diff) return;
     setError(null);
     setPhase("publishing");
     try {
-      const resolved = await Promise.race([
-        resolveHandle(handle),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Timed out loading current records.")),
-            20000,
-          ),
-        ),
-      ]);
-      const current: EditableRecord[] = resolved
-        ? editableFromZone(resolved.zone).records
-        : [];
-      const { next } = applyOps(current, request.ops);
-
-      const secretKey = await getSigningKey(handle);
-      if (!secretKey) throw new Error("No private key available for this handle.");
-      let cert = await loadCert(handle);
-      if (!cert) {
-        cert = await exportCert(handle);
-        await saveCert(handle, cert);
+      const live = await resolveLive();
+      const liveDiff = applyOps(live.records, request.ops);
+      // If the real diff differs from what we showed, require a second look.
+      const changed =
+        JSON.stringify(liveDiff.next) !== JSON.stringify(diff.next);
+      if (changed) {
+        setDiff(liveDiff);
+        setPhase("changed");
+        return;
       }
-      const seq = Math.floor(Date.now() / 1000);
-      await publishRecords(cert, next, seq, secretKey);
+      await publishDiff(liveDiff, live.seq);
       setPhase("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to publish records.");
-      setPhase("confirm");
+      setPhase("review");
     }
-  }, [handle, request.ops, getSigningKey]);
+  }, [handle, diff, request.ops, getSigningKey]);
 
-  const finish = () => router.back();
-  const returnToApp = () => {
-    if (request.return) Linking.openURL(request.return).catch(() => {});
-    router.back();
-  };
+  const publishAnyway = useCallback(async () => {
+    if (!handle || !diff) return;
+    setError(null);
+    setPhase("publishing");
+    try {
+      const live = await resolveLive();
+      await publishDiff(applyOps(live.records, request.ops), live.seq);
+      setPhase("done");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to publish records.");
+      setPhase("changed");
+    }
+  }, [handle, diff, request.ops, getSigningKey]);
 
-  // Handle picker (no handle specified in the request).
   if (phase === "picking" || !handle) {
     return (
       <Layout underHeader>
         <Stack.Screen options={{ title: "Sign in" }} />
-        <RequestOrigin origin={request.origin} styles={styles} colors={colors} />
         <Text style={styles.prompt}>Choose the handle to use:</Text>
-        {error && <View style={styles.mb}><Message message={error} type="error" /></View>}
-        <View style={styles.card}>
-          {owned.map((h, i) => (
-            <React.Fragment key={h}>
-              {i > 0 && <View style={styles.divider} />}
-              <TouchableOpacity
-                style={styles.pickRow}
-                onPress={() => {
-                  setError(null);
-                  setHandle(h);
-                  setPhase("confirm");
-                }}
-              >
-                <View style={styles.pickIcon}>
-                  <AtSign size={18} color={colors.accent} />
-                </View>
-                <Text style={styles.pickName}>{h}</Text>
-                <ChevronRight size={18} color={colors.iconDefault} />
-              </TouchableOpacity>
-            </React.Fragment>
-          ))}
-        </View>
+        {error && (
+          <View style={styles.mb}>
+            <Message message={error} type="error" />
+          </View>
+        )}
+        {owned.map((h, i) => (
+          <React.Fragment key={h}>
+            {i > 0 && <View style={styles.divider} />}
+            <TouchableOpacity
+              style={styles.pickRow}
+              onPress={() => {
+                setError(null);
+                setHandle(h);
+                setPhase("review");
+              }}
+            >
+              <View style={styles.pickIcon}>
+                <AtSign size={18} color={colors.accent} />
+              </View>
+              <Text style={styles.pickName}>{h}</Text>
+              <ChevronRight size={18} color={colors.iconDefault} />
+            </TouchableOpacity>
+          </React.Fragment>
+        ))}
       </Layout>
     );
   }
@@ -185,23 +493,27 @@ function RecordsConfirm({
     return (
       <Layout underHeader>
         <Stack.Screen options={{ title: "Done" }} />
-        <View style={styles.doneWrap}>
-          <View style={styles.doneIcon}>
+        <View style={styles.hero}>
+          <View style={styles.heroIcon}>
             <Check size={30} color={colors.statusGreenFg} />
           </View>
-          <Text style={styles.doneTitle}>Records published</Text>
-          <Text style={styles.doneSub}>
-            {handle} was updated. It may take a moment to propagate.
-          </Text>
+          <Text style={styles.heroH}>Records published</Text>
+          <Text style={styles.heroS}>{handle} was updated.</Text>
         </View>
         {request.return ? (
-          <TouchableOpacity style={styles.primaryBtn} onPress={returnToApp}>
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={() => {
+              Linking.openURL(request.return!).catch(() => {});
+              router.back();
+            }}
+          >
             <Text style={styles.primaryBtnText}>
-              Return to {request.origin ?? "app"}
+              Return to {hostOf(request.return)}
             </Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.primaryBtn} onPress={finish}>
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.back()}>
             <Text style={styles.primaryBtnText}>Done</Text>
           </TouchableOpacity>
         )}
@@ -209,352 +521,230 @@ function RecordsConfirm({
     );
   }
 
-  // confirm / publishing
-  return (
-    <Layout underHeader>
-      <Stack.Screen options={{ title: "Approve changes" }} />
-      <RequestOrigin origin={request.origin} styles={styles} colors={colors} />
-
-      <View style={styles.targetRow}>
-        <View style={styles.pickIcon}>
-          <AtSign size={18} color={colors.accent} />
-        </View>
-        <Text style={styles.targetName}>{handle}</Text>
-      </View>
-
-      <Text style={styles.prompt}>
-        These changes will be published to your handle. Your existing records are
-        kept.
-      </Text>
-
-      <OpsPreview ops={request.ops} styles={styles} colors={colors} />
-
-      {error && <View style={styles.mt}><Message message={error} type="error" /></View>}
-
-      <TouchableOpacity
-        style={[styles.primaryBtn, phase === "publishing" && styles.btnDisabled]}
-        onPress={publish}
-        disabled={phase === "publishing"}
-      >
-        {phase === "publishing" ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.primaryBtnText}>Approve &amp; publish</Text>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.secondaryBtn}
-        onPress={finish}
-        disabled={phase === "publishing"}
-      >
-        <Text style={styles.secondaryBtnText}>Cancel</Text>
-      </TouchableOpacity>
-    </Layout>
-  );
-}
-
-// Renders the requested ops directly (no live-zone resolve needed). Whether a
-// `set` ends up an add or a replace is only known after the on-approve resolve;
-// here we just show what the request asks for.
-function OpsPreview({
-  ops,
-  styles,
-  colors,
-}: {
-  ops: RecordsRequest["ops"];
-  styles: Styles;
-  colors: Colors;
-}) {
-  return (
-    <View style={styles.card}>
-      {ops.map((op, i) => (
-        <React.Fragment key={i}>
-          {i > 0 && <View style={styles.divider} />}
-          {op.op === "set" ? (
-            <DiffRow
-              Icon={Plus}
-              color={colors.statusGreenFg}
-              label={`${op.rtype} · ${op.key}`}
-              value={op.value.join(", ")}
-              styles={styles}
-            />
-          ) : (
-            <DiffRow
-              Icon={Trash}
-              color="#DC2626"
-              label={`${op.rtype ? op.rtype + " · " : ""}${op.key}`}
-              value="Remove this record"
-              styles={styles}
-            />
-          )}
-        </React.Fragment>
-      ))}
-    </View>
-  );
-}
-
-function DiffRow({
-  Icon,
-  color,
-  label,
-  value,
-  styles,
-}: {
-  Icon: (p: { size?: number; color?: string }) => React.JSX.Element;
-  color: string;
-  label: string;
-  value: string;
-  styles: Styles;
-}) {
-  return (
-    <View style={styles.diffRow}>
-      <View style={[styles.diffIcon, { backgroundColor: color + "22" }]}>
-        <Icon size={16} color={color} />
-      </View>
-      <View style={styles.diffMid}>
-        <Text style={styles.diffLabel}>{label}</Text>
-        <Text style={styles.diffValue} numberOfLines={2}>
-          {value}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-// ------------------------------------------------------------------- PSBT flow
-
-function PsbtConfirm({
-  request,
-  styles,
-  colors,
-}: {
-  request: PsbtRequest;
-  styles: Styles;
-  colors: Colors;
-}) {
-  const router = useRouter();
-  const { handles, xpub, getSigningKey } = useStore();
-
-  // spk (lowercased) → handle name, for matching inputs and labelling outputs.
-  const spkToHandle = useMemo(() => {
-    const m = new Map<string, string>();
-    if (handles && xpub) {
-      for (const [h, data] of Object.entries(handles)) {
-        m.set(scriptForHandle(xpub, data).toLowerCase(), h);
-      }
-    }
-    return m;
-  }, [handles, xpub]);
-
-  // Per-input preview computed before signing (so the user sees what they sign).
-  const preview = useMemo(
-    () =>
-      request.sign.map((inp, i) => {
-        const out = request.outputs[i];
-        return {
-          handle: spkToHandle.get(inp.script.toLowerCase()) ?? null,
-          inAmount: inp.amount,
-          outAmount: out.amount,
-          outHandle: spkToHandle.get(out.script.toLowerCase()) ?? null,
-          outScript: out.script,
-        };
-      }),
-    [request, spkToHandle],
-  );
-  const foreign = preview.find((p) => p.handle === null);
-
-  const [phase, setPhase] = useState<"confirm" | "signing" | "done">("confirm");
-  const [error, setError] = useState<string | null>(null);
-  const [psbt, setPsbt] = useState<string | null>(null);
-  const [signedInfo, setSignedInfo] = useState<SignedInputInfo[]>([]);
-  const [copied, setCopied] = useState(false);
-
-  const sign = useCallback(async () => {
-    setError(null);
-    setPhase("signing");
-    try {
-      const result = await signPsbtRequest(request, async (script) => {
-        const h = spkToHandle.get(script.toLowerCase());
-        if (!h) return null;
-        const privkeyHex = await getSigningKey(h);
-        if (!privkeyHex) return null;
-        return { handle: h, privkeyHex };
-      });
-      setPsbt(result.psbtBase64);
-      setSignedInfo(result.inputs);
-      setPhase("done");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to sign.");
-      setPhase("confirm");
-    }
-  }, [request, spkToHandle, getSigningKey]);
-
-  const copy = async () => {
-    if (!psbt) return;
-    await Clipboard.setStringAsync(psbt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  if (phase === "done" && psbt) {
-    return (
-      <Layout underHeader>
-        <Stack.Screen options={{ title: "Signed" }} />
-        <View style={styles.doneWrap}>
-          <View style={styles.doneIcon}>
-            <Check size={30} color={colors.statusGreenFg} />
-          </View>
-          <Text style={styles.doneTitle}>PSBT signed</Text>
-          <Text style={styles.doneSub}>
-            Signed {signedInfo.length} input{signedInfo.length === 1 ? "" : "s"} with
-            SIGHASH_SINGLE | ANYONECANPAY. Copy it back to the requesting app to
-            combine and broadcast.
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.primaryBtn} onPress={copy}>
-          <Text style={styles.primaryBtnText}>
-            {copied ? "Copied ✓" : "Copy signed PSBT"}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
-          <Text style={styles.secondaryBtnText}>Done</Text>
-        </TouchableOpacity>
-      </Layout>
-    );
-  }
+  const changed = phase === "changed";
+  const busy = phase === "publishing";
 
   return (
     <Layout underHeader>
-      <Stack.Screen options={{ title: "Sign transaction" }} />
-      <RequestOrigin origin={request.origin} styles={styles} colors={colors} />
-      <Text style={styles.prompt}>
-        You are producing a partial signature (ANYONECANPAY): only your input is
-        signed, each bound to the output below.
-      </Text>
-
-      <View style={styles.card}>
-        {preview.map((p, i) => (
-          <React.Fragment key={i}>
-            {i > 0 && <View style={styles.divider} />}
-            <View style={styles.psbtRow}>
-              <View style={styles.psbtLine}>
-                <View style={[styles.diffIcon, { backgroundColor: colors.accent + "22" }]}>
-                  <Bitcoin size={16} color={colors.accent} />
-                </View>
-                <View style={styles.diffMid}>
-                  <Text style={styles.diffLabel}>
-                    Spend {formatSats(p.inAmount)} from{" "}
-                    {p.handle ?? "an unknown input"}
-                  </Text>
-                  <Text style={styles.diffValue}>
-                    → {formatSats(p.outAmount)} to{" "}
-                    {p.outHandle
-                      ? p.outHandle + " (yours)"
-                      : shortHex(p.outScript)}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </React.Fragment>
-        ))}
-      </View>
-
-      {foreign && (
-        <View style={styles.mt}>
-          <Message
-            message="One or more inputs aren't your handles — nacho will refuse to sign this request."
-            type="error"
-          />
+      <Stack.Screen
+        options={{ title: changed ? "Records changed" : "Approve record change" }}
+      />
+      {changed && (
+        <View style={styles.noteWarn}>
+          <AlertCircle size={18} color={colors.statusAmberFg} />
+          <Text style={styles.noteText}>
+            This handle changed since the last screen. Here's what would actually
+            happen now.
+          </Text>
         </View>
       )}
-      {error && <View style={styles.mt}><Message message={error} type="error" /></View>}
+
+      {diff && (
+        <RecordDiffView
+          diff={diff}
+          acks={acks}
+          setAck={(i, v) => setAcks((a) => ({ ...a, [i]: v }))}
+          styles={styles}
+          colors={colors}
+        />
+      )}
+
+      <View style={styles.cardTop}>
+        <View style={styles.kv}>
+          <Text style={styles.kvK}>Publishing to</Text>
+          <Text style={styles.kvV}>{handle}</Text>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.kv}>
+          <Text style={styles.kvK}>Expires</Text>
+          <Text style={styles.kvV}>{remainingValidity(request.exp)}</Text>
+        </View>
+      </View>
+
+      {error && (
+        <View style={styles.mt}>
+          <Message message={error} type="error" />
+        </View>
+      )}
 
       <TouchableOpacity
         style={[
           styles.primaryBtn,
-          (phase === "signing" || !!foreign) && styles.btnDisabled,
+          (busy || (!changed && !allAcked)) && styles.btnDisabled,
         ]}
-        onPress={sign}
-        disabled={phase === "signing" || !!foreign}
+        onPress={changed ? publishAnyway : approve}
+        disabled={busy || (!changed && !allAcked)}
       >
-        {phase === "signing" ? (
+        {busy ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.primaryBtnText}>Approve &amp; sign</Text>
+          <Text style={styles.primaryBtnText}>
+            {changed ? "Publish anyway" : "Approve & publish"}
+          </Text>
         )}
       </TouchableOpacity>
-      <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
+      <TouchableOpacity
+        style={styles.secondaryBtn}
+        onPress={() => router.back()}
+        disabled={busy}
+      >
         <Text style={styles.secondaryBtnText}>Cancel</Text>
       </TouchableOpacity>
     </Layout>
   );
 }
 
-// --------------------------------------------------------------------- shared
-
-function RequestOrigin({
-  origin,
+function RecordDiffView({
+  diff,
+  acks,
+  setAck,
   styles,
   colors,
 }: {
-  origin?: string;
+  diff: RecordDiff;
+  acks: Record<number, boolean>;
+  setAck: (i: number, v: boolean) => void;
   styles: Styles;
   colors: Colors;
 }) {
   return (
-    <View style={styles.originRow}>
-      <View style={styles.originIcon}>
-        <AlertCircle size={18} color={colors.statusAmberFg} />
-      </View>
-      <Text style={styles.originText}>
-        {origin ? (
-          <>
-            Request from <Text style={styles.originStrong}>{origin}</Text>. Only
-            approve if you trust it.
-          </>
-        ) : (
-          <>Untrusted request. Review carefully before approving.</>
-        )}
-      </Text>
+    <View>
+      {diff.added.length > 0 && (
+        <Text style={styles.lbl}>A request asks to add</Text>
+      )}
+      {diff.added.map((r, i) => {
+        const tier = tierFor(r.type, r.key);
+        const warn = warningLine(tier);
+        const mustAck = needsAck(tier);
+        return (
+          <View key={`a${i}`} style={styles.recBlock}>
+            <View style={styles.recHead}>
+              <View style={[styles.opTag, { backgroundColor: colors.statusGreenBg }]}>
+                <Plus size={12} color={colors.statusGreenFg} />
+                <Text style={[styles.opTagText, { color: colors.statusGreenFg }]}>
+                  add
+                </Text>
+              </View>
+              <Text style={styles.recKey}>
+                {r.type} · {r.key}
+              </Text>
+            </View>
+            {tier === "generic" ? (
+              <Text style={styles.recVal}>{r.value.join(", ")}</Text>
+            ) : (
+              <ChunkedValue value={r.value.join(" ")} style={styles.recChunk} />
+            )}
+            {warn && (
+              <View style={styles.noteWarn}>
+                <AlertCircle size={16} color={colors.statusAmberFg} />
+                <Text style={styles.noteText}>{warn}</Text>
+              </View>
+            )}
+            {mustAck && (
+              <TouchableOpacity
+                style={styles.ackRow}
+                onPress={() => setAck(i, !acks[i])}
+              >
+                <View style={[styles.checkbox, acks[i] && styles.checkboxOn]}>
+                  {acks[i] && <Check size={14} color="#FFFFFF" />}
+                </View>
+                <Text style={styles.ackText}>
+                  I've read this address and it's the one I meant to add
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+      })}
+
+      {diff.replaced.length > 0 && (
+        <Text style={styles.lbl}>A request asks to replace</Text>
+      )}
+      {diff.replaced.map((r, i) => (
+        <View key={`r${i}`} style={styles.recBlock}>
+          <View style={styles.recHead}>
+            <View style={[styles.opTag, { backgroundColor: colors.border }]}>
+              <Text style={[styles.opTagText, { color: colors.textSecondary }]}>
+                was
+              </Text>
+            </View>
+            <Text style={styles.recKey}>
+              {r.before.type} · {r.before.key}
+            </Text>
+          </View>
+          <Text style={styles.recValOld}>{r.before.value.join(", ")}</Text>
+          <View style={[styles.recHead, { marginTop: 8 }]}>
+            <View style={[styles.opTag, { backgroundColor: colors.statusGreenBg }]}>
+              <Text style={[styles.opTagText, { color: colors.statusGreenFg }]}>
+                now
+              </Text>
+            </View>
+            <Text style={styles.recKey}>
+              {r.after.type} · {r.after.key}
+            </Text>
+          </View>
+          <Text style={styles.recVal}>{r.after.value.join(", ")}</Text>
+        </View>
+      ))}
+
+      {diff.removed.length > 0 && (
+        <Text style={styles.lbl}>Removes {diff.removed.length} record{diff.removed.length === 1 ? "" : "s"}</Text>
+      )}
+      {diff.removed.map((r, i) => (
+        <View key={`d${i}`} style={styles.recBlock}>
+          <View style={styles.recHead}>
+            <View style={[styles.opTag, { backgroundColor: "#DC262622" }]}>
+              <Trash size={12} color="#DC2626" />
+              <Text style={[styles.opTagText, { color: "#DC2626" }]}>remove</Text>
+            </View>
+            <Text style={styles.recKey}>
+              {r.type} · {r.key}
+            </Text>
+          </View>
+          <Text style={styles.recValOld}>{r.value.join(", ")}</Text>
+        </View>
+      ))}
     </View>
   );
-}
-
-// Thousands-separated sats (Hermes lacks full Intl number formatting).
-function formatSats(n: number): string {
-  return `${n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")} sats`;
-}
-function shortHex(h: string): string {
-  return h.length <= 18 ? h : `${h.slice(0, 10)}…${h.slice(-6)}`;
 }
 
 type Styles = ReturnType<typeof makeStyles>;
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    errorWrap: { marginTop: 20 },
     mt: { marginTop: 16 },
     mb: { marginBottom: 16 },
-    prompt: {
-      fontSize: 15,
-      color: c.textSecondary,
-      marginBottom: 16,
-      lineHeight: 21,
+    prompt: { fontSize: 15, color: c.textSecondary, marginBottom: 16, lineHeight: 21 },
+    lbl: {
+      fontSize: 12,
+      fontWeight: "600",
+      letterSpacing: 0.5,
+      color: c.textMuted,
+      textTransform: "uppercase",
+      marginTop: 8,
+      marginBottom: 8,
     },
-    originRow: {
-      flexDirection: "row",
+    hero: { alignItems: "center", marginTop: 8, marginBottom: 22, gap: 8 },
+    heroIcon: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: c.statusGreenBg,
       alignItems: "center",
-      gap: 12,
-      backgroundColor: c.statusAmberBg,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
-      borderRadius: 14,
-      padding: 14,
-      marginBottom: 20,
+      justifyContent: "center",
+      marginBottom: 4,
     },
-    originIcon: { width: 22, alignItems: "center" },
-    originText: { flex: 1, fontSize: 13, color: c.textSecondary, lineHeight: 18 },
-    originStrong: { color: c.text, fontWeight: "700" },
+    heroIconAccent: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: c.accent + "22",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 4,
+    },
+    heroH: { fontSize: 15, color: c.textSecondary },
+    heroS: { fontSize: 20, fontWeight: "700", color: c.text },
     card: {
       backgroundColor: c.card,
       borderWidth: 1,
@@ -562,13 +752,28 @@ const makeStyles = (c: Colors) =>
       borderRadius: 16,
       overflow: "hidden",
     },
-    divider: { height: 1, backgroundColor: c.border, marginLeft: 56 },
-    // handle picker
+    cardTop: {
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.borderWarm,
+      borderRadius: 16,
+      overflow: "hidden",
+      marginTop: 14,
+    },
+    kv: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+    },
+    kvK: { fontSize: 14, color: c.textSecondary },
+    kvV: { fontSize: 14, fontWeight: "600", color: c.text },
+    divider: { height: 1, backgroundColor: c.border },
     pickRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: 12,
-      paddingHorizontal: 14,
       paddingVertical: 14,
     },
     pickIcon: {
@@ -580,54 +785,81 @@ const makeStyles = (c: Colors) =>
       justifyContent: "center",
     },
     pickName: { flex: 1, fontSize: 16, fontWeight: "600", color: c.text },
-    // target handle
-    targetRow: {
+    recBlock: {
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.borderWarm,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 10,
+    },
+    recHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+    opTag: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 12,
-      marginBottom: 16,
+      gap: 3,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      borderRadius: 6,
     },
-    targetName: { fontSize: 18, fontWeight: "700", color: c.text },
-    // diff rows
-    diffRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-    },
-    diffIcon: {
-      width: 32,
-      height: 32,
-      borderRadius: 9,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    diffMid: { flex: 1, gap: 2 },
-    diffLabel: { fontSize: 15, fontWeight: "600", color: c.text },
-    diffValue: { fontSize: 13, color: c.textSecondary, fontFamily: "monospace" },
-    // psbt
-    psbtRow: { paddingHorizontal: 14, paddingVertical: 12 },
-    psbtLine: { flexDirection: "row", alignItems: "center", gap: 12 },
-    // done
-    doneWrap: { alignItems: "center", marginTop: 12, marginBottom: 28, gap: 10 },
-    doneIcon: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      backgroundColor: c.statusGreenBg,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    doneTitle: { fontSize: 20, fontWeight: "700", color: c.text },
-    doneSub: {
-      fontSize: 14,
+    opTagText: { fontSize: 11, fontWeight: "700", textTransform: "uppercase" },
+    recKey: { fontSize: 13, color: c.textSecondary, fontFamily: "monospace" },
+    recVal: { fontSize: 15, color: c.text, marginTop: 8, lineHeight: 21 },
+    recChunk: { fontSize: 15, color: c.text, marginTop: 8 },
+    recValOld: {
+      fontSize: 15,
       color: c.textSecondary,
-      textAlign: "center",
-      lineHeight: 20,
-      paddingHorizontal: 12,
+      marginTop: 6,
+      textDecorationLine: "line-through",
+      fontFamily: "monospace",
     },
-    // buttons
+    notePlain: {
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.borderWarm,
+      borderRadius: 12,
+      padding: 13,
+      marginTop: 12,
+    },
+    noteWarn: {
+      flexDirection: "row",
+      gap: 10,
+      alignItems: "flex-start",
+      backgroundColor: c.statusAmberBg,
+      borderWidth: 1,
+      borderColor: c.borderWarm,
+      borderRadius: 12,
+      padding: 12,
+      marginTop: 10,
+    },
+    noteText: { flex: 1, fontSize: 13, color: c.textSecondary, lineHeight: 18 },
+    noteStrong: { color: c.text, fontWeight: "700" },
+    ackRow: {
+      flexDirection: "row",
+      gap: 10,
+      alignItems: "flex-start",
+      paddingTop: 12,
+    },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+      borderWidth: 1.5,
+      borderColor: c.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    checkboxOn: { backgroundColor: c.accent, borderColor: c.accent },
+    ackText: { flex: 1, fontSize: 13, color: c.textSecondary, lineHeight: 19 },
+    blob: {
+      backgroundColor: c.field,
+      borderWidth: 1,
+      borderColor: c.borderWarm,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 4,
+    },
+    blobText: { fontFamily: "monospace", fontSize: 12, color: c.textSecondary },
     primaryBtn: {
       backgroundColor: c.accent,
       borderRadius: 14,
