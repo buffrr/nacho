@@ -187,6 +187,11 @@ export type HandleData =
       onboarded?: boolean;
       // Present when bought via nacho IAP (drives the "Purchase complete" state).
       purchase?: PurchaseInfo;
+      // Candidate derivation paths from key rotations that haven't been observed
+      // on-chain yet. The active key is unchanged until a re-resolve shows the
+      // handle actually moved to one of these — then it's promoted (see
+      // setHandleResolution). An unbroadcast rotate stays inert.
+      pendingPaths?: string[];
     }
   | {
       source: "imported";
@@ -196,6 +201,7 @@ export type HandleData =
       certRef?: CertRef;
       onboarded?: boolean;
       purchase?: PurchaseInfo;
+      pendingPaths?: string[];
     };
 
 function isHandleResolution(obj: unknown): obj is HandleResolution {
@@ -238,7 +244,15 @@ function normalizeHandleData(obj: unknown): HandleData | null {
     certRef?: CertRef;
     onboarded?: boolean;
     purchase?: PurchaseInfo;
+    pendingPaths?: string[];
   } = {};
+  if (Array.isArray(handle.pendingPaths)) {
+    const paths = handle.pendingPaths.filter(
+      (p): p is string =>
+        typeof p === "string" && /^m(\/(?:0|[1-9]\d*))+$/.test(p),
+    );
+    if (paths.length) extra.pendingPaths = paths;
+  }
   if (handle.cert !== undefined) {
     extra.cert = handle.cert as CertData;
   }
@@ -279,20 +293,22 @@ function normalizeHandleData(obj: unknown): HandleData | null {
 
 const DERIVATION_PREFIX = "m/35053/0/0/";
 
-// The next unused derivation path for a new handle (max derived index + 1).
+// The next unused derivation path for a new handle / rotation (max index + 1).
+// Considers both active paths and any pending rotation candidates so indexes are
+// never reused.
 function nextDerivedPath(handles: HandlesMap): string {
   let maxIndex = -1;
-  for (const handleData of Object.values(handles)) {
-    if (
-      handleData.source === "derived" &&
-      handleData.path.startsWith(DERIVATION_PREFIX)
-    ) {
-      const indexStr = handleData.path.slice(DERIVATION_PREFIX.length);
-      const index = parseInt(indexStr, 10);
-      if (!isNaN(index) && index.toString() === indexStr && index > maxIndex) {
-        maxIndex = index;
-      }
+  const consider = (path: string) => {
+    if (!path.startsWith(DERIVATION_PREFIX)) return;
+    const indexStr = path.slice(DERIVATION_PREFIX.length);
+    const index = parseInt(indexStr, 10);
+    if (!isNaN(index) && index.toString() === indexStr && index > maxIndex) {
+      maxIndex = index;
     }
+  };
+  for (const handleData of Object.values(handles)) {
+    if (handleData.source === "derived") consider(handleData.path);
+    for (const p of handleData.pendingPaths ?? []) consider(p);
   }
   return DERIVATION_PREFIX + (maxIndex + 1).toString();
 }
@@ -388,6 +404,11 @@ type StoreContextType = {
   nextHandleData: () => HandleData | null;
   importKeypair: (handle: string, privkeyHex: string) => Promise<void>;
   removeHandle: (handle: string) => Promise<void>;
+  // Generate + persist a new candidate key for a rotation (see HandleData.pendingPaths).
+  // Returns the new key's derivation path, x-only pubkey, and p2tr script.
+  addPendingRotation: (
+    handle: string,
+  ) => Promise<{ path: string; pubkey: string; script: string } | null>;
   setHandleCertData: (handle: string, cert: CertData | null) => Promise<void>;
   setHandleResolution: (
     handle: string,
@@ -622,10 +643,50 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     if (!base || handleData === undefined) {
       return;
     }
-    await saveKeystore({
-      ...base,
-      [handle]: { ...handleData, resolution },
-    });
+    let updated: HandleData = { ...handleData, resolution };
+    // Rotation reconciliation: if the chain now shows the handle on a pending
+    // candidate key, promote it to the active key and clear the candidates. An
+    // unbroadcast rotate never matches, so it stays inert.
+    if (
+      resolution.found &&
+      resolution.scriptPubkey &&
+      handleData.pendingPaths?.length &&
+      xpub
+    ) {
+      const match = handleData.pendingPaths.find(
+        (p) => p2trScriptFromPub(pubFromPath(xpub, p)) === resolution.scriptPubkey,
+      );
+      if (match) {
+        updated = {
+          source: "derived",
+          path: match,
+          resolution,
+          ...(handleData.cert ? { cert: handleData.cert } : {}),
+          ...(handleData.certRef ? { certRef: handleData.certRef } : {}),
+          ...(handleData.onboarded !== undefined
+            ? { onboarded: handleData.onboarded }
+            : {}),
+          ...(handleData.purchase ? { purchase: handleData.purchase } : {}),
+        };
+      }
+    }
+    await saveKeystore({ ...base, [handle]: updated });
+  };
+
+  const addPendingRotation = async (
+    handle: string,
+  ): Promise<{ path: string; pubkey: string; script: string } | null> => {
+    const base = currentHandles();
+    const handleData = base?.[handle];
+    if (!base || handleData === undefined || !xpub) {
+      return null;
+    }
+    const path = nextDerivedPath(base);
+    const pubkey = pubFromPath(xpub, path);
+    const script = p2trScriptFromPub(pubkey);
+    const pendingPaths = [...(handleData.pendingPaths ?? []), path];
+    await saveKeystore({ ...base, [handle]: { ...handleData, pendingPaths } });
+    return { path, pubkey, script };
   };
 
   const setCertRef = async (
@@ -694,6 +755,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         nextHandleData,
         importKeypair,
         removeHandle,
+        addPendingRotation,
         setHandleCertData,
         setHandleResolution,
         setCertRef,

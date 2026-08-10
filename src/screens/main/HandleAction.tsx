@@ -22,7 +22,7 @@ export default function HandleAction() {
   const router = useRouter();
   const { handle, action } = useLocalSearchParams<{
     handle: string;
-    action: "sale" | "transfer";
+    action: "sale" | "transfer" | "rotate";
   }>();
 
   const [txid, setTxid] = useState("");
@@ -33,7 +33,8 @@ export default function HandleAction() {
   const [error, setError] = useState<string | null>(null);
 
   const isSale = action === "sale";
-  const title = isSale ? "Sell handle" : "Transfer handle";
+  const isRotate = action === "rotate";
+  const title = isSale ? "Sell handle" : isRotate ? "Rotate key" : "Transfer handle";
 
   const proceed = () => {
     setError(null);
@@ -53,6 +54,8 @@ export default function HandleAction() {
       if (!Number.isInteger(priceN) || priceN <= 0)
         return setError("Enter a price in ₿ base units.");
       req = { v: 1, type: "sale", handle: handle!, price: priceN, outpoint, exp };
+    } else if (isRotate) {
+      req = { v: 1, type: "rotate", handle: handle!, outpoint, exp };
     } else {
       if (!/^[0-9a-fA-F]+$/.test(to.trim()))
         return setError("Enter the recipient's script (hex).");
@@ -66,8 +69,9 @@ export default function HandleAction() {
     <Layout underHeader>
       <Stack.Screen options={{ title }} />
       <Text style={styles.prompt}>
-        Enter the handle's current UTXO and the {isSale ? "price" : "recipient"}.
-        You'll review and sign on the next screen.
+        Enter the handle's current UTXO
+        {isSale ? " and the price" : isRotate ? "" : " and the recipient"}. You'll
+        review and sign on the next screen.
       </Text>
 
       <Text style={styles.lbl}>UTXO</Text>
@@ -99,7 +103,7 @@ export default function HandleAction() {
         />
       </View>
 
-      {isSale ? (
+      {isSale && (
         <>
           <Text style={styles.lbl}>Price (₿ base units)</Text>
           <TextInput
@@ -111,7 +115,8 @@ export default function HandleAction() {
             style={styles.input}
           />
         </>
-      ) : (
+      )}
+      {!isSale && !isRotate && (
         <>
           <Text style={styles.lbl}>Recipient script (hex)</Text>
           <TextInput

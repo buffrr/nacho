@@ -31,6 +31,7 @@ import {
   RecordsRequest,
   TransferRequest,
   SaleRequest,
+  RotateRequest,
   SignRequest as SignReq,
 } from "@/signRequest";
 import { editableFromZone, EditableRecord } from "@/fabricResolver";
@@ -88,16 +89,14 @@ export default function SignRequest() {
       return <TransferConfirm request={r} styles={styles} colors={colors} />;
     case "sale":
       return <SaleConfirm request={r} styles={styles} colors={colors} />;
+    case "rotate":
+      return <RotateConfirm request={r} styles={styles} colors={colors} />;
     default:
-      // rotate — next implementation slice (needs new-key generation + store state).
       return (
         <Layout underHeader>
           <Stack.Screen options={{ title: "Request" }} />
           <View style={styles.mt}>
-            <Message
-              message="This request type isn't available in this build yet."
-              type="error"
-            />
+            <Message message="Unknown request type." type="error" />
           </View>
         </Layout>
       );
@@ -1037,6 +1036,148 @@ function SaleConfirm({
           <ActivityIndicator color="#FFFFFF" />
         ) : (
           <Text style={styles.dangerBtnText}>Sign offer</Text>
+        )}
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
+        <Text style={styles.secondaryBtnText}>Cancel</Text>
+      </TouchableOpacity>
+    </Layout>
+  );
+}
+
+// ---- rotate -----------------------------------------------------------------
+
+function RotateConfirm({
+  request,
+  styles,
+  colors,
+}: {
+  request: RotateRequest;
+  styles: Styles;
+  colors: Colors;
+}) {
+  const router = useRouter();
+  const { handles, xpub, getSigningKey, addPendingRotation } = useStore();
+  const [signing, setSigning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [response, setResponse] = useState<string | null>(null);
+  const [newScript, setNewScript] = useState<string | null>(null);
+
+  const data = handles?.[request.handle];
+  const inputScript = data && xpub ? scriptForHandle(xpub, data) : null;
+
+  // Generate the candidate key up front so the user sees where it's going.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const k = await addPendingRotation(request.handle);
+      if (!cancelled) setNewScript(k?.script ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [request.handle]);
+
+  const sign = useCallback(async () => {
+    if (!data || !xpub || !inputScript || !newScript) {
+      setError("Couldn't prepare a new key for this handle.");
+      return;
+    }
+    setSigning(true);
+    setError(null);
+    try {
+      const key = await getSigningKey(request.handle);
+      if (!key) throw new Error("No private key available for this handle.");
+      // Spend the current UTXO (current key signs) to the NEW key's spk — equal
+      // value, so it's an ownership move to yourself on a fresh key.
+      const psbt = signSingleAnyonecanpay(
+        { ...request.outpoint, script: inputScript },
+        { script: newScript, amount: request.outpoint.amount },
+        key,
+      );
+      setResponse(psbt);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to sign.");
+    } finally {
+      setSigning(false);
+    }
+  }, [data, xpub, inputScript, newScript, request, getSigningKey]);
+
+  if (response) {
+    return (
+      <ResultView
+        heading="Rotation signed"
+        sub="Broadcast this to move to the new key"
+        blob={response}
+        response={response}
+        endpoint={request.endpoint}
+        styles={styles}
+        colors={colors}
+      />
+    );
+  }
+
+  return (
+    <Layout underHeader>
+      <Stack.Screen options={{ title: "Rotate key" }} />
+      <View style={styles.hero}>
+        <Text style={styles.heroH}>Move to a new key</Text>
+        <Text style={styles.heroS}>{request.handle} stays yours</Text>
+      </View>
+
+      <View style={styles.lblRow}>
+        <Text style={styles.lbl}>New key</Text>
+        <View style={[styles.tag, styles.tagMine]}>
+          <Text style={styles.tagText}>generated now</Text>
+        </View>
+      </View>
+      <View style={styles.recBlock}>
+        {newScript ? (
+          <ChunkedValue value={newScript} style={styles.recChunk} />
+        ) : (
+          <ActivityIndicator color={colors.accent} />
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.kv}>
+          <Text style={styles.kvK}>Handle</Text>
+          <Text style={[styles.kvV, { color: colors.statusGreenFg }]}>Stays sovereign</Text>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.kv}>
+          <Text style={styles.kvK}>Live offers</Text>
+          <Text style={[styles.kvV, { color: colors.statusAmberFg }]}>Invalidated</Text>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.kv}>
+          <Text style={styles.kvK}>Records</Text>
+          <Text style={styles.kvV}>Kept</Text>
+        </View>
+      </View>
+
+      <View style={styles.notePlain}>
+        <Text style={styles.noteText}>
+          Copy this to your wallet and broadcast it. The new key takes effect once
+          the move is seen on-chain, which can take up to a day to clear here.
+        </Text>
+      </View>
+
+      {error && (
+        <View style={styles.mt}>
+          <Message message={error} type="error" />
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={[styles.primaryBtn, (signing || !newScript) && styles.btnDisabled]}
+        onPress={sign}
+        disabled={signing || !newScript}
+      >
+        {signing ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.primaryBtnText}>Sign &amp; copy</Text>
         )}
       </TouchableOpacity>
       <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>

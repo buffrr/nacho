@@ -996,6 +996,13 @@ export default function ShowHandle() {
   });
   menuActions.push({
     type: "action",
+    label: "Rotate key",
+    icon: { type: "sfSymbol", name: "arrow.triangle.2.circlepath" },
+    onPress: () =>
+      router.push({ pathname: "/(main)/handle-action", params: { handle, action: "rotate" } }),
+  });
+  menuActions.push({
+    type: "action",
     label: "Cancel offers",
     icon: { type: "sfSymbol", name: "xmark.circle" },
     onPress: () =>
