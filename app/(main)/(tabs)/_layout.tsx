@@ -27,7 +27,9 @@ export default function TabsLayout() {
         )}
         <NativeTabs.Trigger.Label>Handles</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="resolve">
+      {/* role="search" → native iOS search tab (systemItem search); on iOS 26 the
+          bar can expand into a search field. The system title becomes "Search". */}
+      <NativeTabs.Trigger name="resolve" role="search">
         {isIOS ? (
           <NativeTabs.Trigger.Icon sf="magnifyingglass" />
         ) : (
