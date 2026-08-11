@@ -46,20 +46,20 @@ export default function HandleAction() {
     if (!Number.isInteger(amountN) || amountN <= 0)
       return setError("Enter the UTXO value in ₿ base units.");
 
-    const exp = Math.floor(Date.now() / 1000) + 3600; // 1h to complete
+    // User-initiated → no expiry (nothing external is waiting on a deadline).
     const outpoint = { txid: txid.trim().toLowerCase(), vout: voutN, amount: amountN };
     let req: SignRequest;
     if (isSale) {
       const priceN = Number(price);
       if (!Number.isInteger(priceN) || priceN <= 0)
         return setError("Enter a price in ₿ base units.");
-      req = { v: 1, type: "sale", handle: handle!, price: priceN, outpoint, exp };
+      req = { v: 1, type: "sale", handle: handle!, price: priceN, outpoint };
     } else if (isRotate) {
-      req = { v: 1, type: "rotate", handle: handle!, outpoint, exp };
+      req = { v: 1, type: "rotate", handle: handle!, outpoint };
     } else {
       if (!/^[0-9a-fA-F]+$/.test(to.trim()))
         return setError("Enter the recipient's script (hex).");
-      req = { v: 1, type: "transfer", handle: handle!, to: to.trim().toLowerCase(), outpoint, exp };
+      req = { v: 1, type: "transfer", handle: handle!, to: to.trim().toLowerCase(), outpoint };
     }
     const param = extractReqParam(encodeSignRequest(req));
     router.replace({ pathname: "/(main)/sign", params: { req: param ?? "" } });

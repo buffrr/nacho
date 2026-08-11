@@ -12,7 +12,10 @@ export type Outpoint = { txid: string; vout: number; amount: number };
 
 type CommonFields = {
   v: 1;
-  exp: number; // unix seconds — required; rejected when past
+  // Unix seconds. OPTIONAL — its only job is making a stale-request failure
+  // legible (a login QR scanned much later), not replay protection. Enforced
+  // when present (rejected if past); a request without it simply never expires.
+  exp?: number;
   ref?: string; // opaque caller reference — echoed back, NEVER displayed
   endpoint?: string; // https only — host derived from here is the only nameable one
   return?: string; // https only
@@ -144,11 +147,14 @@ function nowSeconds(): number {
 // Validate the fields common to every type; returns them normalized.
 function validateCommon(o: Record<string, unknown>): CommonFields {
   if (o.v !== 1) throw new Error(`Unsupported request version (${String(o.v)}).`);
-  if (typeof o.exp !== "number" || !Number.isFinite(o.exp)) {
-    throw new Error("Request is missing an expiry.");
+  const common: CommonFields = { v: 1 };
+  if (o.exp !== undefined) {
+    if (typeof o.exp !== "number" || !Number.isFinite(o.exp)) {
+      throw new Error("Invalid expiry.");
+    }
+    if (o.exp <= nowSeconds()) throw new Error("This request has expired.");
+    common.exp = o.exp;
   }
-  if (o.exp <= nowSeconds()) throw new Error("This request has expired.");
-  const common: CommonFields = { v: 1, exp: o.exp };
   if (typeof o.ref === "string") common.ref = o.ref; // echoed, never shown
   if (typeof o.endpoint === "string") {
     validateEndpointUrl(o.endpoint); // throws if invalid

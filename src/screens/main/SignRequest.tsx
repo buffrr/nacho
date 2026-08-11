@@ -334,11 +334,15 @@ function MessageConfirm({
           <Text style={styles.kvK}>Signs</Text>
           <Text style={styles.kvV}>A one-time challenge</Text>
         </View>
-        <View style={styles.divider} />
-        <View style={styles.kv}>
-          <Text style={styles.kvK}>Expires</Text>
-          <Text style={styles.kvV}>{remainingValidity(request.exp)}</Text>
-        </View>
+        {request.exp !== undefined && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.kv}>
+              <Text style={styles.kvK}>Expires</Text>
+              <Text style={styles.kvV}>{remainingValidity(request.exp)}</Text>
+            </View>
+          </>
+        )}
       </View>
       {host && (
         <View style={styles.notePlain}>
@@ -610,11 +614,15 @@ function RecordsConfirm({
           <Text style={styles.kvK}>Publishing to</Text>
           <Text style={styles.kvV}>{handle}</Text>
         </View>
-        <View style={styles.divider} />
-        <View style={styles.kv}>
-          <Text style={styles.kvK}>Expires</Text>
-          <Text style={styles.kvV}>{remainingValidity(request.exp)}</Text>
-        </View>
+        {request.exp !== undefined && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.kv}>
+              <Text style={styles.kvK}>Expires</Text>
+              <Text style={styles.kvV}>{remainingValidity(request.exp)}</Text>
+            </View>
+          </>
+        )}
       </View>
     </Layout>
   );
