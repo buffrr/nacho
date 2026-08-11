@@ -6,6 +6,7 @@ import {
   StyleSheet,
   FlatList,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,6 +15,7 @@ import { Colors, useTheme } from "@/theme";
 import { scriptForHandle } from "@/keys";
 import { handleTileInfo } from "@/handleTile";
 import { recordsCounts } from "@/db";
+import { refreshSemiTrust, resolveHandle } from "@/fabric";
 import { HandleTile } from "@/ui/HandleTile";
 import { ShoppingBag } from "@/ui/icons";
 
@@ -23,13 +25,47 @@ import { ShoppingBag } from "@/ui/icons";
 // into the centred nav-bar title as the list scrolls (Messages/Settings style).
 export default function ListHandles() {
   const router = useRouter();
-  const { handles, xpub } = useStore();
+  const { handles, xpub, setHandleResolution } = useStore();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [refreshing, setRefreshing] = useState(false);
 
   const handlesList = Object.entries(handles || {});
+
+  // Pull-to-refresh: EXPLICITLY refresh the semi-trusted anchor (the only place we
+  // re-fetch it — never automatically), then re-resolve each handle so the tiles'
+  // status is current. User-initiated, so the extra network is fine.
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshSemiTrust();
+      await Promise.all(
+        Object.entries(handles || {}).map(async ([name, data]) => {
+          try {
+            const resolved = await resolveHandle(name);
+            if (resolved) {
+              await setHandleResolution(name, {
+                found: true,
+                sovereignty: resolved.zone.sovereignty ?? "unknown",
+                scriptPubkey: resolved.zone.script_pubkey,
+                updatedAt: Date.now(),
+              });
+            } else if (!data.resolution?.found) {
+              // Don't downgrade a handle we've already seen resolve (propagation lag).
+              await setHandleResolution(name, { found: false, updatedAt: Date.now() });
+            }
+          } catch {
+            // skip this handle; others still refresh
+          }
+        }),
+      );
+      setCounts(await recordsCounts());
+    } finally {
+      setRefreshing(false);
+    }
+  }, [handles, setHandleResolution]);
 
   // Refresh the cached record counts each time the list gains focus (e.g. after
   // publishing records on a handle detail screen). Local DB only — no network.
@@ -77,6 +113,13 @@ export default function ListHandles() {
     <FlatList
       style={styles.list}
       contentInsetAdjustmentBehavior="automatic"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.iconDefault}
+        />
+      }
       data={handlesList}
       keyExtractor={([name]) => name}
       renderItem={({ item: [name, handleData] }) => (
