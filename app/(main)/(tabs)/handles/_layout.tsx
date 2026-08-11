@@ -18,11 +18,13 @@ export default function HandlesTabLayout() {
         label: "Add handle",
         identifier: "handles-add",
         icon: { type: "sfSymbol", name: "plus" },
-        tintColor: colors.accent,
+        // Neutral tint (not the orange accent) — native bar buttons aren't the
+        // brand colour.
+        tintColor: colors.text,
         onPress: () => router.push("/(main)/register-hub"),
       },
     ],
-    [colors.accent],
+    [colors.text],
   );
 
   const leftItems = React.useMemo(
@@ -30,14 +32,17 @@ export default function HandlesTabLayout() {
     [colors.text],
   );
 
+  // Large iOS title (Messages/Settings style): renders left-aligned at rest and
+  // collapses into the centred nav-bar title as the list scrolls. This must NOT
+  // set headerTransparent — the scroll-edge glass that drives the collapse is
+  // mutually exclusive with it. ListHandles' FlatList uses
+  // contentInsetAdjustmentBehavior="automatic" so UIKit tracks the scroll.
   const options = React.useMemo(
     () => ({
       title: "Handles",
-      headerLargeTitle: false,
-      headerTransparent: true,
-      headerShadowVisible: false,
+      headerLargeTitle: true,
       headerTintColor: colors.text,
-      headerTitleStyle: { color: colors.text },
+      headerLargeTitleStyle: { color: colors.text },
       contentStyle: { backgroundColor: colors.background },
       unstable_headerLeftItems: () => leftItems,
       unstable_headerRightItems: () => rightItems,

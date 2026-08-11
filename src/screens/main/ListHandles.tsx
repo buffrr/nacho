@@ -1,26 +1,38 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+  Platform,
+} from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HandleData, useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { scriptForHandle } from "@/keys";
 import { handleTileInfo, avatarColors } from "@/handleTile";
 import { recordsCounts } from "@/db";
-import { Layout } from "@/ui/Layout";
 import { HandleTile } from "@/ui/HandleTile";
 import { ShoppingBag } from "@/ui/icons";
 
+// The FlatList is the screen's PRIMARY scroll view (no Layout wrapper) with
+// contentInsetAdjustmentBehavior="automatic", so the native large title
+// (handles/_layout) can track scroll offset — left-aligned at rest, collapsing
+// into the centred nav-bar title as the list scrolls (Messages/Settings style).
 export default function ListHandles() {
   const router = useRouter();
   const { handles, xpub } = useStore();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [counts, setCounts] = useState<Record<string, number>>({});
 
   const handlesList = Object.entries(handles || {});
 
   // Refresh the cached record counts each time the list gains focus (e.g. after
-  // publishing records on a handle detail screen).
+  // publishing records on a handle detail screen). Local DB only — no network.
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -51,55 +63,61 @@ export default function ListHandles() {
     });
   };
 
-  return (
-    <Layout scrollable tabBarInset underHeader>
-      {handlesList.length === 0 ? (
-        <Text style={styles.empty}>No handles yet. Tap + to add one.</Text>
-      ) : (
-        // Plain edge-to-edge list: no card, no dividers — just rows.
-        <View style={styles.list}>
-          {handlesList.map(([name, handleData]) => (
-            <HandleTile
-              key={name}
-              handle={name}
-              info={infoFor(name, handleData)}
-              avatar={avatarColors(colors, name)}
-              onPress={() =>
-                router.push({
-                  pathname: "/(main)/show-handle",
-                  params: { handle: name },
-                })
-              }
-            />
-          ))}
-        </View>
-      )}
+  const shopButton = (
+    <TouchableOpacity
+      style={styles.shopButton}
+      onPress={() => router.push("/(main)/shop")}
+    >
+      <ShoppingBag size={18} color={colors.text} />
+      <Text style={styles.shopText}>Shop handles</Text>
+    </TouchableOpacity>
+  );
 
-      <TouchableOpacity
-        style={styles.shopButton}
-        onPress={() => router.push("/(main)/shop")}
-      >
-        <ShoppingBag size={18} color={colors.text} />
-        <Text style={styles.shopText}>Shop handles</Text>
-      </TouchableOpacity>
-    </Layout>
+  return (
+    <FlatList
+      style={styles.list}
+      contentInsetAdjustmentBehavior="automatic"
+      data={handlesList}
+      keyExtractor={([name]) => name}
+      renderItem={({ item: [name, handleData] }) => (
+        <HandleTile
+          handle={name}
+          info={infoFor(name, handleData)}
+          avatar={avatarColors(colors, name)}
+          onPress={() =>
+            router.push({ pathname: "/(main)/show-handle", params: { handle: name } })
+          }
+        />
+      )}
+      ListEmptyComponent={
+        <Text style={styles.empty}>No handles yet. Tap + to add one.</Text>
+      }
+      ListFooterComponent={<View style={styles.footer}>{shopButton}</View>}
+      // iOS auto-insets for the nav + floating tab bar; other platforms need an
+      // explicit bottom pad so the last row / shop button clears the tab bar.
+      contentContainerStyle={
+        Platform.OS === "ios" ? undefined : { paddingBottom: insets.bottom + 64 }
+      }
+    />
   );
 }
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
     list: {
-      // Break out of the Layout's horizontal padding so rows span full width
-      // (their own paddingHorizontal aligns content to the standard margin).
-      marginHorizontal: -20,
-      marginBottom: 12,
+      flex: 1,
+      backgroundColor: c.background,
     },
     empty: {
       color: c.textMuted,
       fontSize: 15,
       textAlign: "center",
       marginTop: 40,
-      marginBottom: 20,
+      marginHorizontal: 20,
+    },
+    footer: {
+      paddingHorizontal: 20,
+      paddingTop: 16,
     },
     shopButton: {
       flexDirection: "row",
@@ -111,7 +129,6 @@ const makeStyles = (c: Colors) =>
       borderColor: c.borderWarm,
       borderRadius: 14,
       height: 54,
-      marginTop: 4,
       shadowColor: "#000",
       shadowOpacity: 0.06,
       shadowRadius: 16,

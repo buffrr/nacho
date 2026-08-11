@@ -110,6 +110,9 @@ function formatSeq(seq: number): string {
   return `Version ${seq}`;
 }
 
+// Don't re-resolve a handle on focus if we resolved it within this window.
+const RESOLVE_THROTTLE_MS = 2 * 60 * 1000;
+
 export default function ShowHandle() {
   const router = useRouter();
   const { handle } = useLocalSearchParams<{ handle: string }>();
@@ -269,7 +272,13 @@ export default function ShowHandle() {
           setPrice(info.price ?? null);
         });
       }
-      refreshResolution();
+      // Throttle the (decentralized) re-resolve on focus: skip if we resolved
+      // this handle recently, so navigating back and forth doesn't re-hit the
+      // network every time. Onboarding has its own fast poll (below), unaffected.
+      const lastResolved = handleData.resolution?.updatedAt ?? 0;
+      if (Date.now() - lastResolved > RESOLVE_THROTTLE_MS) {
+        refreshResolution();
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [handle, handleData.certRef, handleData.cert]),
   );
