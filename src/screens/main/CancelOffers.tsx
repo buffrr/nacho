@@ -75,7 +75,21 @@ export default function CancelOffers() {
 
   if (psbt) {
     return (
-      <Layout underHeader>
+      <Layout
+        underHeader
+        footer={
+          <>
+            <TouchableOpacity style={styles.primaryBtn} onPress={copy}>
+              <Text style={styles.primaryBtnText}>
+                {copied ? "Copied ✓" : "Copy transaction"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
+              <Text style={styles.secondaryBtnText}>Done</Text>
+            </TouchableOpacity>
+          </>
+        }
+      >
         <Stack.Screen options={{ title: "Cancel offers" }} />
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
@@ -87,20 +101,41 @@ export default function CancelOffers() {
             confirms, and can take up to a day to clear here.
           </Text>
         </View>
-        <TouchableOpacity style={styles.primaryBtn} onPress={copy}>
-          <Text style={styles.primaryBtnText}>
-            {copied ? "Copied ✓" : "Copy transaction"}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
-          <Text style={styles.secondaryBtnText}>Done</Text>
-        </TouchableOpacity>
       </Layout>
     );
   }
 
+  const hasOffers = !!offers && offers.length > 0;
+
   return (
-    <Layout underHeader>
+    <Layout
+      underHeader
+      footer={
+        hasOffers ? (
+          <>
+            {error && (
+              <View style={styles.mt}>
+                <Message message={error} type="error" />
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.primaryBtn, signing && { opacity: 0.5 }]}
+              onPress={sign}
+              disabled={signing}
+            >
+              {signing ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryBtnText}>Sign &amp; copy</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
+              <Text style={styles.secondaryBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </>
+        ) : undefined
+      }
+    >
       <Stack.Screen options={{ title: "Cancel offers" }} />
       {offers === null ? (
         <ActivityIndicator color={colors.accent} size="large" style={{ marginTop: 40 }} />
@@ -135,25 +170,6 @@ export default function CancelOffers() {
               the transaction to your wallet and broadcast it.
             </Text>
           </View>
-          {error && (
-            <View style={styles.mt}>
-              <Message message={error} type="error" />
-            </View>
-          )}
-          <TouchableOpacity
-            style={[styles.primaryBtn, signing && { opacity: 0.5 }]}
-            onPress={sign}
-            disabled={signing}
-          >
-            {signing ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryBtnText}>Sign &amp; copy</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
-            <Text style={styles.secondaryBtnText}>Cancel</Text>
-          </TouchableOpacity>
         </>
       )}
     </Layout>

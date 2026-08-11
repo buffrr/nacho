@@ -164,8 +164,46 @@ function ResultView({
     }
   };
 
+  const actions =
+    host && !sent ? (
+      <>
+        {error && (
+          <View style={styles.mb}>
+            <Message message={error} type="error" />
+          </View>
+        )}
+        <TouchableOpacity
+          style={[styles.primaryBtn, sending && styles.btnDisabled]}
+          onPress={send}
+          disabled={sending}
+        >
+          {sending ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.primaryBtnText}>Send to {host}</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.secondaryBtn} onPress={copy}>
+          <Text style={styles.secondaryBtnText}>
+            {copied ? "Copied ✓" : "Copy response"}
+          </Text>
+        </TouchableOpacity>
+      </>
+    ) : (
+      <>
+        <TouchableOpacity style={styles.primaryBtn} onPress={copy}>
+          <Text style={styles.primaryBtnText}>
+            {copied ? "Copied ✓" : "Copy response"}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
+          <Text style={styles.secondaryBtnText}>Done</Text>
+        </TouchableOpacity>
+      </>
+    );
+
   return (
-    <Layout underHeader>
+    <Layout underHeader footer={actions}>
       <Stack.Screen options={{ title: "Signed" }} />
       <View style={styles.hero}>
         <View style={styles.heroIcon}>
@@ -179,42 +217,6 @@ function ResultView({
           {blob}
         </Text>
       </View>
-      {error && (
-        <View style={styles.mt}>
-          <Message message={error} type="error" />
-        </View>
-      )}
-      {host && !sent ? (
-        <>
-          <TouchableOpacity
-            style={[styles.primaryBtn, sending && styles.btnDisabled]}
-            onPress={send}
-            disabled={sending}
-          >
-            {sending ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryBtnText}>Send to {host}</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={copy}>
-            <Text style={styles.secondaryBtnText}>
-              {copied ? "Copied ✓" : "Copy response"}
-            </Text>
-          </TouchableOpacity>
-        </>
-      ) : (
-        <>
-          <TouchableOpacity style={styles.primaryBtn} onPress={copy}>
-            <Text style={styles.primaryBtnText}>
-              {copied ? "Copied ✓" : "Copy response"}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
-            <Text style={styles.secondaryBtnText}>Done</Text>
-          </TouchableOpacity>
-        </>
-      )}
     </Layout>
   );
 }
@@ -291,7 +293,34 @@ function MessageConfirm({
   }
 
   return (
-    <Layout underHeader>
+    <Layout
+      underHeader
+      footer={
+        <>
+          {error && (
+            <View style={styles.mb}>
+              <Message message={error} type="error" />
+            </View>
+          )}
+          <TouchableOpacity
+            style={[styles.primaryBtn, signing && styles.btnDisabled]}
+            onPress={sign}
+            disabled={signing}
+          >
+            {signing ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.primaryBtnText}>
+                {host ? `Sign & send to ${host}` : "Sign"}
+              </Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
+            <Text style={styles.secondaryBtnText}>Cancel</Text>
+          </TouchableOpacity>
+        </>
+      }
+    >
       <Stack.Screen options={{ title: "Sign in" }} />
       <View style={styles.hero}>
         <View style={styles.heroIconAccent}>
@@ -319,27 +348,6 @@ function MessageConfirm({
           </Text>
         </View>
       )}
-      {error && (
-        <View style={styles.mt}>
-          <Message message={error} type="error" />
-        </View>
-      )}
-      <TouchableOpacity
-        style={[styles.primaryBtn, signing && styles.btnDisabled]}
-        onPress={sign}
-        disabled={signing}
-      >
-        {signing ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.primaryBtnText}>
-            {host ? `Sign & send to ${host}` : "Sign"}
-          </Text>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
-        <Text style={styles.secondaryBtnText}>Cancel</Text>
-      </TouchableOpacity>
     </Layout>
   );
 }
@@ -539,7 +547,41 @@ function RecordsConfirm({
   const busy = phase === "publishing";
 
   return (
-    <Layout underHeader>
+    <Layout
+      underHeader
+      footer={
+        <>
+          {error && (
+            <View style={styles.mb}>
+              <Message message={error} type="error" />
+            </View>
+          )}
+          <TouchableOpacity
+            style={[
+              styles.primaryBtn,
+              (busy || (!changed && !allAcked)) && styles.btnDisabled,
+            ]}
+            onPress={changed ? publishAnyway : approve}
+            disabled={busy || (!changed && !allAcked)}
+          >
+            {busy ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.primaryBtnText}>
+                {changed ? "Publish anyway" : "Approve & publish"}
+              </Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.secondaryBtn}
+            onPress={() => router.back()}
+            disabled={busy}
+          >
+            <Text style={styles.secondaryBtnText}>Cancel</Text>
+          </TouchableOpacity>
+        </>
+      }
+    >
       <Stack.Screen
         options={{ title: changed ? "Records changed" : "Approve record change" }}
       />
@@ -574,36 +616,6 @@ function RecordsConfirm({
           <Text style={styles.kvV}>{remainingValidity(request.exp)}</Text>
         </View>
       </View>
-
-      {error && (
-        <View style={styles.mt}>
-          <Message message={error} type="error" />
-        </View>
-      )}
-
-      <TouchableOpacity
-        style={[
-          styles.primaryBtn,
-          (busy || (!changed && !allAcked)) && styles.btnDisabled,
-        ]}
-        onPress={changed ? publishAnyway : approve}
-        disabled={busy || (!changed && !allAcked)}
-      >
-        {busy ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.primaryBtnText}>
-            {changed ? "Publish anyway" : "Approve & publish"}
-          </Text>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.secondaryBtn}
-        onPress={() => router.back()}
-        disabled={busy}
-      >
-        <Text style={styles.secondaryBtnText}>Cancel</Text>
-      </TouchableOpacity>
     </Layout>
   );
 }
@@ -802,7 +814,32 @@ function TransferConfirm({
   }
 
   return (
-    <Layout underHeader>
+    <Layout
+      underHeader
+      footer={
+        <>
+          {error && (
+            <View style={styles.mb}>
+              <Message message={error} type="error" />
+            </View>
+          )}
+          <TouchableOpacity
+            style={[styles.dangerBtn, (signing || (!toMine && !ack)) && styles.btnDisabled]}
+            onPress={sign}
+            disabled={signing || (!toMine && !ack)}
+          >
+            {signing ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.dangerBtnText}>Sign transfer</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
+            <Text style={styles.secondaryBtnText}>Cancel</Text>
+          </TouchableOpacity>
+        </>
+      }
+    >
       <Stack.Screen options={{ title: "Transfer handle" }} />
       <View style={styles.hero}>
         <Text style={styles.heroH}>Give away {request.handle}</Text>
@@ -834,27 +871,6 @@ function TransferConfirm({
           to undo it.
         </Text>
       </View>
-
-      {error && (
-        <View style={styles.mt}>
-          <Message message={error} type="error" />
-        </View>
-      )}
-
-      <TouchableOpacity
-        style={[styles.dangerBtn, (signing || (!toMine && !ack)) && styles.btnDisabled]}
-        onPress={sign}
-        disabled={signing || (!toMine && !ack)}
-      >
-        {signing ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.dangerBtnText}>Sign transfer</Text>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
-        <Text style={styles.secondaryBtnText}>Cancel</Text>
-      </TouchableOpacity>
     </Layout>
   );
 }
@@ -1118,7 +1134,32 @@ function RotateConfirm({
   }
 
   return (
-    <Layout underHeader>
+    <Layout
+      underHeader
+      footer={
+        <>
+          {error && (
+            <View style={styles.mb}>
+              <Message message={error} type="error" />
+            </View>
+          )}
+          <TouchableOpacity
+            style={[styles.primaryBtn, (signing || !newScript) && styles.btnDisabled]}
+            onPress={sign}
+            disabled={signing || !newScript}
+          >
+            {signing ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.primaryBtnText}>Sign &amp; copy</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
+            <Text style={styles.secondaryBtnText}>Cancel</Text>
+          </TouchableOpacity>
+        </>
+      }
+    >
       <Stack.Screen options={{ title: "Rotate key" }} />
       <View style={styles.hero}>
         <Text style={styles.heroH}>Move to a new key</Text>
@@ -1162,27 +1203,6 @@ function RotateConfirm({
           the move is seen on-chain, which can take up to a day to clear here.
         </Text>
       </View>
-
-      {error && (
-        <View style={styles.mt}>
-          <Message message={error} type="error" />
-        </View>
-      )}
-
-      <TouchableOpacity
-        style={[styles.primaryBtn, (signing || !newScript) && styles.btnDisabled]}
-        onPress={sign}
-        disabled={signing || !newScript}
-      >
-        {signing ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.primaryBtnText}>Sign &amp; copy</Text>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
-        <Text style={styles.secondaryBtnText}>Cancel</Text>
-      </TouchableOpacity>
     </Layout>
   );
 }
