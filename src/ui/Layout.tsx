@@ -84,6 +84,10 @@ export function Layout({
       </KeyboardAwareScrollView>
     );
   } else {
+    // Plain scroll (e.g. Resolve): the input is the nav-bar search field, not an
+    // in-content TextInput, so the results don't need to dodge the keyboard.
+    // `automaticallyAdjustKeyboardInsets` here fought the search controller's own
+    // inset changes and shoved content up off-screen — so it's intentionally off.
     content = (
       <ScrollView
         style={styles.scrollView}
@@ -91,7 +95,6 @@ export function Layout({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior={autoInset ? "automatic" : "never"}
-        automaticallyAdjustKeyboardInsets
       >
         {children}
       </ScrollView>
