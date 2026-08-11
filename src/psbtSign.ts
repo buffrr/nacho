@@ -1,3 +1,4 @@
+import "@/nobleSetup"; // wire hashes.sha256 for @noble/secp256k1 sync signing
 import { Transaction, SigHash, Address, OutScript } from "@scure/btc-signer";
 import { schnorr } from "@noble/secp256k1";
 import { hexToBytes, bytesToHex } from "@noble/hashes/utils.js";

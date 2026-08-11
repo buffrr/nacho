@@ -1,3 +1,4 @@
+import "@/nobleSetup"; // wire hashes.sha256 for @noble/secp256k1 sync signing
 import { sha256 } from "@noble/hashes/sha2.js";
 import {
   utf8ToBytes,
