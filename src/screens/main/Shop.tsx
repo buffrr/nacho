@@ -9,7 +9,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
@@ -23,7 +23,9 @@ export default function Shop() {
   const { handles } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [query, setQuery] = useState("");
+  // Prefill from a handed-off query (e.g. a not-found resolve → "check availability").
+  const { prefill } = useLocalSearchParams<{ prefill?: string }>();
+  const [query, setQuery] = useState(prefill ?? "");
   const [matches, setMatches] = useState<SearchMatch[]>([]);
   const [searching, setSearching] = useState(false);
 

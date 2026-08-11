@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { Colors, useTheme } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
@@ -15,7 +15,7 @@ import { Message } from "@/ui/Message";
 import {
   Copy,
   Check,
-  AtSign,
+  ShoppingBag,
   Bitcoin,
   Zap,
   EyeOff,
@@ -144,11 +144,12 @@ function copyText(text: string) {
 
 export default function Resolve() {
   const { colors } = useTheme();
+  const router = useRouter();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [handle, setHandle] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ResolvedHandle | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  const [notFound, setNotFound] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const onResolve = async (nameArg?: string) => {
@@ -156,14 +157,17 @@ export default function Resolve() {
     if (!name.includes("@") || isLoading) return;
     setIsLoading(true);
     setError(null);
-    setNotFound(false);
+    setNotFound(null);
     setResult(null);
     try {
       const resolved = await resolveHandle(name);
       if (resolved) {
         setResult(resolved);
       } else {
-        setNotFound(true);
+        // Not on the decentralized network. We do NOT auto-check the shop here —
+        // that would leak every lookup to the central server. Offer an explicit
+        // "check availability" (see the notFound render).
+        setNotFound(name);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to resolve handle");
@@ -253,7 +257,22 @@ export default function Resolve() {
       )}
       {error && <Message message={error} type="error" />}
       {notFound && (
-        <Message message="Handle not found on the network." type="error" />
+        <View style={styles.notFound}>
+          <Text style={styles.notFoundTitle}>Not registered</Text>
+          <Text style={styles.notFoundSub}>
+            <Text style={styles.notFoundName}>{notFound}</Text> isn't on the network
+            yet.
+          </Text>
+          <TouchableOpacity
+            style={styles.checkBtn}
+            onPress={() =>
+              router.push({ pathname: "/(main)/shop", params: { prefill: notFound } })
+            }
+          >
+            <ShoppingBag size={18} color={colors.accent} />
+            <Text style={styles.checkBtnText}>Check if it's available to buy</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {result && (
@@ -318,6 +337,29 @@ const makeStyles = (c: Colors) =>
     loader: {
       marginTop: 28,
     },
+    notFound: {
+      marginTop: 20,
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.borderWarm,
+      borderRadius: 16,
+      padding: 18,
+      gap: 6,
+    },
+    notFoundTitle: { fontSize: 17, fontWeight: "700", color: c.text },
+    notFoundSub: { fontSize: 14, color: c.textSecondary, lineHeight: 20 },
+    notFoundName: { color: c.text, fontFamily: "monospace" },
+    checkBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      marginTop: 10,
+      backgroundColor: c.accent + "1A",
+      borderRadius: 12,
+      paddingVertical: 13,
+    },
+    checkBtnText: { fontSize: 15, fontWeight: "600", color: c.accent },
     identity: {
       flexDirection: "row",
       alignItems: "center",
