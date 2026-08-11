@@ -256,13 +256,22 @@ export default function ShowHandle() {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchAndUpdateHandleStatus();
-      checkPurchaseInfo(handle).then((info) => {
-        setPurchaseSupport(info.support);
-        setPrice(info.price ?? null);
-      });
+      // The nacho purchase API only matters until the handle has its certificate.
+      // Once we hold the cert, its job is done — the handle lives on the
+      // decentralized network, so we only resolve (below) and never poll the
+      // server again. This also means a server outage can't mislabel an
+      // established handle as "not available to buy".
+      const hasCertYet = !!handleData.certRef || !!handleData.cert;
+      if (!hasCertYet) {
+        fetchAndUpdateHandleStatus();
+        checkPurchaseInfo(handle).then((info) => {
+          setPurchaseSupport(info.support);
+          setPrice(info.price ?? null);
+        });
+      }
       refreshResolution();
-    }, []),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [handle, handleData.certRef, handleData.cert]),
   );
 
   useEffect(() => {
@@ -644,7 +653,10 @@ export default function ShowHandle() {
     resolvable ||
     hasCert ||
     isImported ||
-    handleStatusString === "taken";
+    handleStatusString === "taken" ||
+    // A recorded nacho purchase means it's paid even if the server is unreachable
+    // or resolution is lagging — so it shows issuing/waiting, not buy/unsupported.
+    !!handleData.purchase;
   // "Waiting for the certificate to appear" only applies to a PAID handle that
   // doesn't have its cert yet (never a reserved/unpaid one).
   const awaitingCert = isPaid && !keyMismatch && !hasCert;
