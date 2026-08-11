@@ -129,33 +129,24 @@ export function handleTileInfo(args: {
   };
 }
 
-export type AvatarColors = { bg: string; fg: string };
-
-// Deterministic tinted avatar (pastel background + saturated glyph) per handle.
-// bg comes from the theme so it adapts to light/dark; fg is a fixed saturated
-// tone that reads on both, index-matched to bg so the pair always agrees.
-const AVATAR_FG = [
-  "#088C70", // teal
-  "#C2410C", // orange
-  "#7C3AED", // lavender
-  "#A16207", // gold
-  "#2567CA", // blue
-  "#C81E78", // pink
+// Deterministic per-handle avatar gradient (Messages/Contacts style): a calm,
+// low-chroma vertical gradient (lighter top → darker bottom) with a white glyph.
+// Muted mid-tones read on both a dark and a light screen, so the palette is
+// scheme-independent. Rendered by <Avatar> (src/ui/Avatar.tsx), used everywhere
+// avatars appear so the look stays consistent across the app.
+const AVATAR_GRADIENTS: [string, string][] = [
+  ["#4E6E64", "#32473F"], // teal
+  ["#6E5748", "#48382D"], // orange
+  ["#574F70", "#39344B"], // lavender
+  ["#6E6448", "#48412D"], // gold
+  ["#48586E", "#2E3D4B"], // blue
+  ["#6E4A5C", "#48313D"], // pink
 ];
 
-export function avatarColors(c: Colors, handle: string): AvatarColors {
-  const bgs = [
-    c.tileTealBg,
-    c.tileOrangeBg,
-    c.tileLavenderBg,
-    c.tileGoldBg,
-    c.tileBlueBg,
-    c.tilePinkBg,
-  ];
+export function avatarGradient(handle: string): [string, string] {
   let h = 0;
   for (let i = 0; i < handle.length; i++) {
     h = (h * 31 + handle.charCodeAt(i)) >>> 0;
   }
-  const i = h % bgs.length;
-  return { bg: bgs[i], fg: AVATAR_FG[i] };
+  return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length];
 }

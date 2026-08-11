@@ -25,6 +25,7 @@ export type Colors = {
   textFaint: string;
   placeholder: string;
   iconDefault: string; // icon/default
+  chevron: string; // icon/chevron — subtle disclosure indicator (systemGray-ish)
   accentText: string; // text/on-accent
   // lines
   border: string; // border/divider
@@ -77,6 +78,7 @@ export const darkColors: Colors = {
   textFaint: "#9E9EA8",
   placeholder: "#80808A",
   iconDefault: "#B2B2BD",
+  chevron: "#5E5E68",
   accentText: "#FFFFFF",
   border: "#303037",
   borderWarm: "#5F3D1C",
@@ -123,6 +125,7 @@ export const lightColors: Colors = {
   textFaint: "#6B6B73",
   placeholder: "#B8B8BF",
   iconDefault: "#B8B8BF",
+  chevron: "#C4C4CC",
   accentText: "#FFFFFF",
   border: "#E5E7EA",
   borderWarm: "#F6D3B0",

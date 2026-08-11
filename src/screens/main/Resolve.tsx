@@ -9,7 +9,7 @@ import {
 import { Stack, useLocalSearchParams } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { Colors, useTheme } from "@/theme";
-import { avatarColors } from "@/handleTile";
+import { Avatar } from "@/ui/Avatar";
 import { Layout } from "@/ui/Layout";
 import { Message } from "@/ui/Message";
 import {
@@ -259,14 +259,7 @@ export default function Resolve() {
       {result && (
         <>
           <View style={styles.identity}>
-            <View
-              style={[
-                styles.avatar,
-                { backgroundColor: avatarColors(colors, result.handle).bg },
-              ]}
-            >
-              <AtSign size={22} color={avatarColors(colors, result.handle).fg} />
-            </View>
+            <Avatar handle={result.handle} size={40} />
             <Text style={styles.idName} numberOfLines={1}>
               {result.handle}
             </Text>

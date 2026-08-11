@@ -27,7 +27,8 @@ import * as Clipboard from "expo-clipboard";
 import { saveCert, loadCert, deleteCert } from "@/certStore";
 import { useRecordsDraft } from "@/RecordsDraft";
 import { editableFromZone } from "@/fabricResolver";
-import { avatarColors, handlePill } from "@/handleTile";
+import { handlePill } from "@/handleTile";
+import { Avatar } from "@/ui/Avatar";
 import { Layout } from "@/ui/Layout";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
@@ -762,7 +763,6 @@ export default function ShowHandle() {
     );
   };
 
-  const avatar = avatarColors(colors, handle);
 
   const dismissOnboarding = () => setHandleOnboarded(handle, true);
 
@@ -912,9 +912,7 @@ export default function ShowHandle() {
 
   const renderPurchase = () => (
     <View style={styles.purchase}>
-      <View style={[styles.buyAvatar, { backgroundColor: avatar.bg }]}>
-        <AtSign size={30} color={avatar.fg} />
-      </View>
+      <Avatar handle={handle} size={64} />
       <Text style={styles.buyName} numberOfLines={1}>
         {handle}
       </Text>
@@ -1120,14 +1118,7 @@ export default function ShowHandle() {
       ) : (
         <>
       <View style={styles.identity}>
-        <View
-          style={[
-            styles.avatar,
-            { backgroundColor: avatarColors(colors, handle).bg },
-          ]}
-        >
-          <AtSign size={24} color={avatarColors(colors, handle).fg} />
-        </View>
+        <Avatar handle={handle} size={48} />
         <View style={styles.idcol}>
           <Text style={styles.name} numberOfLines={1}>
             {handle}

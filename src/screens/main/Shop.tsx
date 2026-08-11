@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
-import { avatarColors } from "@/handleTile";
+import { Avatar } from "@/ui/Avatar";
 import { Layout } from "@/ui/Layout";
 import { AtSign, Search } from "@/ui/icons";
 import { searchHandles, formatPrice, SearchMatch } from "@/api";
@@ -75,9 +75,7 @@ export default function Shop() {
       isAvailable && typeof item.price === "number" ? item.price : undefined;
     return (
       <View style={styles.row}>
-        <View style={[styles.avatar, { backgroundColor: avatarColors(colors, item.handle).bg }]}>
-          <AtSign size={22} color={avatarColors(colors, item.handle).fg} />
-        </View>
+        <Avatar handle={item.handle} size={46} />
         <View style={styles.mid}>
           <Text style={styles.name} numberOfLines={1}>
             {item.handle}

@@ -1,14 +1,9 @@
 import React, { useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Colors, useTheme } from "@/theme";
-import { AvatarColors, TileInfo } from "@/handleTile";
-import {
-  AtSign,
-  ChevronRight,
-  ShieldCheck,
-  Clock,
-  AlertCircle,
-} from "@/ui/icons";
+import { TileInfo } from "@/handleTile";
+import { Avatar } from "@/ui/Avatar";
+import { ChevronRight, ShieldCheck, Clock, AlertCircle } from "@/ui/icons";
 
 // Inline status glyph next to the name (img_11): sovereign → green shield,
 // waiting-for-cert → grey clock, attention → amber alert. A handle that already
@@ -29,12 +24,10 @@ function StatusIcon({ info, c }: { info: TileInfo; c: Colors }) {
 export function HandleTile({
   handle,
   info,
-  avatar,
   onPress,
 }: {
   handle: string;
   info: TileInfo;
-  avatar: AvatarColors;
   onPress: () => void;
 }) {
   const { colors } = useTheme();
@@ -46,15 +39,18 @@ export function HandleTile({
       onPress={onPress}
       activeOpacity={0.6}
     >
-      <View style={[styles.avatar, { backgroundColor: avatar.bg }]}>
-        <AtSign size={28} color={avatar.fg} />
-      </View>
+      <Avatar handle={handle} size={44} />
       <View style={styles.mid}>
-        <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
-            {handle}
-          </Text>
-          <StatusIcon info={info} c={colors} />
+        {/* Name + status + chevron share the top line (Messages style); the
+            chevron top-aligns with the name and the subtitle spans full width. */}
+        <View style={styles.topRow}>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {handle}
+            </Text>
+            <StatusIcon info={info} c={colors} />
+          </View>
+          <ChevronRight size={15} color={colors.chevron} strokeWidth={2} />
         </View>
         <Text
           style={[
@@ -66,7 +62,6 @@ export function HandleTile({
           {info.subtitle}
         </Text>
       </View>
-      <ChevronRight size={18} color={colors.iconDefault} />
     </TouchableOpacity>
   );
 }
@@ -86,26 +81,24 @@ const makeStyles = (c: Colors) =>
     rowAttention: {
       backgroundColor: c.statusAmberBg,
     },
-    avatar: {
-      width: 52,
-      height: 52,
-      borderRadius: 15,
-      borderCurve: "continuous",
-      alignItems: "center",
-      justifyContent: "center",
-    },
     mid: {
       flex: 1,
       gap: 3,
     },
+    topRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
     nameRow: {
+      flex: 1,
       flexDirection: "row",
       alignItems: "center",
       gap: 6,
     },
     name: {
       fontSize: 17,
-      fontWeight: "500",
+      fontWeight: "600",
       color: c.text,
       flexShrink: 1,
     },

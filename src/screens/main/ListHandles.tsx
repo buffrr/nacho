@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HandleData, useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { scriptForHandle } from "@/keys";
-import { handleTileInfo, avatarColors } from "@/handleTile";
+import { handleTileInfo } from "@/handleTile";
 import { recordsCounts } from "@/db";
 import { HandleTile } from "@/ui/HandleTile";
 import { ShoppingBag } from "@/ui/icons";
@@ -83,12 +83,12 @@ export default function ListHandles() {
         <HandleTile
           handle={name}
           info={infoFor(name, handleData)}
-          avatar={avatarColors(colors, name)}
           onPress={() =>
             router.push({ pathname: "/(main)/show-handle", params: { handle: name } })
           }
         />
       )}
+      ItemSeparatorComponent={() => <View style={styles.separator} />}
       ListEmptyComponent={
         <Text style={styles.empty}>No handles yet. Tap + to add one.</Text>
       }
@@ -107,6 +107,13 @@ const makeStyles = (c: Colors) =>
     list: {
       flex: 1,
       backgroundColor: c.background,
+    },
+    // Hairline inset to the text start (row pad 20 + avatar 44 + gap 14),
+    // full-bleed to the right edge — Messages style.
+    separator: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: c.border,
+      marginLeft: 78,
     },
     empty: {
       color: c.textMuted,
