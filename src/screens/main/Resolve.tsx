@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import {
+  Stack,
+  useLocalSearchParams,
+  useRouter,
+  useFocusEffect,
+} from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { Colors, useTheme } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
@@ -185,6 +190,15 @@ export default function Resolve() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
 
+  // Transient outcomes shouldn't greet the user on arrival — clear a stale
+  // error / not-found each time the tab regains focus (keeps a valid result).
+  useFocusEffect(
+    useCallback(() => {
+      setError(null);
+      setNotFound(null);
+    }, []),
+  );
+
   const { addresses, records } = result
     ? classify(result)
     : { addresses: [], records: [] };
@@ -241,9 +255,22 @@ export default function Resolve() {
             hideWhenScrolling: false,
             textColor: colors.text,
             tintColor: colors.accent,
-            onChangeText: (e) =>
-              setHandle(e.nativeEvent.text.trim().toLowerCase()),
+            onChangeText: (e) => {
+              const t = e.nativeEvent.text.trim().toLowerCase();
+              setHandle(t);
+              // A new/edited query invalidates any previous outcome — clear the
+              // last error/not-found so a stale one doesn't linger on the tab.
+              setError(null);
+              setNotFound(null);
+              if (!t) setResult(null);
+            },
             onSearchButtonPress: (e) => onResolve(e.nativeEvent.text),
+            onCancelButtonPress: () => {
+              setHandle("");
+              setError(null);
+              setNotFound(null);
+              setResult(null);
+            },
           },
         }}
       />
