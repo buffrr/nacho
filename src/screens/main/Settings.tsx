@@ -13,6 +13,7 @@ import {
   Download,
   Eye,
   ChevronRight,
+  ShieldCheck,
 } from "@/ui/icons";
 import {
   ensureSemiTrust,
@@ -112,54 +113,19 @@ export default function Settings() {
 
   return (
     <Layout tabBarInset underHeader>
-      {/* SEMI-TRUSTED — the default anchor we fetch from public relays. */}
-      <Text style={styles.sectionLabel}>SEMI-TRUSTED</Text>
-
-      <TouchableOpacity
-        style={styles.anchorRow}
-        onPress={onRefreshAnchor}
-        activeOpacity={0.8}
-      >
-        <View style={[styles.iconTile, { backgroundColor: colors.tileOrangeBg }]}>
-          <Anchor size={18} color={colors.text} />
-        </View>
-        <View style={styles.anchorMid}>
-          <Text style={styles.rowTitle}>Trust anchor</Text>
-          <Text style={styles.rowSub} numberOfLines={1}>
-            {refreshing
-              ? "Refreshing…"
-              : anchor
-                ? formatAnchor(anchor)
-                : "Not set — tap to fetch"}
-          </Text>
-        </View>
-        <View style={styles.anchorRight}>
-          <View
-            style={[
-              styles.dot,
-              { backgroundColor: semiPinned ? colors.statusGreenFg : colors.textMuted },
-            ]}
-          />
-          <ChevronRight size={18} color={colors.iconDefault} />
-        </View>
-      </TouchableOpacity>
-      <Text style={styles.note}>
-        Fetched from a set of trusted relays. Scan from a local Veritas client for self-verification.
-      </Text>
-
-      <View style={styles.spacer} />
-
-      {/* TRUSTED — the Safety ID scanned from a local Veritas client. */}
-      <Text style={styles.sectionLabel}>TRUSTED</Text>
+      {/* YOUR SAFETY ID — the trusted anchor scanned from a local Veritas
+          client. First on the page: it's the strongest guarantee a resolved
+          handle is genuine (verified against an anchor you scanned yourself). */}
+      <Text style={styles.sectionLabel}>YOUR SAFETY ID</Text>
 
       {safetyIdSet ? (
         <>
           <View style={styles.anchorRow}>
             <View style={[styles.iconTile, { backgroundColor: colors.tileOrangeBg }]}>
-              <Anchor size={18} color={colors.text} />
+              <ShieldCheck size={18} color={colors.text} />
             </View>
             <View style={styles.anchorMid}>
-              <Text style={styles.rowTitle}>Trust anchor</Text>
+              <Text style={styles.rowTitle}>Safety ID</Text>
               <Text style={styles.rowSub} numberOfLines={1}>
                 {trustedAnchor ? formatAnchor(trustedAnchor) : "Pinned"}
               </Text>
@@ -202,6 +168,45 @@ export default function Settings() {
           </TouchableOpacity>
         </View>
       )}
+
+      <View style={styles.spacer} />
+
+      {/* TRUST FALLBACK SOURCES — the default anchor fetched from public relays,
+          used to verify when no Safety ID is pinned. */}
+      <Text style={styles.sectionLabel}>TRUST FALLBACK SOURCES</Text>
+
+      <TouchableOpacity
+        style={styles.anchorRow}
+        onPress={onRefreshAnchor}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.iconTile, { backgroundColor: colors.tileOrangeBg }]}>
+          <Anchor size={18} color={colors.text} />
+        </View>
+        <View style={styles.anchorMid}>
+          <Text style={styles.rowTitle}>Default anchor</Text>
+          <Text style={styles.rowSub} numberOfLines={1}>
+            {refreshing
+              ? "Refreshing…"
+              : anchor
+                ? formatAnchor(anchor)
+                : "Not set — tap to fetch"}
+          </Text>
+        </View>
+        <View style={styles.anchorRight}>
+          <View
+            style={[
+              styles.dot,
+              { backgroundColor: semiPinned ? colors.statusGreenFg : colors.textMuted },
+            ]}
+          />
+          <ChevronRight size={18} color={colors.iconDefault} />
+        </View>
+      </TouchableOpacity>
+      <Text style={styles.note}>
+        Fetched from a set of public relays and refreshed only when you pull to
+        refresh. Scan your own Safety ID above for self-verification.
+      </Text>
 
       <View style={styles.spacer} />
 

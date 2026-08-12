@@ -129,24 +129,15 @@ export function handleTileInfo(args: {
   };
 }
 
-// Deterministic per-handle avatar gradient (Messages/Contacts style): a calm,
-// low-chroma vertical gradient (lighter top → darker bottom) with a white glyph.
-// Muted mid-tones read on both a dark and a light screen, so the palette is
-// scheme-independent. Rendered by <Avatar> (src/ui/Avatar.tsx), used everywhere
-// avatars appear so the look stays consistent across the app.
-const AVATAR_GRADIENTS: [string, string][] = [
-  ["#4E6E64", "#32473F"], // teal
-  ["#6E5748", "#48382D"], // orange
-  ["#574F70", "#39344B"], // lavender
-  ["#6E6448", "#48412D"], // gold
-  ["#48586E", "#2E3D4B"], // blue
-  ["#6E4A5C", "#48313D"], // pink
-];
+// A single calm avatar gradient for every handle — the desaturated grey-purple
+// iOS uses for a contact with no assigned colour (see img_24): a vertical
+// gradient, lighter at the top. Dropping per-handle colours reads calmer and
+// more mature (the handle string is the identity, not a colour). Rendered by
+// <Avatar> (src/ui/Avatar.tsx) everywhere avatars appear; reads on dark + light.
+const AVATAR_GRAY: [string, string] = ["#6E6B7E", "#474455"];
 
-export function avatarGradient(handle: string): [string, string] {
-  let h = 0;
-  for (let i = 0; i < handle.length; i++) {
-    h = (h * 31 + handle.charCodeAt(i)) >>> 0;
-  }
-  return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length];
+// Signature kept (takes a handle) so callers don't change; the colour is now
+// constant regardless of the handle.
+export function avatarGradient(_handle: string): [string, string] {
+  return AVATAR_GRAY;
 }

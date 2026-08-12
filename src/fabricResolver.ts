@@ -65,6 +65,24 @@ export function editableFromZone(zone: ZoneJson): {
   return { records, seq };
 }
 
+// True only when a resolve failed because the queried name is *provably* absent
+// — the relay returned a valid proof that simply doesn't cover the name, and
+// libveritas raises a "<name> not found in proof" (or "… not found for …")
+// VerificationFailed. That's a genuine not-found, so the UI can show the clean
+// not-found state instead of a scary "verification error".
+//
+// This is deliberately NARROW and must stay that way: a verification failure on
+// a name that DOES exist — a tampered or forged proof, a root/anchor mismatch,
+// an incomplete proof ("Root mismatch", "proof is invalid", "Incomplete proof")
+// — carries a *different* message and MUST keep surfacing as an error rather
+// than being masked as "not found". Network/relay/decode failures (no peers,
+// http error, relay 5xx) don't match either, so they propagate too. Do NOT
+// widen this to the bare VerificationFailed tag — that tag covers both cases.
+export function isNotFoundResolveError(e: unknown): boolean {
+  const msg = String((e as { message?: unknown } | null)?.message ?? e ?? "");
+  return /not found in proof|not found for /i.test(msg);
+}
+
 interface FabricZoneLike {
   handle: string;
   toJson(): any;

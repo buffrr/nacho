@@ -609,3 +609,96 @@ export function Key({ size = 32, color = "#0E0E12" }: IconProps) {
     </Frame>
   );
 }
+
+// ── mocks2 additions: resolve/records views ─────────────────────────────────
+
+export function Globe({ size = 24, color = "#9A9AA0", strokeWidth = 2 }: IconProps) {
+  return (
+    <Frame size={size} vb={24}>
+      <Path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M2 12H22" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M12 2C14.5013 4.73835 15.9228 8.29203 16 12C15.9228 15.708 14.5013 19.2616 12 22C9.49872 19.2616 8.07725 15.708 8 12C8.07725 8.29203 9.49872 4.73835 12 2Z" stroke={color} strokeWidth={strokeWidth} {...cap} />
+    </Frame>
+  );
+}
+
+export function ExternalLink({ size = 18, color = "#9A9AA0", strokeWidth = 2 }: IconProps) {
+  return (
+    <Frame size={size} vb={24}>
+      <Path d="M15 3H21V9" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M10 14L21 3" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M18 13V19C18 19.5304 17.7893 20.0391 17.4142 20.4142C17.0391 20.7893 16.5304 21 16 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V8C3 7.46957 3.21071 6.96086 3.58579 6.58579C3.96086 6.21071 4.46957 6 5 6H11" stroke={color} strokeWidth={strokeWidth} {...cap} />
+    </Frame>
+  );
+}
+
+export function ChevronDown({ size = 18, color = "#B8B8BF", strokeWidth = 2 }: IconProps) {
+  return (
+    <Frame size={size} vb={24}>
+      <Path d="M6 9L12 15L18 9" stroke={color} strokeWidth={strokeWidth} {...cap} />
+    </Frame>
+  );
+}
+
+export function ChevronUp({ size = 18, color = "#B8B8BF", strokeWidth = 2 }: IconProps) {
+  return (
+    <Frame size={size} vb={24}>
+      <Path d="M18 15L12 9L6 15" stroke={color} strokeWidth={strokeWidth} {...cap} />
+    </Frame>
+  );
+}
+
+export function ShieldX({ size = 24, color = "#9A9AA0", strokeWidth = 2 }: IconProps) {
+  return (
+    <Frame size={size} vb={24}>
+      <Path d="M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M9.5 9L14.5 14" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M14.5 9L9.5 14" stroke={color} strokeWidth={strokeWidth} {...cap} />
+    </Frame>
+  );
+}
+
+export function WifiOff({ size = 24, color = "#9A9AA0", strokeWidth = 2 }: IconProps) {
+  return (
+    <Frame size={size} vb={24}>
+      <Path d="M2 2L22 22" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M8.5 16.5C9.5 15.6 10.7 15 12 15C13.3 15 14.5 15.6 15.5 16.5" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M5 12.5C5.9 11.6 6.95 10.9 8.1 10.45" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M19 12.5C18.1 11.6 17.05 10.9 15.9 10.45" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M2 8.82C3.5 7.6 5.2 6.7 7 6.15" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M22 8.82C20.7 7.76 19.24 6.94 17.68 6.4" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M12 20H12.01" stroke={color} strokeWidth={strokeWidth} {...cap} />
+    </Frame>
+  );
+}
+
+export function SearchX({ size = 24, color = "#9A9AA0", strokeWidth = 2 }: IconProps) {
+  return (
+    <Frame size={size} vb={24}>
+      <Path d="M13.5 8.5L8.5 13.5" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M8.5 8.5L13.5 13.5" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M11 19C15.4183 19 19 15.4183 19 11C19 6.58172 15.4183 3 11 3C6.58172 3 3 6.58172 3 11C3 15.4183 6.58172 19 11 19Z" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M21 21L16.65 16.65" stroke={color} strokeWidth={strokeWidth} {...cap} />
+    </Frame>
+  );
+}
+
+export function RefreshCw({ size = 18, color = "#9A9AA0", strokeWidth = 2 }: IconProps) {
+  return (
+    <Frame size={size} vb={24}>
+      <Path d="M21 2V8H15" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M3 12C3 7.02944 7.02944 3 12 3C14.8273 3 17.35 4.30367 19 6.34267L21 8" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M3 22V16H9" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M21 12C21 16.9706 16.9706 21 12 21C9.17273 21 6.65 19.6963 5 17.6573L3 16" stroke={color} strokeWidth={strokeWidth} {...cap} />
+    </Frame>
+  );
+}
+
+export function Terminal({ size = 24, color = "#9A9AA0", strokeWidth = 2 }: IconProps) {
+  return (
+    <Frame size={size} vb={24}>
+      <Path d="M4 17L10 11L4 5" stroke={color} strokeWidth={strokeWidth} {...cap} />
+      <Path d="M12 19H20" stroke={color} strokeWidth={strokeWidth} {...cap} />
+    </Frame>
+  );
+}

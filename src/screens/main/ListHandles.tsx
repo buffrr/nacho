@@ -17,7 +17,7 @@ import { handleTileInfo } from "@/handleTile";
 import { recordsCounts } from "@/db";
 import { refreshSemiTrust, resolveHandle } from "@/fabric";
 import { HandleTile } from "@/ui/HandleTile";
-import { ShoppingBag } from "@/ui/icons";
+import { ShoppingBag, Plus, AtSign, ChevronRight } from "@/ui/icons";
 
 // The FlatList is the screen's PRIMARY scroll view (no Layout wrapper) with
 // contentInsetAdjustmentBehavior="automatic", so the native large title
@@ -109,6 +109,35 @@ export default function ListHandles() {
     </TouchableOpacity>
   );
 
+  const isEmpty = handlesList.length === 0;
+  const emptyState = (
+    <View style={styles.empty}>
+      <View style={styles.emptyIcon}>
+        <AtSign size={30} color={colors.textMuted} />
+      </View>
+      <Text style={styles.emptyTitle}>No handles yet</Text>
+      <Text style={styles.emptySub}>
+        Register a new handle or buy one — it lives in this keystore, yours to
+        control.
+      </Text>
+      <TouchableOpacity
+        style={styles.emptyPrimary}
+        onPress={() => router.push("/(main)/register-hub")}
+      >
+        <Plus size={18} color={colors.accentText} />
+        <Text style={styles.emptyPrimaryText}>Register a handle</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.emptySecondary}
+        onPress={() => router.push("/(main)/shop")}
+      >
+        <ShoppingBag size={18} color={colors.text} />
+        <Text style={styles.emptySecondaryText}>Shop handles</Text>
+        <ChevronRight size={18} color={colors.chevron} />
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <FlatList
       style={styles.list}
@@ -132,10 +161,12 @@ export default function ListHandles() {
         />
       )}
       ItemSeparatorComponent={() => <View style={styles.separator} />}
-      ListEmptyComponent={
-        <Text style={styles.empty}>No handles yet. Tap + to add one.</Text>
+      ListEmptyComponent={emptyState}
+      // The shop button repeats in the footer only once there are handles; the
+      // empty state already offers both actions.
+      ListFooterComponent={
+        isEmpty ? null : <View style={styles.footer}>{shopButton}</View>
       }
-      ListFooterComponent={<View style={styles.footer}>{shopButton}</View>}
       // iOS auto-insets for the nav + floating tab bar; other platforms need an
       // explicit bottom pad so the last row / shop button clears the tab bar.
       contentContainerStyle={
@@ -151,20 +182,59 @@ const makeStyles = (c: Colors) =>
       flex: 1,
       backgroundColor: c.background,
     },
-    // Hairline inset to the text start (row pad 20 + avatar 44 + gap 14),
+    // Hairline inset to the text start (row pad 20 + avatar 50 + gap 14),
     // full-bleed to the right edge — Messages style.
     separator: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: c.border,
-      marginLeft: 78,
+      marginLeft: 84,
     },
     empty: {
-      color: c.textMuted,
-      fontSize: 15,
-      textAlign: "center",
-      marginTop: 40,
-      marginHorizontal: 20,
+      alignItems: "center",
+      marginTop: 56,
+      paddingHorizontal: 32,
     },
+    emptyIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: c.surfaceSunken,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 18,
+    },
+    emptyTitle: { fontSize: 20, fontWeight: "700", color: c.text },
+    emptySub: {
+      fontSize: 14,
+      color: c.textSecondary,
+      textAlign: "center",
+      lineHeight: 20,
+      marginTop: 8,
+      marginBottom: 24,
+    },
+    emptyPrimary: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      alignSelf: "stretch",
+      backgroundColor: c.accent,
+      borderRadius: 14,
+      paddingVertical: 14,
+    },
+    emptyPrimaryText: { fontSize: 15, fontWeight: "600", color: c.accentText },
+    emptySecondary: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      alignSelf: "stretch",
+      backgroundColor: c.card,
+      borderRadius: 14,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      marginTop: 12,
+    },
+    emptySecondaryText: { flex: 1, fontSize: 15, fontWeight: "500", color: c.text },
     footer: {
       paddingHorizontal: 20,
       paddingTop: 16,

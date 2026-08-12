@@ -81,7 +81,10 @@ export const darkColors: Colors = {
   chevron: "#5E5E68",
   accentText: "#FFFFFF",
   border: "#303037",
-  borderWarm: "#5F3D1C",
+  // Formerly a warm amber divider; neutralised to the standard border so cards
+  // and forms read native rather than "highlighted". Kept as an alias so callers
+  // don't all need editing.
+  borderWarm: "#303037",
   accent: "#FF7B00",
   accentMuted: "#B8571F",
   accentDisabledBg: "#3D291C",
@@ -128,7 +131,7 @@ export const lightColors: Colors = {
   chevron: "#C4C4CC",
   accentText: "#FFFFFF",
   border: "#E5E7EA",
-  borderWarm: "#F6D3B0",
+  borderWarm: "#E5E7EA",
   accent: "#FF7B00",
   accentMuted: "#B8571F",
   accentDisabledBg: "#FFD9B3",

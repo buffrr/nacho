@@ -13,6 +13,7 @@ import {
   resolveWith,
   ResolvedHandle,
   EditableRecord,
+  isNotFoundResolveError,
 } from "@/fabricResolver";
 import { activeSeeds, loadNetConfig, onNetConfigChange } from "@/config";
 import {
@@ -92,7 +93,13 @@ export async function resolveHandle(
   handle: string,
 ): Promise<ResolvedHandle | null> {
   await ensureInit();
-  return resolveWith(getClient(), handle);
+  try {
+    return await resolveWith(getClient(), handle);
+  } catch (e) {
+    // A non-existent space can't be proven → treat as not found (see fabric.ts).
+    if (isNotFoundResolveError(e)) return null;
+    throw e;
+  }
 }
 
 // Resolve with a throwaway client so the SDK's in-memory zone cache can't return

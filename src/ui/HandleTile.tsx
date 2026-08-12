@@ -39,28 +39,29 @@ export function HandleTile({
       onPress={onPress}
       activeOpacity={0.6}
     >
-      <Avatar handle={handle} size={44} />
+      <Avatar handle={handle} size={50} />
       <View style={styles.mid}>
-        {/* Name + status + chevron share the top line (Messages style); the
-            chevron top-aligns with the name and the subtitle spans full width. */}
+        {/* Name + chevron on the top line; the status glyph moves to the second
+            line beside the description (e.g. "⏱ Waiting for records") — calmer
+            than crowding the name. */}
         <View style={styles.topRow}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>
-              {handle}
-            </Text>
-            <StatusIcon info={info} c={colors} />
-          </View>
+          <Text style={styles.name} numberOfLines={1}>
+            {handle}
+          </Text>
           <ChevronRight size={15} color={colors.chevron} strokeWidth={2} />
         </View>
-        <Text
-          style={[
-            styles.subtitle,
-            info.attention && { color: colors.statusAmberFg },
-          ]}
-          numberOfLines={1}
-        >
-          {info.subtitle}
-        </Text>
+        <View style={styles.subRow}>
+          <StatusIcon info={info} c={colors} />
+          <Text
+            style={[
+              styles.subtitle,
+              info.attention && { color: colors.statusAmberFg },
+            ]}
+            numberOfLines={1}
+          >
+            {info.subtitle}
+          </Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -90,21 +91,21 @@ const makeStyles = (c: Colors) =>
       alignItems: "center",
       gap: 8,
     },
-    nameRow: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-    },
     name: {
+      flex: 1,
       fontSize: 17,
       fontWeight: "600",
       color: c.text,
-      flexShrink: 1,
+    },
+    subRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
     },
     subtitle: {
       fontSize: 14,
       fontWeight: "400",
       color: c.textMuted,
+      flexShrink: 1,
     },
   });

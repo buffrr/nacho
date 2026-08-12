@@ -44,14 +44,17 @@ import { recordsGet, recordsSet } from "@/db";
 import {
   AtSign,
   Copy,
-  Pencil,
   Lock,
   Check,
   Anchor,
   ShieldCheck,
   Clock,
+  ChevronRight,
+  Plus,
   Infinity as InfinityIcon,
 } from "@/ui/icons";
+import { lookupRecord } from "@/recordRegistry";
+import type { EditableRecord } from "@/fabricResolver";
 import {
   fetchHandleStatus,
   reserveHandle,
@@ -731,35 +734,38 @@ export default function ShowHandle() {
     </View>
   );
 
-  const recordRow = (
-    chip: string,
-    title: string,
-    opts?: { sub?: string; onPress?: () => void },
-  ) => {
-    const body = (
-      <View style={styles.recRow}>
-        <View style={styles.chip}>
-          <Text style={styles.chipText}>{chip}</Text>
-        </View>
-        <View style={styles.recMid}>
-          <Text style={styles.recTitle}>{title}</Text>
-          {opts?.sub ? (
-            <Text style={styles.recSub} numberOfLines={1}>
-              {opts.sub}
+  // One record row rendered through the shared registry (mocks2 §04): known keys
+  // get a labelled icon, unknown keys show their key verbatim in monospace. Tap
+  // opens the editor — full values live on the detail screen, one tap away.
+  const registryRow = (r: EditableRecord, i: number) => {
+    const { def, known } = lookupRecord(r.type, r.key);
+    const value = r.value.join(", ");
+    return (
+      <TouchableOpacity
+        onPress={() =>
+          router.push({
+            pathname: "/(main)/edit-record",
+            params: { handle, index: String(i) },
+          })
+        }
+        activeOpacity={0.7}
+      >
+        <View style={styles.recRow}>
+          <View style={[styles.recIco, { backgroundColor: def.color + "22" }]}>
+            <def.Icon size={18} color={def.color} />
+          </View>
+          <View style={styles.recMid}>
+            <Text style={[styles.recTitle, !known && styles.recTitleMono]}>
+              {def.label}
+              {def.note ? <Text style={styles.recNote}> {def.note}</Text> : null}
             </Text>
-          ) : null}
+            <Text style={styles.recSub} numberOfLines={1}>
+              {value}
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.chevron} />
         </View>
-        {opts?.onPress ? (
-          <Pencil size={16} color={colors.iconDefault} />
-        ) : (
-          <Lock size={16} color={colors.iconDefault} />
-        )}
-      </View>
-    );
-    return opts?.onPress ? (
-      <TouchableOpacity onPress={opts.onPress}>{body}</TouchableOpacity>
-    ) : (
-      body
+      </TouchableOpacity>
     );
   };
 
@@ -977,7 +983,9 @@ export default function ShowHandle() {
     ? "Buy handle"
     : showOnboarding && onboardStage === "issuing" && boughtViaNacho
       ? "Issuing certificate"
-      : handle;
+      : // Manage view uses the iOS-Contacts layout — the handle is shown big
+        // under the avatar, so the nav bar carries no title (no duplication).
+        "";
 
   // The ⋯ options as a NATIVE header menu (UIMenu). Only when the handle is
   // owned (not while buying).
@@ -1037,6 +1045,22 @@ export default function ShowHandle() {
   const headerItems: NativeStackHeaderItem[] = buyable
     ? []
     : [
+        // Add is a persistent header action (mocks2 §04), not a link that moves
+        // as the list grows — and it picks up the native iOS 26 bar-button look.
+        ...(manageable
+          ? ([
+              {
+                type: "button",
+                label: "Add record",
+                icon: { type: "sfSymbol", name: "plus" },
+                onPress: () =>
+                  router.push({
+                    pathname: "/(main)/add-record",
+                    params: { handle },
+                  }),
+              },
+            ] as NativeStackHeaderItem[])
+          : []),
         {
           type: "menu",
           label: "Options",
@@ -1117,20 +1141,28 @@ export default function ShowHandle() {
         renderOnboarding()
       ) : (
         <>
-      <View style={styles.identity}>
-        <Avatar handle={handle} size={48} />
-        <View style={styles.idcol}>
-          <Text style={styles.name} numberOfLines={1}>
-            {handle}
-          </Text>
-          <View style={styles.statusRow}>
+      <View style={styles.profile}>
+        <Avatar handle={handle} size={76} />
+        <Text style={styles.profileName} numberOfLines={1}>
+          {handle}
+        </Text>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusChip, { backgroundColor: pill.bg }]}>
             <View style={[styles.dot, { backgroundColor: pill.fg }]} />
-            <Text style={styles.statusText}>{pill.label}</Text>
+            <Text style={[styles.statusText, { color: pill.fg }]}>
+              {pill.label}
+            </Text>
           </View>
+          <TouchableOpacity
+            onPress={() => refreshResolution()}
+            disabled={resolving}
+            hitSlop={8}
+          >
+            <Text style={styles.refreshText}>
+              {resolving ? "Refreshing…" : "Refresh"}
+            </Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={() => refreshResolution()} disabled={resolving} hitSlop={8}>
-          <Text style={styles.refreshText}>{resolving ? "…" : "Refresh"}</Text>
-        </TouchableOpacity>
       </View>
 
       {published && !error && (
@@ -1194,41 +1226,56 @@ export default function ShowHandle() {
             </View>
           </>
         )}
+        {manageable && seq > 0 && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>Last published</Text>
+              <Text style={[styles.rowValue, { fontFamily: undefined }]}>
+                {formatSeq(seq).replace(/^Updated /, "")}
+              </Text>
+            </View>
+          </>
+        )}
       </View>
 
       {manageable && (
         <>
           <View style={styles.recordsHead}>
             <Text style={styles.recordsTitle}>Records</Text>
+          </View>
+          {records.length > 0 ? (
+            <View style={styles.card}>
+              {records.map((r, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && <View style={styles.recDivider} />}
+                  {registryRow(r, i)}
+                </React.Fragment>
+              ))}
+            </View>
+          ) : (
             <TouchableOpacity
+              style={[styles.card, styles.emptyRecords]}
+              activeOpacity={0.7}
               onPress={() =>
                 router.push({
-                  pathname: "/(main)/edit-record",
+                  pathname: "/(main)/add-record",
                   params: { handle },
                 })
               }
             >
-              <Text style={styles.addText}>+ Add</Text>
+              <View style={styles.emptyRecordsIco}>
+                <Plus size={18} color={colors.textSecondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.emptyRecordsTitle}>Add your first record</Text>
+                <Text style={styles.emptyRecordsSub}>
+                  A payment address, Nostr key, website…
+                </Text>
+              </View>
+              <ChevronRight size={18} color={colors.chevron} />
             </TouchableOpacity>
-          </View>
-          <View style={styles.card}>
-            {recordRow("SEQ", formatSeq(seq))}
-            {records.map((r, i) => (
-              <React.Fragment key={i}>
-                <View style={styles.divider} />
-                {recordRow(r.type.toUpperCase(), r.key, {
-                  sub: r.value.join(", "),
-                  onPress: () =>
-                    router.push({
-                      pathname: "/(main)/edit-record",
-                      params: { handle, index: String(i) },
-                    }),
-                })}
-              </React.Fragment>
-            ))}
-            <View style={styles.divider} />
-            {recordRow("SIG", `Signed · ${handle}`)}
-          </View>
+          )}
         </>
       )}
 
@@ -1249,12 +1296,6 @@ export default function ShowHandle() {
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    topbar: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginTop: 4,
-      marginBottom: 24,
-    },
     // ── Post-purchase onboarding states (issuing / ready / sovereign) ──
     onboard: {
       alignItems: "center",
@@ -1495,38 +1536,29 @@ const makeStyles = (c: Colors) =>
       fontWeight: "600",
       color: c.text,
     },
-    identity: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      marginTop: 4,
-      marginBottom: 20,
-    },
-    avatar: {
-      width: 48,
-      height: 48,
-      borderRadius: 14,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    at: {
-      fontSize: 22,
-      fontWeight: "600",
+    // Centered iOS-Contacts profile header (matches the Resolve screen).
+    profile: { alignItems: "center", paddingTop: 8, paddingBottom: 18 },
+    profileName: {
+      fontSize: 23,
+      fontWeight: "700",
       color: c.text,
-    },
-    idcol: {
-      flex: 1,
-      gap: 3,
-    },
-    name: {
-      fontSize: 18,
-      fontWeight: "500",
-      color: c.text,
+      marginTop: 14,
+      letterSpacing: -0.3,
+      textAlign: "center",
     },
     statusRow: {
       flexDirection: "row",
       alignItems: "center",
+      gap: 12,
+      marginTop: 10,
+    },
+    statusChip: {
+      flexDirection: "row",
+      alignItems: "center",
       gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 999,
     },
     dot: {
       width: 7,
@@ -1535,31 +1567,25 @@ const makeStyles = (c: Colors) =>
     },
     statusText: {
       fontSize: 12,
-      color: c.textMuted,
+      fontWeight: "500",
     },
     refreshText: {
       color: c.accent,
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: "500",
     },
     card: {
       backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
-      borderRadius: 12,
-      marginBottom: 16,
-      shadowColor: "#000",
-      shadowOpacity: 0.06,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 2,
+      borderRadius: 16,
+      marginBottom: 22,
+      overflow: "hidden",
     },
     row: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingHorizontal: 14,
-      paddingVertical: 13,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
     },
     rowLabel: {
       fontSize: 13,
@@ -1576,56 +1602,88 @@ const makeStyles = (c: Colors) =>
       fontFamily: "monospace",
     },
     divider: {
-      height: 1,
+      height: StyleSheet.hairlineWidth,
       backgroundColor: c.border,
+      marginLeft: 16,
+    },
+    recDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: c.border,
+      marginLeft: 56,
     },
     recordsHead: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 12,
+      marginBottom: 7,
+      marginLeft: 4,
     },
     recordsTitle: {
-      fontSize: 15,
-      fontWeight: "700",
-      color: c.text,
-    },
-    addText: {
-      fontSize: 13,
-      fontWeight: "500",
-      color: c.text,
+      fontFamily: "monospace",
+      fontSize: 10.5,
+      letterSpacing: 0.8,
+      textTransform: "uppercase",
+      color: c.textMuted,
     },
     recRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 10,
+      gap: 12,
       paddingHorizontal: 14,
-      paddingVertical: 13,
+      paddingVertical: 12,
     },
-    chip: {
-      backgroundColor: c.chip,
-      borderRadius: 5,
-      paddingHorizontal: 7,
-      paddingVertical: 3,
-    },
-    chipText: {
-      fontSize: 10,
-      fontWeight: "600",
-      color: c.textMuted,
+    recIco: {
+      width: 30,
+      height: 30,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
     },
     recMid: {
       flex: 1,
       gap: 2,
     },
     recTitle: {
-      fontSize: 13,
+      fontSize: 14.5,
       fontWeight: "500",
       color: c.text,
     },
-    recSub: {
-      fontSize: 11,
-      color: c.textMuted,
+    recTitleMono: {
       fontFamily: "monospace",
+      fontSize: 13,
+      fontWeight: "400",
+    },
+    recNote: {
+      fontSize: 11.5,
+      color: c.textMuted,
+      fontWeight: "400",
+    },
+    recSub: {
+      fontSize: 12.5,
+      color: c.textSecondary,
+      fontFamily: "monospace",
+    },
+    emptyRecords: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+    },
+    emptyRecordsIco: {
+      width: 30,
+      height: 30,
+      borderRadius: 8,
+      backgroundColor: c.surfaceSunken,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    emptyRecordsTitle: {
+      fontSize: 14.5,
+      fontWeight: "500",
+      color: c.text,
+    },
+    emptyRecordsSub: {
+      fontSize: 12.5,
+      color: c.textMuted,
+      marginTop: 1,
     },
     waiting: {
       fontSize: 14,

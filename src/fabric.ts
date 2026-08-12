@@ -7,6 +7,7 @@ import {
   resolveWith,
   ResolvedHandle,
   EditableRecord,
+  isNotFoundResolveError,
 } from "@/fabricResolver";
 import { activeSeeds, loadNetConfig, onNetConfigChange } from "@/config";
 
@@ -70,7 +71,22 @@ export async function resolveHandle(
   handle: string,
 ): Promise<ResolvedHandle | null> {
   await ensureInit();
-  const resolved = await resolveWith(getClient(), handle);
+  let resolved: ResolvedHandle | null;
+  try {
+    resolved = await resolveWith(getClient(), handle);
+  } catch (e) {
+    // A name that's provably absent from the proof → not found (see helper).
+    // A real verification failure on an existing name still throws.
+    if (__DEV__) {
+      console.log("[nacho/resolve-error]", handle, {
+        tag: (e as { tag?: unknown })?.tag,
+        message: (e as { message?: unknown })?.message,
+        notFound: isNotFoundResolveError(e),
+      });
+    }
+    if (isNotFoundResolveError(e)) return null;
+    throw e;
+  }
   // TEMP diagnostic: why does native badge grace@key as "unverified" while web
   // returns "none"? Logs the badge, pinned trust state, and whether the native
   // zone carries an anchor_hash (badge() returns "unverified" if it's missing).
