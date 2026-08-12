@@ -284,10 +284,16 @@ export default function Resolve() {
             },
             onSearchButtonPress: (e) => onResolve(e.nativeEvent.text),
             onCancelButtonPress: () => {
+              // If no search was actually performed (no result/not-found/error on
+              // screen — regardless of typed-but-unsubmitted text), cancelling
+              // reads as "I didn't mean to be here" → go back to Handles. If a
+              // search outcome is showing, just clear it and stay.
+              const noSearch = !result && !notFound && !error;
               setHandle("");
               setError(null);
               setNotFound(null);
               setResult(null);
+              if (noSearch) router.navigate("/(main)/(tabs)/handles");
             },
           },
         }}
