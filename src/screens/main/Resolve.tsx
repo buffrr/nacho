@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -190,12 +190,28 @@ export default function Resolve() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
 
+  // Imperative handle to the native search bar (mirrors react-native-screens'
+  // SearchBarCommands, which isn't exported from the package root).
+  const searchRef = useRef<{
+    focus: () => void;
+    blur: () => void;
+    clearText: () => void;
+    toggleCancelButton: (show: boolean) => void;
+    setText: (text: string) => void;
+    cancelSearch: () => void;
+  } | null>(null);
+
   // Transient outcomes shouldn't greet the user on arrival — clear a stale
   // error / not-found each time the tab regains focus (keeps a valid result).
+  // Also focus the search field so tapping the Search tab shows the keyboard
+  // immediately (the tab stays mounted, so autoFocus only fires once — this
+  // re-focuses on every re-selection).
   useFocusEffect(
     useCallback(() => {
       setError(null);
       setNotFound(null);
+      const t = setTimeout(() => searchRef.current?.focus(), 60);
+      return () => clearTimeout(t);
     }, []),
   );
 
@@ -250,6 +266,8 @@ export default function Resolve() {
       <Stack.Screen
         options={{
           headerSearchBarOptions: {
+            ref: searchRef,
+            autoFocus: true,
             placeholder: "satoshi@bitcoin",
             autoCapitalize: "none",
             hideWhenScrolling: false,
