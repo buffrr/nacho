@@ -1,23 +1,25 @@
 import React, { useState, useCallback, useMemo } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-  Platform,
-  RefreshControl,
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  Host,
+  List,
+  ListItem,
+  Icon,
+  Text as UIText,
+  Row,
+  RNHostView,
+} from "@expo/ui";
+import { listRowBackground } from "@expo/ui/swift-ui/modifiers";
 import { HandleData, useStore } from "@/Store";
 import { Colors, useTheme } from "@/theme";
 import { scriptForHandle } from "@/keys";
-import { handleTileInfo } from "@/handleTile";
+import { handleTileInfo, TileInfo } from "@/handleTile";
 import { recordsCounts } from "@/db";
 import { refreshSemiTrust, resolveHandle } from "@/fabric";
-import { HandleTile } from "@/ui/HandleTile";
+import { Avatar } from "@/ui/Avatar";
 import { ShoppingBag, Plus, AtSign, ChevronRight } from "@/ui/icons";
+import type { SFSymbol } from "sf-symbols-typescript";
 
 // The FlatList is the screen's PRIMARY scroll view (no Layout wrapper) with
 // contentInsetAdjustmentBehavior="automatic", so the native large title
@@ -26,11 +28,10 @@ import { ShoppingBag, Plus, AtSign, ChevronRight } from "@/ui/icons";
 export default function ListHandles() {
   const router = useRouter();
   const { handles, xpub, setHandleResolution } = useStore();
-  const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
+  const { colors, scheme } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [counts, setCounts] = useState<Record<string, number>>({});
-  const [refreshing, setRefreshing] = useState(false);
+  const [, setRefreshing] = useState(false);
 
   const handlesList = Object.entries(handles || {});
 
@@ -99,16 +100,6 @@ export default function ListHandles() {
     });
   };
 
-  const shopButton = (
-    <TouchableOpacity
-      style={styles.shopButton}
-      onPress={() => router.push("/(main)/shop")}
-    >
-      <ShoppingBag size={18} color={colors.text} />
-      <Text style={styles.shopText}>Shop handles</Text>
-    </TouchableOpacity>
-  );
-
   const isEmpty = handlesList.length === 0;
   const emptyState = (
     <View style={styles.empty}>
@@ -138,57 +129,83 @@ export default function ListHandles() {
     </View>
   );
 
+  if (isEmpty) {
+    return <View style={styles.emptyWrap}>{emptyState}</View>;
+  }
+
+  // Inline status glyph (SF Symbol) shown beside the subtitle.
+  const glyphFor = (info: TileInfo): { sf: SFSymbol; color: string } | null => {
+    switch (info.status) {
+      case "sovereign":
+        return { sf: "checkmark.seal.fill", color: colors.statusGreenFg };
+      case "anchoring":
+        return { sf: "clock", color: colors.statusAmberFg };
+      case "attention":
+        return { sf: "exclamationmark.triangle.fill", color: colors.statusAmberFg };
+      default:
+        return null;
+    }
+  };
+
+  // Paint each row the theme background so the list reads as a plain black list
+  // (not SwiftUI's default grouped grey). List-level scrollContentBackground
+  // isn't exposed on the universal List, but ListItem forwards row modifiers.
+  const rowBg = [listRowBackground(colors.background)];
+
   return (
-    <FlatList
-      style={styles.list}
-      contentInsetAdjustmentBehavior="automatic"
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={colors.iconDefault}
-        />
-      }
-      data={handlesList}
-      keyExtractor={([name]) => name}
-      renderItem={({ item: [name, handleData] }) => (
-        <HandleTile
-          handle={name}
-          info={infoFor(name, handleData)}
-          onPress={() =>
-            router.push({ pathname: "/(main)/show-handle", params: { handle: name } })
-          }
-        />
-      )}
-      ItemSeparatorComponent={() => <View style={styles.separator} />}
-      ListEmptyComponent={emptyState}
-      // The shop button repeats in the footer only once there are handles; the
-      // empty state already offers both actions.
-      ListFooterComponent={
-        isEmpty ? null : <View style={styles.footer}>{shopButton}</View>
-      }
-      // iOS auto-insets for the nav + floating tab bar; other platforms need an
-      // explicit bottom pad so the last row / shop button clears the tab bar.
-      contentContainerStyle={
-        Platform.OS === "ios" ? undefined : { paddingBottom: insets.bottom + 64 }
-      }
-    />
+    <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <List onRefresh={onRefresh}>
+        {handlesList.map(([name, handleData]) => {
+          const info = infoFor(name, handleData);
+          const glyph = glyphFor(info);
+          return (
+            <ListItem
+              key={name}
+              modifiers={rowBg}
+              leading={
+                <RNHostView matchContents style={{ width: 50, height: 50 }}>
+                  <Avatar handle={name} size={50} />
+                </RNHostView>
+              }
+              supportingText={
+                <Row alignment="center" spacing={5}>
+                  {glyph ? <Icon name={glyph.sf} size={13} color={glyph.color} /> : null}
+                  <UIText
+                    textStyle={{
+                      fontSize: 14,
+                      color: info.attention ? colors.statusAmberFg : colors.textMuted,
+                    }}
+                  >
+                    {info.subtitle}
+                  </UIText>
+                </Row>
+              }
+              trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
+              onPress={() =>
+                router.push({ pathname: "/(main)/show-handle", params: { handle: name } })
+              }
+            >
+              <UIText textStyle={{ fontSize: 17, fontWeight: "600" }}>{name}</UIText>
+            </ListItem>
+          );
+        })}
+
+        {/* Shop entry at the end of the list. */}
+        <ListItem
+          modifiers={rowBg}
+          leading={<Icon name="bag" size={22} color={colors.textSecondary} />}
+          onPress={() => router.push("/(main)/shop")}
+        >
+          <UIText textStyle={{ color: colors.textSecondary }}>Shop handles</UIText>
+        </ListItem>
+      </List>
+    </Host>
   );
 }
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    list: {
-      flex: 1,
-      backgroundColor: c.background,
-    },
-    // Hairline inset to the text start (row padLeft 24 + avatar 50 + gap 14),
-    // full-bleed to the right edge — Messages style.
-    separator: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: c.border,
-      marginLeft: 88,
-    },
+    emptyWrap: { flex: 1, backgroundColor: c.background },
     empty: {
       alignItems: "center",
       marginTop: 56,
@@ -238,30 +255,4 @@ const makeStyles = (c: Colors) =>
       marginTop: 12,
     },
     emptySecondaryText: { flex: 1, fontSize: 15, fontWeight: "500", color: c.text },
-    footer: {
-      paddingHorizontal: 20,
-      paddingTop: 16,
-    },
-    shopButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
-      borderRadius: 14,
-      borderCurve: "continuous",
-      height: 54,
-      shadowColor: "#000",
-      shadowOpacity: 0.06,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 2,
-    },
-    shopText: {
-      fontSize: 16,
-      fontWeight: "500",
-      color: c.text,
-    },
   });

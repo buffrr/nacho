@@ -1,25 +1,21 @@
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-  Platform,
-  Alert,
-} from "react-native";
+import { View, Text, StyleSheet, Alert } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
+import {
+  Host,
+  List,
+  ListItem,
+  Icon,
+  Text as UIText,
+  Row,
+  RNHostView,
+} from "@expo/ui";
+import { listRowBackground } from "@expo/ui/swift-ui/modifiers";
+import type { SFSymbol } from "sf-symbols-typescript";
 import { Colors, useTheme } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
-import {
-  ChevronRight,
-  ShieldCheck,
-  ShieldX,
-  Clock,
-  Trash,
-} from "@/ui/icons";
+import { Clock } from "@/ui/icons";
 import {
   listHistory,
   removeHistory,
@@ -27,28 +23,26 @@ import {
   ResolveHistoryEntry,
 } from "@/resolveHistory";
 
-// Trust snapshot glyph for a recents row: your-anchor verified → green shield,
-// default-anchor → neutral shield, observed-only → amber shield-x.
-function TrustGlyph({ badge, c }: { badge: ResolveHistoryEntry["badge"]; c: Colors }) {
-  if (badge === "orange")
-    return <ShieldCheck size={14} color={c.statusGreenFg} strokeWidth={2.2} />;
-  if (badge === "unverified")
-    return <ShieldX size={14} color={c.statusAmberFg} strokeWidth={2.2} />;
-  return <ShieldCheck size={14} color={c.textMuted} strokeWidth={2.2} />;
+// Trust snapshot glyph (SF Symbol) for a recents row.
+function trustGlyph(
+  badge: ResolveHistoryEntry["badge"],
+  c: Colors,
+): { sf: SFSymbol; color: string } {
+  if (badge === "orange") return { sf: "checkmark.seal.fill", color: c.statusGreenFg };
+  if (badge === "unverified") return { sf: "exclamationmark.shield.fill", color: c.statusAmberFg };
+  return { sf: "checkmark.shield", color: c.textMuted };
 }
 
 export default function Recents() {
   const router = useRouter();
-  const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
+  const { scheme, colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [entries, setEntries] = useState<ResolveHistoryEntry[]>([]);
   const [editing, setEditing] = useState(false);
 
   const load = useCallback(async () => setEntries(await listHistory()), []);
 
-  // Reload from the kv log each time the tab gains focus (picks up new resolves).
-  // Leaving the tab exits edit mode, so returning never lands in a stale "Done".
+  // Reload from the kv log on focus; leaving exits edit mode.
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -86,14 +80,12 @@ export default function Recents() {
   const open = (handle: string) =>
     router.push({ pathname: "/(main)/view-handle", params: { handle } });
 
-  // Edit / Done toggle as a native header button (only when there are entries).
   const headerItems: NativeStackHeaderItem[] = useMemo(
     () =>
       entries.length === 0
         ? []
         : [
             {
-              // Neutral tint — native bar buttons aren't the brand colour.
               type: "button",
               label: editing ? "Done" : "Edit",
               tintColor: colors.text,
@@ -103,112 +95,92 @@ export default function Recents() {
     [entries.length, editing, colors.text],
   );
 
-  const renderItem = ({ item }: { item: ResolveHistoryEntry }) => {
-    const count =
-      item.recordCount > 0
-        ? `${item.recordCount} record${item.recordCount === 1 ? "" : "s"}`
-        : "No records";
+  const screen = (
+    <Stack.Screen options={{ unstable_headerRightItems: () => headerItems }} />
+  );
+
+  if (entries.length === 0) {
     return (
-      <TouchableOpacity
-        style={styles.row}
-        activeOpacity={0.6}
-        onPress={() => (editing ? remove(item.handle) : open(item.handle))}
-        onLongPress={() => !editing && remove(item.handle)}
-      >
-        {editing && (
-          <TouchableOpacity
-            style={styles.removeBtn}
-            onPress={() => remove(item.handle)}
-            hitSlop={8}
-          >
-            <Trash size={15} color="#FFFFFF" />
-          </TouchableOpacity>
-        )}
-        <Avatar handle={item.handle} size={50} />
-        <View style={styles.mid}>
-          <Text style={styles.name} numberOfLines={1}>
-            {item.handle}
-          </Text>
-          <View style={styles.subRow}>
-            <TrustGlyph badge={item.badge} c={colors} />
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {count}
-            </Text>
+      <View style={styles.emptyWrap}>
+        {screen}
+        <View style={styles.empty}>
+          <View style={styles.emptyIcon}>
+            <Clock size={28} color={colors.textMuted} strokeWidth={2} />
           </View>
+          <Text style={styles.emptyTitle}>No recents yet</Text>
+          <Text style={styles.emptySub}>
+            Handles you resolve from Search appear here, with their trust status.
+          </Text>
         </View>
-        {!editing && <ChevronRight size={15} color={colors.chevron} strokeWidth={2} />}
-      </TouchableOpacity>
+      </View>
     );
-  };
+  }
+
+  const rowBg = [listRowBackground(colors.background)];
 
   return (
     <>
-      <Stack.Screen options={{ unstable_headerRightItems: () => headerItems }} />
-      <FlatList
-        style={styles.list}
-        contentInsetAdjustmentBehavior="automatic"
-        data={entries}
-        keyExtractor={(e) => e.handle}
-        renderItem={renderItem}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <Clock size={28} color={colors.textMuted} strokeWidth={2} />
-            </View>
-            <Text style={styles.emptyTitle}>No recents yet</Text>
-            <Text style={styles.emptySub}>
-              Handles you resolve from Search appear here, with their trust
-              status.
-            </Text>
-          </View>
-        }
-        ListFooterComponent={
-          editing && entries.length > 0 ? (
-            <TouchableOpacity style={styles.clearBtn} onPress={confirmClear}>
-              <Text style={styles.clearText}>Clear All</Text>
-            </TouchableOpacity>
-          ) : null
-        }
-        contentContainerStyle={
-          Platform.OS === "ios"
-            ? undefined
-            : { paddingBottom: insets.bottom + 64 }
-        }
-      />
+      {screen}
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <List>
+          {entries.map((item) => {
+            const count =
+              item.recordCount > 0
+                ? `${item.recordCount} record${item.recordCount === 1 ? "" : "s"}`
+                : "No records";
+            const g = trustGlyph(item.badge, colors);
+            return (
+              <ListItem
+                key={item.handle}
+                modifiers={rowBg}
+                leading={
+                  <RNHostView matchContents style={{ width: 50, height: 50 }}>
+                    <Avatar handle={item.handle} size={50} />
+                  </RNHostView>
+                }
+                supportingText={
+                  <Row alignment="center" spacing={5}>
+                    <Icon name={g.sf} size={13} color={g.color} />
+                    <UIText textStyle={{ fontSize: 14, color: colors.textMuted }}>
+                      {count}
+                    </UIText>
+                  </Row>
+                }
+                trailing={
+                  editing ? (
+                    <Icon
+                      name="minus.circle.fill"
+                      size={20}
+                      color={colors.danger}
+                      onPress={() => remove(item.handle)}
+                    />
+                  ) : (
+                    <Icon name="chevron.forward" size={14} color={colors.chevron} />
+                  )
+                }
+                onPress={() => (editing ? remove(item.handle) : open(item.handle))}
+              >
+                <UIText textStyle={{ fontSize: 17, fontWeight: "600" }}>
+                  {item.handle}
+                </UIText>
+              </ListItem>
+            );
+          })}
+
+          {editing ? (
+            <ListItem modifiers={rowBg} onPress={confirmClear}>
+              <UIText textStyle={{ color: colors.danger }}>Clear All</UIText>
+            </ListItem>
+          ) : null}
+        </List>
+      </Host>
     </>
   );
 }
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    list: { flex: 1, backgroundColor: c.background },
-    row: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 14,
-      paddingLeft: 24,
-      paddingRight: 18,
-      paddingVertical: 14,
-    },
-    removeBtn: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      borderCurve: "continuous",
-      backgroundColor: c.danger,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    separator: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: c.border,
-      marginLeft: 88,
-    },
-    mid: { flex: 1, gap: 3 },
-    name: { fontSize: 17, fontWeight: "600", color: c.text },
-    subRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-    subtitle: { fontSize: 14, color: c.textMuted, flexShrink: 1 },
+    emptyWrap: { flex: 1, backgroundColor: c.background },
     empty: { alignItems: "center", marginTop: 56, paddingHorizontal: 32 },
     emptyIcon: {
       width: 64,
@@ -228,6 +200,4 @@ const makeStyles = (c: Colors) =>
       lineHeight: 20,
       marginTop: 8,
     },
-    clearBtn: { alignItems: "center", paddingVertical: 18 },
-    clearText: { fontSize: 15, fontWeight: "500", color: c.danger },
   });

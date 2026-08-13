@@ -20,12 +20,12 @@ import { ResolvedHandle } from "@/fabricResolver";
 import { recordResolve } from "@/resolveHistory";
 import {
   ProfileShell,
-  ResolvedProfile,
   NotFoundState,
   NetworkErrorState,
   VerifyErrorState,
   recordCountOf,
 } from "@/ui/handleProfile";
+import { ResolvedProfileNative } from "@/ui/handleProfileNative";
 
 export default function Resolve() {
   const { colors } = useTheme();
@@ -112,37 +112,52 @@ export default function Resolve() {
     }, []),
   );
 
+  const searchScreen = (
+    <Stack.Screen
+      options={{
+        headerSearchBarOptions: {
+          ref: searchRef,
+          autoFocus: true,
+          placeholder: "satoshi@bitcoin",
+          autoCapitalize: "none",
+          hideWhenScrolling: false,
+          textColor: colors.text,
+          tintColor: colors.accent,
+          onChangeText: (e) => {
+            const t = e.nativeEvent.text.trim().toLowerCase();
+            setHandle(t);
+            setError(null);
+            setNotFound(null);
+            if (!t) setResult(null);
+          },
+          onSearchButtonPress: (e) => onResolve(e.nativeEvent.text),
+          onCancelButtonPress: () => {
+            const noSearch = !result && !notFound && !error;
+            setHandle("");
+            setError(null);
+            setNotFound(null);
+            setResult(null);
+            if (noSearch) router.navigate("/(main)/(tabs)/handles");
+          },
+        },
+      }}
+    />
+  );
+
+  // Result → the native @expo/ui profile (its own scroll container), matching
+  // the Recents handle view. Other phases stay on the RN Layout.
+  if (phase === "result" && result) {
+    return (
+      <>
+        {searchScreen}
+        <ResolvedProfileNative result={result} />
+      </>
+    );
+  }
+
   return (
     <Layout tabBarInset underHeader keyboardAware={false}>
-      <Stack.Screen
-        options={{
-          headerSearchBarOptions: {
-            ref: searchRef,
-            autoFocus: true,
-            placeholder: "satoshi@bitcoin",
-            autoCapitalize: "none",
-            hideWhenScrolling: false,
-            textColor: colors.text,
-            tintColor: colors.accent,
-            onChangeText: (e) => {
-              const t = e.nativeEvent.text.trim().toLowerCase();
-              setHandle(t);
-              setError(null);
-              setNotFound(null);
-              if (!t) setResult(null);
-            },
-            onSearchButtonPress: (e) => onResolve(e.nativeEvent.text),
-            onCancelButtonPress: () => {
-              const noSearch = !result && !notFound && !error;
-              setHandle("");
-              setError(null);
-              setNotFound(null);
-              setResult(null);
-              if (noSearch) router.navigate("/(main)/(tabs)/handles");
-            },
-          },
-        }}
-      />
+      {searchScreen}
 
       {phase === "idle" && (
         <View style={styles.centerState}>
@@ -182,8 +197,6 @@ export default function Resolve() {
           onTrustSettings={() => router.push("/(main)/trust")}
         />
       )}
-
-      {phase === "result" && result && <ResolvedProfile result={result} />}
     </Layout>
   );
 }
