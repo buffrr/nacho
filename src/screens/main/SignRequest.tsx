@@ -20,6 +20,8 @@ import {
   Row as NRow,
   Spacer as NSpacer,
   Checkbox as NCheckbox,
+  TextInput as NTextInput,
+  useNativeState,
 } from "@expo/ui";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
@@ -821,6 +823,7 @@ function TransferConfirm({
   colors: Colors;
 }) {
   const router = useRouter();
+  const { scheme } = useTheme();
   const { handles, xpub, getSigningKey } = useStore();
   const [ack, setAck] = useState(false);
   const [signing, setSigning] = useState(false);
@@ -888,65 +891,75 @@ function TransferConfirm({
     );
   }
 
+  const canSign = !signing && (toMine || ack);
+
   return (
-    <Layout
-      underHeader
-      footer={
-        <>
-          {error && (
-            <View style={styles.mb}>
-              <Message message={error} type="error" />
-            </View>
-          )}
-          <TouchableOpacity
-            style={[styles.dangerBtn, (signing || (!toMine && !ack)) && styles.btnDisabled]}
-            onPress={sign}
-            disabled={signing || (!toMine && !ack)}
-          >
-            {signing ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.dangerBtnText}>Sign transfer</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
-            <Text style={styles.secondaryBtnText}>Cancel</Text>
-          </TouchableOpacity>
-        </>
-      }
-    >
+    <>
       <Stack.Screen options={{ title: "Transfer handle" }} />
-      <View style={styles.hero}>
-        <Text style={styles.heroH}>Give away {request.handle}</Text>
-        <Text style={styles.heroS}>You will no longer control this handle</Text>
-      </View>
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <NFieldGroup>
+          <NFieldGroup.Section>
+            <NFieldGroup.SectionHeader>
+              <NRow alignment="center">
+                <NSpacer />
+                <NColumn alignment="center" spacing={8}>
+                  <NIcon name="arrow.right.circle.fill" size={40} color={colors.dangerText} />
+                  <NText textStyle={{ fontSize: 20, fontWeight: "700" }}>
+                    {`Give away ${request.handle}`}
+                  </NText>
+                  <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
+                    You will no longer control this handle
+                  </NText>
+                </NColumn>
+                <NSpacer />
+              </NRow>
+            </NFieldGroup.SectionHeader>
+          </NFieldGroup.Section>
 
-      <View style={styles.lblRow}>
-        <Text style={styles.lbl}>Recipient</Text>
-        <View style={[styles.tag, toMine ? styles.tagMine : styles.tagExt]}>
-          <Text style={styles.tagText}>{toMine ? "your key" : "external"}</Text>
-        </View>
-      </View>
-      <View style={styles.recBlock}>
-        <ChunkedValue value={request.to} style={styles.recChunk} />
-      </View>
+          <NFieldGroup.Section title={toMine ? "Recipient · your key" : "Recipient · external"}>
+            <NListItem>
+              <NText>{request.to}</NText>
+            </NListItem>
+            {!toMine ? (
+              <NCheckbox
+                value={ack}
+                onValueChange={setAck}
+                label="This matches the key the recipient gave me"
+              />
+            ) : null}
+            <NFieldGroup.SectionFooter>
+              <NText textStyle={{ fontSize: 12, color: colors.statusAmberFg }}>
+                Once this transaction is broadcast, the handle is theirs. There is
+                no way to undo it.
+              </NText>
+            </NFieldGroup.SectionFooter>
+          </NFieldGroup.Section>
 
-      {!toMine && (
-        <TouchableOpacity style={styles.ackRow} onPress={() => setAck((a) => !a)}>
-          <View style={[styles.checkbox, ack && styles.checkboxOn]}>
-            {ack && <Check size={14} color="#FFFFFF" />}
-          </View>
-          <Text style={styles.ackText}>This matches the key the recipient gave me</Text>
-        </TouchableOpacity>
-      )}
+          {error ? (
+            <NFieldGroup.Section>
+              <NListItem
+                leading={<NIcon name="exclamationmark.triangle.fill" size={18} color={colors.dangerText} />}
+              >
+                <NText textStyle={{ color: colors.textSecondary }}>{error}</NText>
+              </NListItem>
+            </NFieldGroup.Section>
+          ) : null}
 
-      <View style={styles.noteDot}>
-        <Text style={styles.noteText}>
-          Once this transaction is broadcast, the handle is theirs. There is no way
-          to undo it.
-        </Text>
-      </View>
-    </Layout>
+          <NFieldGroup.Section>
+            <NListItem onPress={canSign ? sign : undefined}>
+              <NText
+                textStyle={{ color: canSign ? colors.dangerText : colors.textMuted, fontWeight: "700" }}
+              >
+                {signing ? "Signing…" : "Sign transfer"}
+              </NText>
+            </NListItem>
+            <NListItem onPress={() => router.back()}>
+              <NText textStyle={{ color: colors.textSecondary }}>Cancel</NText>
+            </NListItem>
+          </NFieldGroup.Section>
+        </NFieldGroup>
+      </Host>
+    </>
   );
 }
 
@@ -962,8 +975,9 @@ function SaleConfirm({
   colors: Colors;
 }) {
   const router = useRouter();
+  const { scheme } = useTheme();
   const { handles, xpub, getSigningKey } = useStore();
-  const [payout, setPayout] = useState("");
+  const payout = useNativeState(""); // native input; .value is the payout address
   const [payoutSource, setPayoutSource] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -983,7 +997,7 @@ function SaleConfirm({
             (x) => x.type === "addr" && x.key.toLowerCase() === "btc",
           );
           if (btc?.value[0]) {
-            setPayout(btc.value[0]);
+            payout.value = btc.value[0];
             setPayoutSource("addr · btc");
           }
         }
@@ -1001,14 +1015,14 @@ function SaleConfirm({
       setError("You don't own this handle.");
       return;
     }
-    if (!payout.trim()) {
+    if (!payout.value.trim()) {
       setError("Enter a payout address.");
       return;
     }
     setError(null);
     let outScript: string;
     try {
-      outScript = addressToScriptHex(payout);
+      outScript = addressToScriptHex(payout.value);
     } catch {
       setError("That payout address isn't valid.");
       return;
@@ -1066,73 +1080,81 @@ function SaleConfirm({
   }
 
   return (
-    <Layout underHeader>
+    <>
       <Stack.Screen options={{ title: "Sell handle" }} />
-      <View style={styles.hero}>
-        <Text style={styles.lbl}>Asking price</Text>
-        <Text style={styles.bigPrice}>{formatBtc(request.price)}</Text>
-        <Text style={styles.heroS}>for {request.handle}</Text>
-      </View>
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <NFieldGroup>
+          <NFieldGroup.Section>
+            <NFieldGroup.SectionHeader>
+              <NRow alignment="center">
+                <NSpacer />
+                <NColumn alignment="center" spacing={4}>
+                  <NText textStyle={{ fontSize: 13, color: colors.textSecondary }}>
+                    Asking price
+                  </NText>
+                  <NText textStyle={{ fontSize: 34, fontWeight: "800" }}>
+                    {formatBtc(request.price)}
+                  </NText>
+                  <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
+                    {`for ${request.handle}`}
+                  </NText>
+                </NColumn>
+                <NSpacer />
+              </NRow>
+            </NFieldGroup.SectionHeader>
+          </NFieldGroup.Section>
 
-      <Text style={styles.lbl}>You get paid to</Text>
-      <View style={styles.card}>
-        <TextInput
-          value={payout}
-          onChangeText={setPayout}
-          placeholder="bc1…"
-          placeholderTextColor={colors.placeholder}
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.payoutInput}
-        />
-        {payoutSource && (
-          <>
-            <View style={styles.divider} />
-            <View style={styles.kv}>
-              <Text style={styles.kvK}>From your record</Text>
-              <Text style={[styles.kvV, { fontFamily: "monospace" }]}>{payoutSource}</Text>
-            </View>
-          </>
-        )}
-      </View>
+          <NFieldGroup.Section title="You get paid to">
+            <NListItem>
+              <NTextInput
+                value={payout}
+                placeholder="bc1…"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </NListItem>
+            {payoutSource ? (
+              <NFieldGroup.SectionFooter>
+                <NText textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                  {`Prefilled from your ${payoutSource} record`}
+                </NText>
+              </NFieldGroup.SectionFooter>
+            ) : null}
+          </NFieldGroup.Section>
 
-      <View style={styles.noteDot}>
-        <Text style={styles.noteText}>
-          <Text style={styles.noteStrong}>
-            Anyone who pays {formatBtc(request.price)} can take ownership of this
-            handle.
-          </Text>
-        </Text>
-      </View>
-      <View style={styles.noteWarn}>
-        <AlertCircle size={16} color={colors.statusAmberFg} />
-        <Text style={styles.noteText}>
-          This offer stays valid until you cancel it. Cancelling means moving the
-          handle to yourself.
-        </Text>
-      </View>
+          <NFieldGroup.Section>
+            <NListItem
+              leading={<NIcon name="exclamationmark.triangle.fill" size={18} color={colors.statusAmberFg} />}
+            >
+              <NText>
+                {`Anyone who pays ${formatBtc(request.price)} can take ownership of this handle. The offer stays valid until you cancel it (by moving the handle to yourself).`}
+              </NText>
+            </NListItem>
+          </NFieldGroup.Section>
 
-      {error && (
-        <View style={styles.mt}>
-          <Message message={error} type="error" />
-        </View>
-      )}
+          {error ? (
+            <NFieldGroup.Section>
+              <NListItem
+                leading={<NIcon name="exclamationmark.triangle.fill" size={18} color={colors.dangerText} />}
+              >
+                <NText textStyle={{ color: colors.textSecondary }}>{error}</NText>
+              </NListItem>
+            </NFieldGroup.Section>
+          ) : null}
 
-      <TouchableOpacity
-        style={[styles.dangerBtn, signing && styles.btnDisabled]}
-        onPress={sign}
-        disabled={signing}
-      >
-        {signing ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.dangerBtnText}>Sign offer</Text>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
-        <Text style={styles.secondaryBtnText}>Cancel</Text>
-      </TouchableOpacity>
-    </Layout>
+          <NFieldGroup.Section>
+            <NListItem onPress={signing ? undefined : sign}>
+              <NText textStyle={{ color: colors.dangerText, fontWeight: "700" }}>
+                {signing ? "Signing…" : "Sign offer"}
+              </NText>
+            </NListItem>
+            <NListItem onPress={() => router.back()}>
+              <NText textStyle={{ color: colors.textSecondary }}>Cancel</NText>
+            </NListItem>
+          </NFieldGroup.Section>
+        </NFieldGroup>
+      </Host>
+    </>
   );
 }
 
@@ -1148,6 +1170,7 @@ function RotateConfirm({
   colors: Colors;
 }) {
   const router = useRouter();
+  const { scheme } = useTheme();
   const { handles, xpub, getSigningKey, addPendingRotation } = useStore();
   const [signing, setSigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1209,76 +1232,80 @@ function RotateConfirm({
   }
 
   return (
-    <Layout
-      underHeader
-      footer={
-        <>
-          {error && (
-            <View style={styles.mb}>
-              <Message message={error} type="error" />
-            </View>
-          )}
-          <TouchableOpacity
-            style={[styles.primaryBtn, (signing || !newScript) && styles.btnDisabled]}
-            onPress={sign}
-            disabled={signing || !newScript}
-          >
-            {signing ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryBtnText}>Sign &amp; copy</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
-            <Text style={styles.secondaryBtnText}>Cancel</Text>
-          </TouchableOpacity>
-        </>
-      }
-    >
+    <>
       <Stack.Screen options={{ title: "Rotate key" }} />
-      <View style={styles.hero}>
-        <Text style={styles.heroH}>Move to a new key</Text>
-        <Text style={styles.heroS}>{request.handle} stays yours</Text>
-      </View>
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <NFieldGroup>
+          <NFieldGroup.Section>
+            <NFieldGroup.SectionHeader>
+              <NRow alignment="center">
+                <NSpacer />
+                <NColumn alignment="center" spacing={8}>
+                  <NIcon name="arrow.triangle.2.circlepath" size={40} color={colors.accent} />
+                  <NText textStyle={{ fontSize: 20, fontWeight: "700" }}>
+                    Move to a new key
+                  </NText>
+                  <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
+                    {`${request.handle} stays yours`}
+                  </NText>
+                </NColumn>
+                <NSpacer />
+              </NRow>
+            </NFieldGroup.SectionHeader>
+          </NFieldGroup.Section>
 
-      <View style={styles.lblRow}>
-        <Text style={styles.lbl}>New key</Text>
-        <View style={[styles.tag, styles.tagMine]}>
-          <Text style={styles.tagText}>generated now</Text>
-        </View>
-      </View>
-      <View style={styles.recBlock}>
-        {newScript ? (
-          <ChunkedValue value={newScript} style={styles.recChunk} />
-        ) : (
-          <ActivityIndicator color={colors.accent} />
-        )}
-      </View>
+          <NFieldGroup.Section title="New key · generated now">
+            <NListItem>
+              <NText>{newScript ?? "Preparing…"}</NText>
+            </NListItem>
+          </NFieldGroup.Section>
 
-      <View style={styles.card}>
-        <View style={styles.kv}>
-          <Text style={styles.kvK}>Handle</Text>
-          <Text style={[styles.kvV, { color: colors.statusGreenFg }]}>Stays sovereign</Text>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.kv}>
-          <Text style={styles.kvK}>Live offers</Text>
-          <Text style={[styles.kvV, { color: colors.statusAmberFg }]}>Invalidated</Text>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.kv}>
-          <Text style={styles.kvK}>Records</Text>
-          <Text style={styles.kvV}>Kept</Text>
-        </View>
-      </View>
+          <NFieldGroup.Section title="Effect">
+            <NListItem trailing={<NText textStyle={{ color: colors.statusGreenFg }}>Stays sovereign</NText>}>
+              <NText>Handle</NText>
+            </NListItem>
+            <NListItem trailing={<NText textStyle={{ color: colors.statusAmberFg }}>Invalidated</NText>}>
+              <NText>Live offers</NText>
+            </NListItem>
+            <NListItem trailing={<NText textStyle={{ color: colors.textSecondary }}>Kept</NText>}>
+              <NText>Records</NText>
+            </NListItem>
+            <NFieldGroup.SectionFooter>
+              <NText textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                Copy this to your wallet and broadcast it. The new key takes effect
+                once the move is seen on-chain, which can take up to a day here.
+              </NText>
+            </NFieldGroup.SectionFooter>
+          </NFieldGroup.Section>
 
-      <View style={styles.notePlain}>
-        <Text style={styles.noteText}>
-          Copy this to your wallet and broadcast it. The new key takes effect once
-          the move is seen on-chain, which can take up to a day to clear here.
-        </Text>
-      </View>
-    </Layout>
+          {error ? (
+            <NFieldGroup.Section>
+              <NListItem
+                leading={<NIcon name="exclamationmark.triangle.fill" size={18} color={colors.dangerText} />}
+              >
+                <NText textStyle={{ color: colors.textSecondary }}>{error}</NText>
+              </NListItem>
+            </NFieldGroup.Section>
+          ) : null}
+
+          <NFieldGroup.Section>
+            <NListItem onPress={signing || !newScript ? undefined : sign}>
+              <NText
+                textStyle={{
+                  color: signing || !newScript ? colors.textMuted : colors.accent,
+                  fontWeight: "700",
+                }}
+              >
+                {signing ? "Signing…" : "Sign & copy"}
+              </NText>
+            </NListItem>
+            <NListItem onPress={() => router.back()}>
+              <NText textStyle={{ color: colors.textSecondary }}>Cancel</NText>
+            </NListItem>
+          </NFieldGroup.Section>
+        </NFieldGroup>
+      </Host>
+    </>
   );
 }
 
