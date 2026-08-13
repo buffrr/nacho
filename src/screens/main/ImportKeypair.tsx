@@ -1,119 +1,101 @@
-import React, { useState, useMemo } from "react";
-import { TextInput, StyleSheet } from "react-native";
+import React, { useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  Host,
+  FieldGroup,
+  ListItem,
+  Icon,
+  Text,
+  TextInput,
+  useNativeState,
+} from "@expo/ui";
 import { useStore } from "@/Store";
-import { Colors, useTheme } from "@/theme";
+import { useTheme } from "@/theme";
 import { isValidHandle } from "@/handle";
 import { isValidPrivkeyHex } from "@/keys";
-import { Layout } from "@/ui/Layout";
-import { ScreenSubtitle } from "@/ui/ScreenSubtitle";
-import { Button } from "@/ui/Button";
-import { Message } from "@/ui/Message";
+import { ActionFooter } from "@/ui/actionFooter";
 
 export default function ImportKeypair() {
   const router = useRouter();
   const params = useLocalSearchParams<{ handle?: string }>();
   const { handles, importKeypair } = useStore();
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [handle, setHandle] = useState(params.handle ?? "");
-  const [privkey, setPrivkey] = useState("");
+  const { scheme, colors } = useTheme();
+  const handle = useNativeState(params.handle ?? "");
+  const privkey = useNativeState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const canSubmit =
-    handles !== null &&
-    !isLoading &&
-    isValidHandle(handle) &&
-    isValidPrivkeyHex(privkey);
-
   const submit = async () => {
-    if (!canSubmit) return;
+    if (isLoading || handles === null) return;
     setError(null);
-    if (handle in handles) {
-      setError("This handle already exists in your keystore.");
-      return;
-    }
+    const h = handle.value.trim().toLowerCase();
+    const pk = privkey.value.trim().toLowerCase();
+    if (!isValidHandle(h)) return setError("Enter a valid handle, e.g. me@bitcoin.");
+    if (!isValidPrivkeyHex(pk)) return setError("Enter a valid 64-hex private key.");
+    if (h in handles) return setError("This handle already exists in your keystore.");
     setIsLoading(true);
     try {
-      await importKeypair(handle, privkey);
-      router.replace({ pathname: "/(main)/show-handle", params: { handle } });
+      await importKeypair(h, pk);
+      router.replace({ pathname: "/(main)/show-handle", params: { handle: h } });
     } catch (err) {
       setIsLoading(false);
-      setError(
-        err instanceof Error ? err.message : "Failed to import keypair",
-      );
+      setError(err instanceof Error ? err.message : "Failed to import keypair");
     }
   };
 
   return (
-    <Layout
-      underHeader
-      footer={
-        <Button
-          text={isLoading ? "Importing..." : "Import keypair"}
-          onPress={submit}
-          type="main"
-          disabled={!canSubmit}
-        />
-      }
-    >
-      <ScreenSubtitle>
-        Add a handle backed by an existing private key, not derived from your
-        seed phrase.
-      </ScreenSubtitle>
+    <>
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <FieldGroup>
+          <FieldGroup.Section title="Handle">
+            <ListItem>
+              <TextInput
+                value={handle}
+                placeholder="me@bitcoin"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!isLoading}
+              />
+            </ListItem>
+          </FieldGroup.Section>
 
-      <TextInput
-        value={handle}
-        onChangeText={(text) => {
-          setHandle(text.trim().toLowerCase());
-          setError(null);
+          <FieldGroup.Section title="Private key">
+            <ListItem>
+              <TextInput
+                value={privkey}
+                placeholder="private key (64 hex characters)"
+                autoCapitalize="none"
+                autoCorrect={false}
+                multiline
+                editable={!isLoading}
+              />
+            </ListItem>
+            <FieldGroup.SectionFooter>
+              <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                Adds a handle backed by an existing private key, not derived from
+                your seed phrase.
+              </Text>
+            </FieldGroup.SectionFooter>
+          </FieldGroup.Section>
+
+          {error ? (
+            <FieldGroup.Section>
+              <ListItem
+                leading={<Icon name="exclamationmark.triangle.fill" size={18} color={colors.dangerText} />}
+              >
+                <Text textStyle={{ color: colors.textSecondary }}>{error}</Text>
+              </ListItem>
+            </FieldGroup.Section>
+          ) : null}
+        </FieldGroup>
+      </Host>
+      <ActionFooter
+        primary={{
+          label: isLoading ? "Importing…" : "Import keypair",
+          onPress: submit,
+          disabled: isLoading,
         }}
-        placeholder="me@bitcoin"
-        placeholderTextColor={colors.placeholder}
-        style={styles.input}
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={!isLoading}
       />
-
-      <TextInput
-        value={privkey}
-        onChangeText={(text) => {
-          setPrivkey(text.trim().toLowerCase());
-          setError(null);
-        }}
-        placeholder="private key (64 hex characters)"
-        placeholderTextColor={colors.placeholder}
-        style={[styles.input, styles.privkeyInput]}
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
-        multiline
-        editable={!isLoading}
-      />
-
-      {error && <Message message={error} type="error" />}
-    </Layout>
+    </>
   );
 }
-
-const makeStyles = (c: Colors) =>
-  StyleSheet.create({
-    input: {
-      backgroundColor: c.field,
-      borderRadius: 14,
-      paddingHorizontal: 16,
-      paddingVertical: 17,
-      fontSize: 16,
-      color: c.text,
-      fontFamily: "monospace",
-      marginBottom: 12,
-      // @ts-ignore - web-only style to remove focus outline
-      outlineStyle: "none",
-    } as any,
-    privkeyInput: {
-      minHeight: 80,
-      textAlignVertical: "top",
-    },
-  });
