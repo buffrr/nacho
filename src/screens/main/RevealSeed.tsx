@@ -1,18 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { Host, FieldGroup, ListItem, Icon, Text } from "@expo/ui";
 import { useStore } from "@/Store";
-import { Colors, useTheme } from "@/theme";
-import { Layout } from "@/ui/Layout";
-import { ScreenSubtitle } from "@/ui/ScreenSubtitle";
-import { Button } from "@/ui/Button";
-import { Message } from "@/ui/Message";
+import { useTheme } from "@/theme";
+import { NativeEmpty } from "@/ui/nativeEmpty";
+import { ActionFooter } from "@/ui/actionFooter";
 
 export default function RevealSeed() {
-  const router = useRouter();
   const { getMnemonic } = useStore();
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { scheme, colors } = useTheme();
   const [words, setWords] = useState<string[] | null>(null);
   const [revealed, setRevealed] = useState(false);
 
@@ -28,79 +23,65 @@ export default function RevealSeed() {
 
   if (words !== null && words.length === 0) {
     return (
-      <Layout underHeader>
-        <ScreenSubtitle>
-          No seed phrase is stored on this device.
-        </ScreenSubtitle>
-        <Message
-          message="This keystore was set up without saving its seed phrase. Back it up with the keystore file from Settings instead."
-          type="error"
-        />
-      </Layout>
+      <NativeEmpty
+        sf="exclamationmark.triangle"
+        title="No seed phrase stored"
+        message="This keystore was set up without saving its seed phrase. Back it up with the keystore file from Settings instead."
+      />
     );
   }
 
   return (
-    <Layout
-      underHeader
-      footer={
-        !revealed ? (
-          <Button
-            text="Reveal seed phrase"
-            onPress={() => setRevealed(true)}
-            type="main"
-            disabled={words === null}
-          />
-        ) : undefined
-      }
-    >
-      <ScreenSubtitle>
-        Write these 12 words down in order and keep them offline. Anyone with
-        them controls your handles.
-      </ScreenSubtitle>
-
-      {revealed && words && (
-        <View style={styles.wordsGrid}>
-          {words.map((word, index) => (
-            <View key={index} style={styles.wordItem}>
-              <Text style={styles.wordNumber}>{index + 1}.</Text>
-              <Text style={styles.wordText}>{word}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </Layout>
+    <>
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <FieldGroup>
+          {revealed && words ? (
+            <FieldGroup.Section title="Your seed phrase">
+              {words.map((word, i) => (
+                <ListItem
+                  key={i}
+                  leading={
+                    <Text textStyle={{ color: colors.textMuted, fontWeight: "600" }}>
+                      {`${i + 1}`}
+                    </Text>
+                  }
+                >
+                  <Text textStyle={{ fontWeight: "600" }}>{word}</Text>
+                </ListItem>
+              ))}
+              <FieldGroup.SectionFooter>
+                <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                  Write these 12 words down in order and keep them offline. Anyone
+                  with them controls your handles.
+                </Text>
+              </FieldGroup.SectionFooter>
+            </FieldGroup.Section>
+          ) : (
+            <FieldGroup.Section>
+              <ListItem leading={<Icon name="lock.fill" size={22} color={colors.textMuted} />}>
+                <Text textStyle={{ color: colors.textSecondary }}>
+                  Hidden until you reveal it
+                </Text>
+              </ListItem>
+              <FieldGroup.SectionFooter>
+                <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                  Anyone with your seed phrase controls your handles. Make sure
+                  no one is watching your screen.
+                </Text>
+              </FieldGroup.SectionFooter>
+            </FieldGroup.Section>
+          )}
+        </FieldGroup>
+      </Host>
+      {!revealed ? (
+        <ActionFooter
+          primary={{
+            label: "Reveal seed phrase",
+            onPress: () => setRevealed(true),
+            disabled: words === null,
+          }}
+        />
+      ) : null}
+    </>
   );
 }
-
-const makeStyles = (c: Colors) =>
-  StyleSheet.create({
-    wordsGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "space-between",
-    },
-    wordItem: {
-      width: "48%",
-      backgroundColor: c.field,
-      borderRadius: 10,
-      paddingVertical: 13,
-      paddingHorizontal: 14,
-      marginBottom: 10,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-    },
-    wordNumber: {
-      fontSize: 14,
-      color: c.textMuted,
-      fontWeight: "500",
-      minWidth: 18,
-    },
-    wordText: {
-      fontSize: 15,
-      fontWeight: "500",
-      color: c.text,
-      flex: 1,
-    },
-  });
