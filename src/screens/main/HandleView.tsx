@@ -56,7 +56,7 @@ export default function HandleView() {
   }, [run]);
 
   // Handle shown big under the avatar, so the bar carries no title.
-  const screen = <Stack.Screen options={{ title: "", headerLargeTitle: false }} />;
+  const screen = <Stack.Screen options={{ title: "" }} />;
 
   // Result → the native @expo/ui view, which is its own scroll container (fills
   // the screen directly, not inside the RN Layout ScrollView). Header + native

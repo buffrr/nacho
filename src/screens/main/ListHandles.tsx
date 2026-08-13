@@ -8,7 +8,7 @@ import {
   Row,
   RNHostView,
 } from "@expo/ui";
-import { listRowBackground } from "@expo/ui/swift-ui/modifiers";
+import { listRowBackground, listRowSeparator } from "@expo/ui/swift-ui/modifiers";
 import { PlainList } from "@/ui/PlainList";
 import { HandleData, useStore } from "@/Store";
 import { useTheme } from "@/theme";
@@ -128,18 +128,22 @@ export default function ListHandles() {
   // Paint each row the theme background so the list reads as a plain black list
   // (not SwiftUI's default grouped grey). List-level scrollContentBackground
   // isn't exposed on the universal List, but ListItem forwards row modifiers.
+  // The first row also hides its TOP separator — a plain-style List draws a
+  // hairline above the first cell, which reads as a stray divider under the header.
   const rowBg = [listRowBackground(colors.background)];
+  const rowMods = (i: number) =>
+    i === 0 ? [...rowBg, listRowSeparator("hidden", "top")] : rowBg;
 
   return (
     <Host style={{ flex: 1 }} colorScheme={scheme}>
       <PlainList onRefresh={onRefresh}>
-        {handlesList.map(([name, handleData]) => {
+        {handlesList.map(([name, handleData], i) => {
           const info = infoFor(name, handleData);
           const glyph = glyphFor(info);
           return (
             <ListItem
               key={name}
-              modifiers={rowBg}
+              modifiers={rowMods(i)}
               leading={
                 <RNHostView matchContents style={{ width: 50, height: 50 }}>
                   <Avatar handle={name} size={50} />
@@ -168,9 +172,10 @@ export default function ListHandles() {
           );
         })}
 
-        {/* Shop entry at the end of the list. */}
+        {/* Shop entry at the end of the list. Hide its bottom separator so the
+            list doesn't trail off with a stray divider. */}
         <ListItem
-          modifiers={rowBg}
+          modifiers={[...rowBg, listRowSeparator("hidden", "bottom")]}
           leading={<Icon name="bag" size={22} color={colors.textSecondary} />}
           onPress={() => router.push("/(main)/shop")}
         >

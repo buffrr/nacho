@@ -10,7 +10,7 @@ import {
   Row,
   RNHostView,
 } from "@expo/ui";
-import { listRowBackground } from "@expo/ui/swift-ui/modifiers";
+import { listRowBackground, listRowSeparator } from "@expo/ui/swift-ui/modifiers";
 import { PlainList } from "@/ui/PlainList";
 import type { SFSymbol } from "sf-symbols-typescript";
 import { Colors, useTheme } from "@/theme";
@@ -111,14 +111,23 @@ export default function Recents() {
     );
   }
 
+  // Hide the plain-style List's hairline above the first cell and below the last
+  // (stray dividers at the ends). When editing, the trailing "Clear All" row is
+  // the last one, so the entries don't hide their bottom then.
   const rowBg = [listRowBackground(colors.background)];
+  const rowMods = (i: number) => {
+    const m = [...rowBg];
+    if (i === 0) m.push(listRowSeparator("hidden", "top"));
+    if (!editing && i === entries.length - 1) m.push(listRowSeparator("hidden", "bottom"));
+    return m;
+  };
 
   return (
     <>
       {screen}
       <Host style={{ flex: 1 }} colorScheme={scheme}>
         <PlainList>
-          {entries.map((item) => {
+          {entries.map((item, i) => {
             const count =
               item.recordCount > 0
                 ? `${item.recordCount} record${item.recordCount === 1 ? "" : "s"}`
@@ -127,7 +136,7 @@ export default function Recents() {
             return (
               <ListItem
                 key={item.handle}
-                modifiers={rowBg}
+                modifiers={rowMods(i)}
                 leading={
                   <RNHostView matchContents style={{ width: 50, height: 50 }}>
                     <Avatar handle={item.handle} size={50} />
@@ -163,7 +172,10 @@ export default function Recents() {
           })}
 
           {editing ? (
-            <ListItem modifiers={rowBg} onPress={confirmClear}>
+            <ListItem
+              modifiers={[...rowBg, listRowSeparator("hidden", "bottom")]}
+              onPress={confirmClear}
+            >
               <UIText textStyle={{ color: colors.danger }}>Clear All</UIText>
             </ListItem>
           ) : null}

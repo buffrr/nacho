@@ -16,21 +16,18 @@ export function nativeHeader(colors: Colors) {
   };
 }
 
-// Detail-screen header: the SAME large-title recipe as the Handles tab, so the
-// nav bar carries iOS's scroll-edge "glass" (transparent at rest, blurred as the
-// content scrolls under it). The glass is driven by `headerLargeTitle` + the
-// native scroll-inset tracking — it is mutually exclusive with a forced
-// `headerStyle.backgroundColor` (opaque) or `headerTransparent: true`, so we set
-// neither. The dark `contentStyle` guards against white flashes during the push.
-// Screens with a custom big profile header (show-handle / view-handle) opt out
-// with `headerLargeTitle: false`.
+// Detail-screen header: a transparent native nav bar (same treatment as the tab
+// screens, minus the large title) so content scrolls UNDER it instead of being
+// hard-cut by a flat opaque fill. The dark `contentStyle` guards against white
+// flashes during the push. A screen that wants a large title (Add record, Shop)
+// opts in per-screen with `headerLargeTitle: true`.
 export function solidNativeHeader(colors: Colors) {
   return {
-    headerLargeTitle: true,
+    headerLargeTitle: false,
+    headerTransparent: true,
     headerShadowVisible: false,
     headerTintColor: colors.text,
     headerTitleStyle: { color: colors.text },
-    headerLargeTitleStyle: { color: colors.text },
     contentStyle: { backgroundColor: colors.background },
   };
 }

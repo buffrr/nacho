@@ -1196,7 +1196,7 @@ export default function ShowHandle() {
 
     return (
       <>
-        <Stack.Screen options={{ title: headerTitle, headerLargeTitle: false }} />
+        <Stack.Screen options={{ title: headerTitle }} />
         <HandleStatusNative
           handle={handle}
           icon={sIcon}
@@ -1217,7 +1217,7 @@ export default function ShowHandle() {
     return (
       <>
         <Stack.Screen
-          options={{ title: "", headerLargeTitle: false, unstable_headerRightItems: () => headerItems }}
+          options={{ title: "", unstable_headerRightItems: () => headerItems }}
         />
         <HandleStatusNative
           handle={handle}
@@ -1253,7 +1253,7 @@ export default function ShowHandle() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Stack.Screen
-          options={{ title: "", headerLargeTitle: false, unstable_headerRightItems: () => headerItems }}
+          options={{ title: "", unstable_headerRightItems: () => headerItems }}
         />
         <OwnerProfileNative
           handle={handle}
@@ -1302,7 +1302,7 @@ export default function ShowHandle() {
   if (buyable) {
     return (
       <>
-        <Stack.Screen options={{ title: headerTitle, headerLargeTitle: false }} />
+        <Stack.Screen options={{ title: headerTitle }} />
         <PurchaseNative
           handle={handle}
           pubkey={pubkey}
@@ -1321,7 +1321,7 @@ export default function ShowHandle() {
     return (
       <>
         <Stack.Screen
-          options={{ title: "", headerLargeTitle: false, unstable_headerRightItems: () => removeHeaderItems }}
+          options={{ title: "", unstable_headerRightItems: () => removeHeaderItems }}
         />
         <HandleStatusNative
           handle={handle}
@@ -1339,7 +1339,7 @@ export default function ShowHandle() {
   if (ownedByOther) {
     return (
       <>
-        <Stack.Screen options={{ title: "", headerLargeTitle: false }} />
+        <Stack.Screen options={{ title: "" }} />
         <HandleStatusNative
           handle={handle}
           icon="exclamationmark.triangle.fill"
@@ -1359,7 +1359,7 @@ export default function ShowHandle() {
   // Not owned and not purchasable here → request / unsupported / processing.
   return (
     <>
-      <Stack.Screen options={{ title: headerTitle, headerLargeTitle: false }} />
+      <Stack.Screen options={{ title: headerTitle }} />
       <HandleStatusNative
         handle={handle}
         icon={isProcessingPurchase ? "clock" : "paperplane"}

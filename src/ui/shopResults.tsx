@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { Host, ListItem, Icon, Text, RNHostView } from "@expo/ui";
-import { listRowBackground } from "@expo/ui/swift-ui/modifiers";
+import { Host, ListItem, Text, Button, RNHostView } from "@expo/ui";
+import {
+  listRowBackground,
+  listRowSeparator,
+  controlSize,
+  tint,
+} from "@expo/ui/swift-ui/modifiers";
 import { PlainList } from "@/ui/PlainList";
 import { useStore } from "@/Store";
 import { useTheme } from "@/theme";
@@ -87,27 +92,43 @@ export function ShopResults({
     );
   }
 
+  // Hide the plain-style List's hairline above the first cell and below the last
+  // (stray dividers at the ends).
   const rowBg = [listRowBackground(colors.background)];
+  const rowMods = (i: number, count: number) => {
+    const m = [...rowBg];
+    if (i === 0) m.push(listRowSeparator("hidden", "top"));
+    if (i === count - 1) m.push(listRowSeparator("hidden", "bottom"));
+    return m;
+  };
+  // Trailing "Buy <price>" button: a filled (accent background, white text)
+  // prominent button — tapping it (or the row) opens the buy flow.
+  const pill = [controlSize("small"), tint(colors.accent)];
+
   return (
     <Host style={{ flex: 1 }} colorScheme={scheme}>
       <PlainList>
-        {shown.map((item) => {
+        {shown.map((item, i) => {
           const isAvailable = item.status === "available";
           const price =
             isAvailable && typeof item.price === "number" ? item.price : undefined;
           return (
             <ListItem
               key={item.handle}
-              modifiers={rowBg}
+              modifiers={rowMods(i, shown.length)}
               leading={
                 <RNHostView matchContents style={{ width: 50, height: 50 }}>
                   <Avatar handle={item.handle} size={50} />
                 </RNHostView>
               }
-              supportingText={price !== undefined ? formatPrice(price) : "Unavailable"}
               trailing={
                 isAvailable ? (
-                  <Text textStyle={{ color: colors.accent, fontWeight: "600" }}>Buy</Text>
+                  <Button
+                    label={price !== undefined ? `Buy ${formatPrice(price)}` : "Buy"}
+                    variant="filled"
+                    modifiers={pill}
+                    onPress={() => onBuy(item.handle)}
+                  />
                 ) : (
                   <Text textStyle={{ color: colors.textMuted }}>Taken</Text>
                 )
