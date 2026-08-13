@@ -25,7 +25,7 @@ import {
 } from "@/fabric";
 import { formatAnchor, TrustAnchor, TrustState } from "@/trust";
 
-// How stale a trusted (Safety ID) anchor is relative to the current tip — the
+// How stale a trusted (Trust ID) anchor is relative to the current tip — the
 // semi-trusted anchor tracks the tip, so the block gap tells you how far the
 // trusted snapshot has fallen behind. ~10 min/block for the rough time.
 function stalenessText(trustedHeight: number | null, tip: number | null): string | null {
@@ -56,7 +56,7 @@ export default function Settings() {
   const [tip, setTip] = useState<number | null>(getTipHeight());
   const [refreshing, setRefreshing] = useState(false);
 
-  // Re-read the trusted anchor whenever the tab regains focus, so a Safety ID
+  // Re-read the trusted anchor whenever the tab regains focus, so a Trust ID
   // just scanned in VerifyAnchor shows up on return.
   const syncTrust = useCallback(() => {
     setTrust(getTrustState());
@@ -113,10 +113,10 @@ export default function Settings() {
 
   return (
     <Layout tabBarInset underHeader>
-      {/* YOUR SAFETY ID — the trusted anchor scanned from a local Veritas
+      {/* YOUR TRUST ID — the trusted anchor scanned from a local Veritas
           client. First on the page: it's the strongest guarantee a resolved
           handle is genuine (verified against an anchor you scanned yourself). */}
-      <Text style={styles.sectionLabel}>YOUR SAFETY ID</Text>
+      <Text style={styles.sectionLabel}>YOUR TRUST ID</Text>
 
       {safetyIdSet ? (
         <>
@@ -125,7 +125,7 @@ export default function Settings() {
               <ShieldCheck size={18} color={colors.text} />
             </View>
             <View style={styles.anchorMid}>
-              <Text style={styles.rowTitle}>Safety ID</Text>
+              <Text style={styles.rowTitle}>Trust ID</Text>
               <Text style={styles.rowSub} numberOfLines={1}>
                 {trustedAnchor ? formatAnchor(trustedAnchor) : "Pinned"}
               </Text>
@@ -152,10 +152,10 @@ export default function Settings() {
         <View style={styles.safetyCard}>
           <View style={styles.safetyHead}>
             <AlertCircle size={18} color={colors.text} />
-            <Text style={styles.safetyTitle}>Safety ID</Text>
+            <Text style={styles.safetyTitle}>Trust ID</Text>
           </View>
           <Text style={styles.safetyText}>
-            No Safety ID set. Scan from a local Veritas client to fully verify
+            No Trust ID set. Scan from a local Veritas client to fully verify
             sovereign handles against your own anchor.
           </Text>
           <TouchableOpacity
@@ -172,7 +172,7 @@ export default function Settings() {
       <View style={styles.spacer} />
 
       {/* TRUST FALLBACK SOURCES — the default anchor fetched from public relays,
-          used to verify when no Safety ID is pinned. */}
+          used to verify when no Trust ID is pinned. */}
       <Text style={styles.sectionLabel}>TRUST FALLBACK SOURCES</Text>
 
       <TouchableOpacity
@@ -205,7 +205,7 @@ export default function Settings() {
       </TouchableOpacity>
       <Text style={styles.note}>
         Fetched from a set of public relays and refreshed only when you pull to
-        refresh. Scan your own Safety ID above for self-verification.
+        refresh. Scan your own Trust ID above for self-verification.
       </Text>
 
       <View style={styles.spacer} />

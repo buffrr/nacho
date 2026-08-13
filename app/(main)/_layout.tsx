@@ -37,7 +37,8 @@ export default function MainLayout() {
             contentStyle: { backgroundColor: "transparent" },
           }}
         />
-        {/* show-handle + edit-record set their (dynamic) titles in-component. */}
+        {/* show-handle + edit-record + view-handle set their titles in-component. */}
+        <Stack.Screen name="view-handle" options={{ title: "" }} />
         <Stack.Screen name="shop" options={{ title: "Shop" }} />
         <Stack.Screen name="trust" options={{ title: "Trust" }} />
         <Stack.Screen name="create-request" options={{ title: "Create a request" }} />
@@ -52,6 +53,7 @@ export default function MainLayout() {
         <Stack.Screen name="cancel-offers" options={{ title: "Cancel offers" }} />
         <Stack.Screen name="preferences" options={{ title: "Settings" }} />
         <Stack.Screen name="verify-anchor" options={{ title: "Verify anchor" }} />
+        <Stack.Screen name="trust-approve" options={{ title: "Trust ID" }} />
         <Stack.Screen name="reveal-seed" options={{ title: "Seed phrase" }} />
       </Stack>
     </RecordsDraftProvider>

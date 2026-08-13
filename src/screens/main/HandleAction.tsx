@@ -158,8 +158,6 @@ const makeStyles = (c: Colors) =>
     },
     input: {
       backgroundColor: c.field,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
       borderRadius: 12,
       paddingHorizontal: 14,
       paddingVertical: 13,

@@ -39,6 +39,7 @@ import { resolveHandle, exportCert, publishRecords } from "@/fabric";
 import { loadCert, saveCert } from "@/certStore";
 import { recordsGet } from "@/db";
 import { tierFor, warningLine, needsAck } from "@/recordTiers";
+import { lookupRecord } from "@/recordRegistry";
 import { remainingValidity, formatBtc } from "@/format";
 import { signMessage } from "@/messageSign";
 import { scriptForHandle } from "@/keys";
@@ -628,6 +629,34 @@ function RecordsConfirm({
   );
 }
 
+// The registry icon + friendly label for a record, with the raw `type · key`
+// beneath it for transparency (the approval screen must always show exactly what
+// key is changing). Matches how records render on the resolve / handle screens.
+function RecMeta({
+  rtype,
+  rkey,
+  styles,
+}: {
+  rtype: string;
+  rkey: string;
+  styles: Styles;
+}) {
+  const { def } = lookupRecord(rtype, rkey);
+  return (
+    <>
+      <View style={[styles.recIco, { backgroundColor: def.color + "22" }]}>
+        <def.Icon size={16} color={def.color} />
+      </View>
+      <View style={styles.recMetaMid}>
+        <Text style={styles.recName}>{def.label}</Text>
+        <Text style={styles.recKey}>
+          {rtype} · {rkey}
+        </Text>
+      </View>
+    </>
+  );
+}
+
 function RecordDiffView({
   diff,
   acks,
@@ -653,15 +682,13 @@ function RecordDiffView({
         return (
           <View key={`a${i}`} style={styles.recBlock}>
             <View style={styles.recHead}>
+              <RecMeta rtype={r.type} rkey={r.key} styles={styles} />
               <View style={[styles.opTag, { backgroundColor: colors.statusGreenBg }]}>
                 <Plus size={12} color={colors.statusGreenFg} />
                 <Text style={[styles.opTagText, { color: colors.statusGreenFg }]}>
                   add
                 </Text>
               </View>
-              <Text style={styles.recKey}>
-                {r.type} · {r.key}
-              </Text>
             </View>
             {tier === "generic" ? (
               <Text style={styles.recVal}>{r.value.join(", ")}</Text>
@@ -697,26 +724,14 @@ function RecordDiffView({
       {diff.replaced.map((r, i) => (
         <View key={`r${i}`} style={styles.recBlock}>
           <View style={styles.recHead}>
-            <View style={[styles.opTag, { backgroundColor: colors.border }]}>
-              <Text style={[styles.opTagText, { color: colors.textSecondary }]}>
-                was
-              </Text>
-            </View>
-            <Text style={styles.recKey}>
-              {r.before.type} · {r.before.key}
-            </Text>
-          </View>
-          <Text style={styles.recValOld}>{r.before.value.join(", ")}</Text>
-          <View style={[styles.recHead, { marginTop: 8 }]}>
+            <RecMeta rtype={r.after.type} rkey={r.after.key} styles={styles} />
             <View style={[styles.opTag, { backgroundColor: colors.statusGreenBg }]}>
               <Text style={[styles.opTagText, { color: colors.statusGreenFg }]}>
-                now
+                replace
               </Text>
             </View>
-            <Text style={styles.recKey}>
-              {r.after.type} · {r.after.key}
-            </Text>
           </View>
+          <Text style={styles.recValOld}>{r.before.value.join(", ")}</Text>
           <Text style={styles.recVal}>{r.after.value.join(", ")}</Text>
         </View>
       ))}
@@ -727,13 +742,11 @@ function RecordDiffView({
       {diff.removed.map((r, i) => (
         <View key={`d${i}`} style={styles.recBlock}>
           <View style={styles.recHead}>
+            <RecMeta rtype={r.type} rkey={r.key} styles={styles} />
             <View style={[styles.opTag, { backgroundColor: "#DC262622" }]}>
               <Trash size={12} color="#DC2626" />
               <Text style={[styles.opTagText, { color: "#DC2626" }]}>remove</Text>
             </View>
-            <Text style={styles.recKey}>
-              {r.type} · {r.key}
-            </Text>
           </View>
           <Text style={styles.recValOld}>{r.value.join(", ")}</Text>
         </View>
@@ -1279,23 +1292,17 @@ const makeStyles = (c: Colors) =>
     } as any,
     noteDot: {
       backgroundColor: c.statusAmberBg,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
       borderRadius: 12,
       padding: 13,
       marginTop: 12,
     },
     card: {
       backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
       borderRadius: 16,
       overflow: "hidden",
     },
     cardTop: {
       backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
       borderRadius: 16,
       overflow: "hidden",
       marginTop: 14,
@@ -1327,13 +1334,20 @@ const makeStyles = (c: Colors) =>
     pickName: { flex: 1, fontSize: 16, fontWeight: "600", color: c.text },
     recBlock: {
       backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
       borderRadius: 14,
       padding: 14,
       marginBottom: 10,
     },
-    recHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+    recHead: { flexDirection: "row", alignItems: "center", gap: 10 },
+    recIco: {
+      width: 30,
+      height: 30,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    recMetaMid: { flex: 1, gap: 1 },
+    recName: { fontSize: 14.5, fontWeight: "500", color: c.text },
     opTag: {
       flexDirection: "row",
       alignItems: "center",
@@ -1355,8 +1369,6 @@ const makeStyles = (c: Colors) =>
     },
     notePlain: {
       backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
       borderRadius: 12,
       padding: 13,
       marginTop: 12,
@@ -1366,8 +1378,6 @@ const makeStyles = (c: Colors) =>
       gap: 10,
       alignItems: "flex-start",
       backgroundColor: c.statusAmberBg,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
       borderRadius: 12,
       padding: 12,
       marginTop: 10,
@@ -1393,8 +1403,6 @@ const makeStyles = (c: Colors) =>
     ackText: { flex: 1, fontSize: 13, color: c.textSecondary, lineHeight: 19 },
     blob: {
       backgroundColor: c.field,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
       borderRadius: 12,
       padding: 14,
       marginBottom: 4,

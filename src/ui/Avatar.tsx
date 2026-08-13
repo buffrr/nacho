@@ -3,6 +3,7 @@ import { View, StyleSheet } from "react-native";
 import Svg, { Defs, LinearGradient, Stop, Circle } from "react-native-svg";
 import { AtSign } from "@/ui/icons";
 import { avatarGradient } from "@/handleTile";
+import { useTheme } from "@/theme";
 
 // The single source of the handle-avatar look (used in the list, handle screen,
 // Shop and Resolve so it stays consistent): a circular vertical gradient with a
@@ -12,7 +13,8 @@ export function Avatar({ handle, size = 44 }: { handle: string; size?: number })
   // Unique gradient id per instance (RNSVG registers ids; colons from useId
   // aren't valid in a url(#…) reference).
   const gid = "ag" + useId().replace(/[^a-zA-Z0-9]/g, "");
-  const [from, to] = avatarGradient(handle);
+  const { scheme } = useTheme();
+  const [from, to] = avatarGradient(handle, scheme);
   return (
     <View style={{ width: size, height: size }}>
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>

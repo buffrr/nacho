@@ -80,7 +80,8 @@ export default function Scan() {
       if (
         parsed.kind === "handle" ||
         parsed.kind === "uri" ||
-        parsed.kind === "sign"
+        parsed.kind === "sign" ||
+        parsed.kind === "trust"
       ) {
         lock(parsed);
       } else {
@@ -134,13 +135,20 @@ export default function Scan() {
     }
   };
 
-  // A signing request goes straight to its confirmation screen (which is the
-  // real gate) rather than through the result card. Returning to this tab
-  // re-arms scanning via the focus effect above.
+  // A signing request or a Trust ID goes straight to its confirmation screen
+  // (the real gate) rather than through the result card. A Trust ID is critical —
+  // pinning it changes how every handle verifies — so it is NEVER accepted here;
+  // the approval screen requires an explicit tap. Returning to this tab re-arms
+  // scanning via the focus effect above.
   useEffect(() => {
     if (result?.kind === "sign") {
       const req = extractReqParam(result.value);
       router.push({ pathname: "/(main)/sign", params: { req: req ?? "" } });
+    } else if (result?.kind === "trust") {
+      router.push({
+        pathname: "/(main)/trust-approve",
+        params: { payload: result.value },
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result]);

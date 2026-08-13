@@ -129,15 +129,20 @@ export function handleTileInfo(args: {
   };
 }
 
-// A single calm avatar gradient for every handle — the desaturated grey-purple
-// iOS uses for a contact with no assigned colour (see img_24): a vertical
-// gradient, lighter at the top. Dropping per-handle colours reads calmer and
-// more mature (the handle string is the identity, not a colour). Rendered by
-// <Avatar> (src/ui/Avatar.tsx) everywhere avatars appear; reads on dark + light.
-const AVATAR_GRAY: [string, string] = ["#6E6B7E", "#474455"];
+// A single calm avatar gradient for every handle — the desaturated tone
+// iMessage/Contacts uses for an initial avatar: a vertical gradient, lighter at
+// the top. Dark mode is the grey-purple (bottom #2D283F → top #555265); light
+// mode is the airy blue (bottom #7580BA → top #A6BFDE). <Avatar> draws the first
+// stop at the TOP, so `from` is the lighter top colour. Dropping per-handle
+// colours reads calmer and more mature (the handle string is the identity).
+const AVATAR_DARK: [string, string] = ["#555265", "#2D283F"];
+const AVATAR_LIGHT: [string, string] = ["#A6BFDE", "#7580BA"];
 
-// Signature kept (takes a handle) so callers don't change; the colour is now
-// constant regardless of the handle.
-export function avatarGradient(_handle: string): [string, string] {
-  return AVATAR_GRAY;
+// Signature takes a handle (kept for callers) plus the colour scheme; the colour
+// is constant per scheme, independent of the handle.
+export function avatarGradient(
+  _handle: string,
+  scheme: "light" | "dark" = "dark",
+): [string, string] {
+  return scheme === "light" ? AVATAR_LIGHT : AVATAR_DARK;
 }

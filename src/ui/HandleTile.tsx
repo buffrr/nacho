@@ -75,7 +75,8 @@ const makeStyles = (c: Colors) =>
       flexDirection: "row",
       alignItems: "center",
       gap: 14,
-      paddingHorizontal: 20,
+      paddingLeft: 24,
+      paddingRight: 18,
       paddingVertical: 14,
     },
     // Needs-action rows get a subtle amber wash rather than a border.

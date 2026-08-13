@@ -115,11 +115,14 @@ export const darkColors: Colors = {
 };
 
 export const lightColors: Colors = {
-  background: "#FFFFFF",
+  // iOS grouped style: the screen is a light grey so white cards/fields stand
+  // out as distinct groups (previously bg + card were both white → cards
+  // vanished into the screen). Cards + inputs are white to pop off the grey.
+  background: "#F2F2F7",
   card: "#FFFFFF",
-  surface: "#F2F3F6",
+  surface: "#FFFFFF",
   surfaceSunken: "#E9EAED",
-  field: "#F2F3F6",
+  field: "#FFFFFF",
   chip: "#E5E6E9",
   tileNeutral: "#0E0E12",
   text: "#0E0E12",

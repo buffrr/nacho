@@ -182,12 +182,12 @@ const makeStyles = (c: Colors) =>
       flex: 1,
       backgroundColor: c.background,
     },
-    // Hairline inset to the text start (row pad 20 + avatar 50 + gap 14),
+    // Hairline inset to the text start (row padLeft 24 + avatar 50 + gap 14),
     // full-bleed to the right edge — Messages style.
     separator: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: c.border,
-      marginLeft: 84,
+      marginLeft: 88,
     },
     empty: {
       alignItems: "center",

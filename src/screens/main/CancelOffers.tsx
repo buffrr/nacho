@@ -193,8 +193,6 @@ const makeStyles = (c: Colors) =>
     heroS: { fontSize: 14, color: c.textSecondary, textAlign: "center", lineHeight: 20 },
     card: {
       backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
       borderRadius: 16,
       overflow: "hidden",
     },
@@ -210,8 +208,6 @@ const makeStyles = (c: Colors) =>
     divider: { height: 1, backgroundColor: c.border },
     note: {
       backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
       borderRadius: 12,
       padding: 13,
       marginTop: 12,

@@ -87,7 +87,9 @@ export default function RegisterHub() {
                   onPress={select(go)}
                   activeOpacity={0.6}
                 >
-                  <Icon size={24} color={colors.accent} />
+                  {/* Neutral secondary tint — accent-coloured icons here read
+                      less native than a calm monochrome row. */}
+                  <Icon size={24} color={colors.textSecondary} />
                   <View style={styles.mid}>
                     <Text style={styles.rowTitle}>{title}</Text>
                     <Text style={styles.rowSub}>{subtitle}</Text>

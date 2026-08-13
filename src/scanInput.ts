@@ -9,6 +9,7 @@ export type ScanInput =
   | { kind: "handle"; value: string }
   | { kind: "uri"; value: string }
   | { kind: "sign"; value: string }
+  | { kind: "trust"; value: string }
   | { kind: "unknown"; value: string };
 
 const HANDLE_RE = /^[a-z0-9._-]+@[a-z0-9._-]+$/i;
@@ -17,7 +18,12 @@ export function interpret(raw: string): ScanInput {
   const text = raw.trim();
   if (!text) return { kind: "unknown", value: text };
 
-  // A signing request (checked first — its URL would otherwise fall through as
+  // A Veritas Trust ID (`veritas://scan?id=…`). Critical — pinning it changes how
+  // every handle is verified — so the Scan screen must route it to an explicit
+  // approval, never pin it silently. Checked first so it can't fall through.
+  if (/^veritas:\/\//i.test(text)) return { kind: "trust", value: text };
+
+  // A signing request (checked next — its URL would otherwise fall through as
   // "unknown"). The envelope is validated later, on the confirmation screen.
   if (isSignRequestUrl(text)) return { kind: "sign", value: text };
 

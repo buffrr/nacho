@@ -333,21 +333,18 @@ export default function ShowHandle() {
   };
 
   // Runs once a nacho purchase succeeds: record the purchase (so we show the
-  // reassuring "Purchase complete" state, not the plain "waiting for cert"),
-  // pin the latest anchor, then reset the stack so Back lands on Your handles
-  // rather than the Shop/search screen this was pushed from.
+  // reassuring "Purchase complete" state, not the plain "waiting for cert") and
+  // pin the latest anchor. The onboarding (issuing → ready → sovereign) then
+  // plays out IN PLACE on this screen — we deliberately do NOT rebuild the nav
+  // stack here, because doing so mid-onboarding slid the screen out and back,
+  // flashing the "handle is yours" state twice. The Back → Your handles reset
+  // happens once the user finishes onboarding (see dismissOnboarding).
   const finalizePurchase = async () => {
     await fetchAndUpdateHandleStatus();
     // The purchase advanced the chain, so pin the latest anchor before resolving
     // — otherwise the just-bought handle is newer than the pinned anchor.
     await refreshSemiTrust();
     await setHandlePurchase(handle, price !== null ? { amountCents: price } : {});
-    // Rebuild the stack as [handles tab, this handle] so Back lands on Your
-    // handles (not the Shop/Redeem screen this was pushed from). Expo Router has
-    // no `reset`; dismiss the detail stack, switch to the handles tab, re-push.
-    if (router.canDismiss()) router.dismissAll();
-    router.navigate("/(main)/(tabs)/handles");
-    router.push({ pathname: "/(main)/show-handle", params: { handle } });
   };
 
   // `fresh` uses a throwaway Fabric client so the SDK's zone cache can't return
@@ -770,7 +767,18 @@ export default function ShowHandle() {
   };
 
 
-  const dismissOnboarding = () => setHandleOnboarded(handle, true);
+  // Finishing onboarding ("Set up records" / "Continue"): mark it done, then
+  // rebuild the stack as [handles tab, this handle] so Back lands on Your handles
+  // (not the Shop/Redeem screen this was pushed from). We await the onboarded
+  // flag first so the re-pushed screen reads it as true and opens straight into
+  // the normal editor — no onboarding flash. Doing the reset here, on an explicit
+  // tap, means the only stack transition is one the user asked for.
+  const dismissOnboarding = async () => {
+    await setHandleOnboarded(handle, true);
+    if (router.canDismiss()) router.dismissAll();
+    router.navigate("/(main)/(tabs)/handles");
+    router.push({ pathname: "/(main)/show-handle", params: { handle } });
+  };
 
   // Bought through nacho's IAP → show the reassuring "Purchase complete /
   // issuing certificate" state; handles registered elsewhere fall back to the
