@@ -1,36 +1,34 @@
-import React, { useMemo, useState } from "react";
+import React from "react";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import {
-  View,
+  Host,
+  FieldGroup,
+  ListItem,
+  Icon,
   Text,
   TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { Colors, useTheme } from "@/theme";
-import { Layout } from "@/ui/Layout";
-import { Message } from "@/ui/Message";
+  useNativeState,
+} from "@expo/ui";
+import { useTheme } from "@/theme";
 import { encodeSignRequest, extractReqParam, SignRequest } from "@/signRequest";
 
-// User-initiated Sell / Transfer, off any QR/deeplink: the user supplies the
-// handle's current outpoint (txid:vout + value) and the terms, and we build the
-// same v2 envelope + route through the normal /sign confirmation. This is how a
-// user starts a tx when there's no request to scan (design-notes.md §6).
+// User-initiated Sell / Transfer / Rotate, off any QR/deeplink: the user supplies
+// the handle's current outpoint (txid:vout + value) and terms, and we build the
+// same v2 envelope + route through /sign. Native @expo/ui form.
 export default function HandleAction() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { scheme, colors } = useTheme();
   const router = useRouter();
   const { handle, action } = useLocalSearchParams<{
     handle: string;
     action: "sale" | "transfer" | "rotate";
   }>();
 
-  const [txid, setTxid] = useState("");
-  const [vout, setVout] = useState("0");
-  const [amount, setAmount] = useState("");
-  const [to, setTo] = useState(""); // transfer
-  const [price, setPrice] = useState(""); // sale
-  const [error, setError] = useState<string | null>(null);
+  const txid = useNativeState("");
+  const vout = useNativeState("0");
+  const amount = useNativeState("");
+  const to = useNativeState(""); // transfer
+  const price = useNativeState(""); // sale
+  const [error, setError] = React.useState<string | null>(null);
 
   const isSale = action === "sale";
   const isRotate = action === "rotate";
@@ -38,144 +36,93 @@ export default function HandleAction() {
 
   const proceed = () => {
     setError(null);
-    if (!/^[0-9a-fA-F]{64}$/.test(txid.trim()))
+    if (!/^[0-9a-fA-F]{64}$/.test(txid.value.trim()))
       return setError("Enter a valid 64-character txid.");
-    const voutN = Number(vout);
-    const amountN = Number(amount);
+    const voutN = Number(vout.value);
+    const amountN = Number(amount.value);
     if (!Number.isInteger(voutN) || voutN < 0) return setError("Enter a valid vout.");
     if (!Number.isInteger(amountN) || amountN <= 0)
       return setError("Enter the UTXO value in ₿ base units.");
 
-    // User-initiated → no expiry (nothing external is waiting on a deadline).
-    const outpoint = { txid: txid.trim().toLowerCase(), vout: voutN, amount: amountN };
+    const outpoint = { txid: txid.value.trim().toLowerCase(), vout: voutN, amount: amountN };
     let req: SignRequest;
     if (isSale) {
-      const priceN = Number(price);
+      const priceN = Number(price.value);
       if (!Number.isInteger(priceN) || priceN <= 0)
         return setError("Enter a price in ₿ base units.");
       req = { v: 1, type: "sale", handle: handle!, price: priceN, outpoint };
     } else if (isRotate) {
       req = { v: 1, type: "rotate", handle: handle!, outpoint };
     } else {
-      if (!/^[0-9a-fA-F]+$/.test(to.trim()))
+      if (!/^[0-9a-fA-F]+$/.test(to.value.trim()))
         return setError("Enter the recipient's script (hex).");
-      req = { v: 1, type: "transfer", handle: handle!, to: to.trim().toLowerCase(), outpoint };
+      req = {
+        v: 1,
+        type: "transfer",
+        handle: handle!,
+        to: to.value.trim().toLowerCase(),
+        outpoint,
+      };
     }
     const param = extractReqParam(encodeSignRequest(req));
     router.replace({ pathname: "/(main)/sign", params: { req: param ?? "" } });
   };
 
   return (
-    <Layout underHeader>
+    <>
       <Stack.Screen options={{ title }} />
-      <Text style={styles.prompt}>
-        Enter the handle's current UTXO
-        {isSale ? " and the price" : isRotate ? "" : " and the recipient"}. You'll
-        review and sign on the next screen.
-      </Text>
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <FieldGroup>
+          <FieldGroup.Section title="Current UTXO">
+            <ListItem>
+              <TextInput value={txid} placeholder="txid (64 hex)" autoCapitalize="none" autoCorrect={false} />
+            </ListItem>
+            <ListItem>
+              <TextInput value={vout} placeholder="vout" keyboardType="number-pad" />
+            </ListItem>
+            <ListItem>
+              <TextInput value={amount} placeholder="value (₿ base units)" keyboardType="number-pad" />
+            </ListItem>
+            <FieldGroup.SectionFooter>
+              <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                You’ll review and sign on the next screen.
+              </Text>
+            </FieldGroup.SectionFooter>
+          </FieldGroup.Section>
 
-      <Text style={styles.lbl}>UTXO</Text>
-      <TextInput
-        value={txid}
-        onChangeText={setTxid}
-        placeholder="txid (64 hex)"
-        placeholderTextColor={colors.placeholder}
-        autoCapitalize="none"
-        autoCorrect={false}
-        style={styles.input}
-      />
-      <View style={styles.row}>
-        <TextInput
-          value={vout}
-          onChangeText={setVout}
-          placeholder="vout"
-          placeholderTextColor={colors.placeholder}
-          keyboardType="number-pad"
-          style={[styles.input, styles.half]}
-        />
-        <TextInput
-          value={amount}
-          onChangeText={setAmount}
-          placeholder="value (₿ base units)"
-          placeholderTextColor={colors.placeholder}
-          keyboardType="number-pad"
-          style={[styles.input, styles.half]}
-        />
-      </View>
+          {isSale ? (
+            <FieldGroup.Section title="Price (₿ base units)">
+              <ListItem>
+                <TextInput value={price} placeholder="500000" keyboardType="number-pad" />
+              </ListItem>
+            </FieldGroup.Section>
+          ) : null}
 
-      {isSale && (
-        <>
-          <Text style={styles.lbl}>Price (₿ base units)</Text>
-          <TextInput
-            value={price}
-            onChangeText={setPrice}
-            placeholder="500000"
-            placeholderTextColor={colors.placeholder}
-            keyboardType="number-pad"
-            style={styles.input}
-          />
-        </>
-      )}
-      {!isSale && !isRotate && (
-        <>
-          <Text style={styles.lbl}>Recipient script (hex)</Text>
-          <TextInput
-            value={to}
-            onChangeText={setTo}
-            placeholder="5120…"
-            placeholderTextColor={colors.placeholder}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.input}
-          />
-        </>
-      )}
+          {!isSale && !isRotate ? (
+            <FieldGroup.Section title="Recipient script (hex)">
+              <ListItem>
+                <TextInput value={to} placeholder="5120…" autoCapitalize="none" autoCorrect={false} />
+              </ListItem>
+            </FieldGroup.Section>
+          ) : null}
 
-      {error && (
-        <View style={styles.mt}>
-          <Message message={error} type="error" />
-        </View>
-      )}
+          {error ? (
+            <FieldGroup.Section>
+              <ListItem
+                leading={<Icon name="exclamationmark.triangle.fill" size={18} color={colors.dangerText} />}
+              >
+                <Text textStyle={{ color: colors.textSecondary }}>{error}</Text>
+              </ListItem>
+            </FieldGroup.Section>
+          ) : null}
 
-      <TouchableOpacity style={styles.primaryBtn} onPress={proceed}>
-        <Text style={styles.primaryBtnText}>Review</Text>
-      </TouchableOpacity>
-    </Layout>
+          <FieldGroup.Section>
+            <ListItem onPress={proceed}>
+              <Text textStyle={{ color: colors.accent, fontWeight: "700" }}>Review</Text>
+            </ListItem>
+          </FieldGroup.Section>
+        </FieldGroup>
+      </Host>
+    </>
   );
 }
-
-const makeStyles = (c: Colors) =>
-  StyleSheet.create({
-    prompt: { fontSize: 15, color: c.textSecondary, marginBottom: 18, lineHeight: 21 },
-    lbl: {
-      fontSize: 12,
-      fontWeight: "600",
-      letterSpacing: 0.5,
-      color: c.textMuted,
-      textTransform: "uppercase",
-      marginTop: 14,
-      marginBottom: 8,
-    },
-    input: {
-      backgroundColor: c.field,
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 13,
-      fontSize: 14,
-      color: c.text,
-      fontFamily: "monospace",
-      // @ts-ignore web-only
-      outlineStyle: "none",
-    } as any,
-    row: { flexDirection: "row", gap: 10, marginTop: 10 },
-    half: { flex: 1 },
-    mt: { marginTop: 16 },
-    primaryBtn: {
-      backgroundColor: c.accent,
-      borderRadius: 14,
-      paddingVertical: 16,
-      alignItems: "center",
-      marginTop: 24,
-    },
-    primaryBtnText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
-  });
