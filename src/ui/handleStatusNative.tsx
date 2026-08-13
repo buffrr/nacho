@@ -13,6 +13,7 @@ import {
 } from "@expo/ui";
 import { useTheme } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
+import { ActionFooter } from "@/ui/actionFooter";
 
 export type StatusDetail = { label: string; value: string };
 export type StatusAction = { label: string; onPress: () => void };
@@ -44,7 +45,8 @@ export function HandleStatusNative({
 }) {
   const { scheme, colors } = useTheme();
   return (
-    <Host style={{ flex: 1 }} colorScheme={scheme}>
+    <>
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
       <FieldGroup>
         <FieldGroup.Section>
           <FieldGroup.SectionHeader>
@@ -85,23 +87,11 @@ export function HandleStatusNative({
           </FieldGroup.Section>
         ) : null}
 
-        {primary || secondary ? (
-          <FieldGroup.Section>
-            {primary ? (
-              <ListItem onPress={primary.onPress}>
-                <Text textStyle={{ color: colors.accent, fontWeight: "600" }}>
-                  {primary.label}
-                </Text>
-              </ListItem>
-            ) : null}
-            {secondary ? (
-              <ListItem onPress={secondary.onPress}>
-                <Text textStyle={{ color: colors.accent }}>{secondary.label}</Text>
-              </ListItem>
-            ) : null}
-          </FieldGroup.Section>
-        ) : null}
       </FieldGroup>
-    </Host>
+      </Host>
+      {primary || secondary ? (
+        <ActionFooter primary={primary} secondary={secondary} />
+      ) : null}
+    </>
   );
 }

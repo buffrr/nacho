@@ -13,6 +13,7 @@ import {
 } from "@expo/ui";
 import { useTheme } from "@/theme";
 import { NativeEmpty } from "@/ui/nativeEmpty";
+import { ActionFooter } from "@/ui/actionFooter";
 import { useStore } from "@/Store";
 import { scriptForHandle } from "@/keys";
 import { signSingleAnyonecanpay } from "@/psbtSign";
@@ -93,18 +94,12 @@ export default function CancelOffers() {
                 </Row>
               </FieldGroup.SectionHeader>
             </FieldGroup.Section>
-            <FieldGroup.Section>
-              <ListItem onPress={copy}>
-                <Text textStyle={{ color: colors.accent, fontWeight: "700" }}>
-                  {copied ? "Copied ✓" : "Copy transaction"}
-                </Text>
-              </ListItem>
-              <ListItem onPress={() => router.back()}>
-                <Text textStyle={{ color: colors.textSecondary }}>Done</Text>
-              </ListItem>
-            </FieldGroup.Section>
           </FieldGroup>
         </Host>
+        <ActionFooter
+          primary={{ label: copied ? "Copied ✓" : "Copy transaction", onPress: copy }}
+          secondary={{ label: "Done", onPress: () => router.back() }}
+        />
       </>
     );
   }
@@ -166,18 +161,12 @@ export default function CancelOffers() {
             </FieldGroup.Section>
           ) : null}
 
-          <FieldGroup.Section>
-            <ListItem onPress={signing ? undefined : sign}>
-              <Text textStyle={{ color: colors.accent, fontWeight: "700" }}>
-                {signing ? "Signing…" : "Sign & copy"}
-              </Text>
-            </ListItem>
-            <ListItem onPress={() => router.back()}>
-              <Text textStyle={{ color: colors.textSecondary }}>Cancel</Text>
-            </ListItem>
-          </FieldGroup.Section>
         </FieldGroup>
       </Host>
+      <ActionFooter
+        primary={{ label: signing ? "Signing…" : "Sign & copy", onPress: sign, disabled: signing }}
+        secondary={{ label: "Cancel", onPress: () => router.back() }}
+      />
     </>
   );
 }

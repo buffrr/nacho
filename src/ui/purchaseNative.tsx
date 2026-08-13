@@ -12,6 +12,7 @@ import {
 } from "@expo/ui";
 import { useTheme } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
+import { ActionFooter } from "@/ui/actionFooter";
 import { formatPrice } from "@/api";
 
 // Native buy view for an available handle: profile + why-own it + the key it
@@ -37,7 +38,8 @@ export function PurchaseNative({
   const { scheme, colors } = useTheme();
   const priceText = price !== null ? formatPrice(price) : "—";
   return (
-    <Host style={{ flex: 1 }} colorScheme={scheme}>
+    <>
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
       <FieldGroup>
         <FieldGroup.Section>
           <FieldGroup.SectionHeader>
@@ -88,21 +90,20 @@ export function PurchaseNative({
           </ListItem>
         </FieldGroup.Section>
 
-        <FieldGroup.Section>
-          <ListItem onPress={purchasing ? undefined : onBuy}>
-            <Text textStyle={{ color: colors.accent, fontWeight: "700" }}>
-              {purchasing
-                ? "Processing…"
-                : price !== null
-                  ? `Buy handle · ${priceText}`
-                  : "Buy handle"}
-            </Text>
-          </ListItem>
-          <ListItem onPress={onCopyRequest}>
-            <Text textStyle={{ color: colors.textSecondary }}>Copy request</Text>
-          </ListItem>
-        </FieldGroup.Section>
       </FieldGroup>
-    </Host>
+      </Host>
+      <ActionFooter
+        primary={{
+          label: purchasing
+            ? "Processing…"
+            : price !== null
+              ? `Buy handle · ${priceText}`
+              : "Buy handle",
+          onPress: onBuy,
+          disabled: purchasing,
+        }}
+        secondary={{ label: "Copy request", onPress: onCopyRequest }}
+      />
+    </>
   );
 }

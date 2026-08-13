@@ -26,6 +26,7 @@ import {
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
 import { Message } from "@/ui/Message";
+import { ActionFooter } from "@/ui/actionFooter";
 import { ChunkedValue } from "@/ui/ChunkedValue";
 import { useStore } from "@/Store";
 import {
@@ -219,35 +220,20 @@ function ResultView({
             </NFieldGroup.Section>
           ) : null}
 
-          <NFieldGroup.Section>
-            {host && !sent ? (
-              <>
-                <NListItem onPress={sending ? undefined : send}>
-                  <NText textStyle={{ color: colors.accent, fontWeight: "700" }}>
-                    {sending ? "Sending…" : `Send to ${host}`}
-                  </NText>
-                </NListItem>
-                <NListItem onPress={copy}>
-                  <NText textStyle={{ color: colors.textSecondary }}>
-                    {copied ? "Copied ✓" : "Copy response"}
-                  </NText>
-                </NListItem>
-              </>
-            ) : (
-              <>
-                <NListItem onPress={copy}>
-                  <NText textStyle={{ color: colors.accent, fontWeight: "700" }}>
-                    {copied ? "Copied ✓" : "Copy response"}
-                  </NText>
-                </NListItem>
-                <NListItem onPress={() => router.back()}>
-                  <NText textStyle={{ color: colors.textSecondary }}>Done</NText>
-                </NListItem>
-              </>
-            )}
-          </NFieldGroup.Section>
         </NFieldGroup>
       </Host>
+      <ActionFooter
+        primary={
+          host && !sent
+            ? { label: sending ? "Sending…" : `Send to ${host}`, onPress: send, disabled: sending }
+            : { label: copied ? "Copied ✓" : "Copy response", onPress: copy }
+        }
+        secondary={
+          host && !sent
+            ? { label: copied ? "Copied ✓" : "Copy response", onPress: copy }
+            : { label: "Done", onPress: () => router.back() }
+        }
+      />
     </>
   );
 }
@@ -387,18 +373,16 @@ function MessageConfirm({
             </NFieldGroup.Section>
           ) : null}
 
-          <NFieldGroup.Section>
-            <NListItem onPress={signing ? undefined : sign}>
-              <NText textStyle={{ color: colors.accent, fontWeight: "700" }}>
-                {signing ? "Signing…" : host ? `Sign & send to ${host}` : "Sign"}
-              </NText>
-            </NListItem>
-            <NListItem onPress={() => router.back()}>
-              <NText textStyle={{ color: colors.textSecondary }}>Cancel</NText>
-            </NListItem>
-          </NFieldGroup.Section>
         </NFieldGroup>
       </Host>
+      <ActionFooter
+        primary={{
+          label: signing ? "Signing…" : host ? `Sign & send to ${host}` : "Sign",
+          onPress: sign,
+          disabled: signing,
+        }}
+        secondary={{ label: "Cancel", onPress: () => router.back() }}
+      />
     </>
   );
 }
@@ -592,28 +576,21 @@ function RecordsConfirm({
                 </NRow>
               </NFieldGroup.SectionHeader>
             </NFieldGroup.Section>
-            <NFieldGroup.Section>
-              {request.return ? (
-                <NListItem
-                  onPress={() => {
-                    Linking.openURL(request.return!).catch(() => {});
-                    router.back();
-                  }}
-                >
-                  <NText textStyle={{ color: colors.accent, fontWeight: "700" }}>
-                    {`Return to ${hostOf(request.return)}`}
-                  </NText>
-                </NListItem>
-              ) : (
-                <NListItem onPress={() => router.back()}>
-                  <NText textStyle={{ color: colors.accent, fontWeight: "700" }}>
-                    Done
-                  </NText>
-                </NListItem>
-              )}
-            </NFieldGroup.Section>
           </NFieldGroup>
         </Host>
+        <ActionFooter
+          primary={
+            request.return
+              ? {
+                  label: `Return to ${hostOf(request.return)}`,
+                  onPress: () => {
+                    Linking.openURL(request.return!).catch(() => {});
+                    router.back();
+                  },
+                }
+              : { label: "Done", onPress: () => router.back() }
+          }
+        />
       </>
     );
   }
@@ -682,27 +659,16 @@ function RecordsConfirm({
             </NFieldGroup.Section>
           ) : null}
 
-          <NFieldGroup.Section>
-            <NListItem onPress={canApprove ? (changed ? publishAnyway : approve) : undefined}>
-              <NText
-                textStyle={{
-                  color: canApprove ? colors.accent : colors.textMuted,
-                  fontWeight: "700",
-                }}
-              >
-                {busy
-                  ? "Publishing…"
-                  : changed
-                    ? "Publish anyway"
-                    : "Approve & publish"}
-              </NText>
-            </NListItem>
-            <NListItem onPress={busy ? undefined : () => router.back()}>
-              <NText textStyle={{ color: colors.textSecondary }}>Cancel</NText>
-            </NListItem>
-          </NFieldGroup.Section>
         </NFieldGroup>
       </Host>
+      <ActionFooter
+        primary={{
+          label: busy ? "Publishing…" : changed ? "Publish anyway" : "Approve & publish",
+          onPress: changed ? publishAnyway : approve,
+          disabled: !canApprove,
+        }}
+        secondary={{ label: "Cancel", onPress: () => router.back(), disabled: busy }}
+      />
     </>
   );
 }
@@ -945,20 +911,17 @@ function TransferConfirm({
             </NFieldGroup.Section>
           ) : null}
 
-          <NFieldGroup.Section>
-            <NListItem onPress={canSign ? sign : undefined}>
-              <NText
-                textStyle={{ color: canSign ? colors.dangerText : colors.textMuted, fontWeight: "700" }}
-              >
-                {signing ? "Signing…" : "Sign transfer"}
-              </NText>
-            </NListItem>
-            <NListItem onPress={() => router.back()}>
-              <NText textStyle={{ color: colors.textSecondary }}>Cancel</NText>
-            </NListItem>
-          </NFieldGroup.Section>
         </NFieldGroup>
       </Host>
+      <ActionFooter
+        primary={{
+          label: signing ? "Signing…" : "Sign transfer",
+          onPress: sign,
+          disabled: !canSign,
+          type: "danger",
+        }}
+        secondary={{ label: "Cancel", onPress: () => router.back() }}
+      />
     </>
   );
 }
@@ -1142,18 +1105,17 @@ function SaleConfirm({
             </NFieldGroup.Section>
           ) : null}
 
-          <NFieldGroup.Section>
-            <NListItem onPress={signing ? undefined : sign}>
-              <NText textStyle={{ color: colors.dangerText, fontWeight: "700" }}>
-                {signing ? "Signing…" : "Sign offer"}
-              </NText>
-            </NListItem>
-            <NListItem onPress={() => router.back()}>
-              <NText textStyle={{ color: colors.textSecondary }}>Cancel</NText>
-            </NListItem>
-          </NFieldGroup.Section>
         </NFieldGroup>
       </Host>
+      <ActionFooter
+        primary={{
+          label: signing ? "Signing…" : "Sign offer",
+          onPress: sign,
+          disabled: signing,
+          type: "danger",
+        }}
+        secondary={{ label: "Cancel", onPress: () => router.back() }}
+      />
     </>
   );
 }
@@ -1288,23 +1250,16 @@ function RotateConfirm({
             </NFieldGroup.Section>
           ) : null}
 
-          <NFieldGroup.Section>
-            <NListItem onPress={signing || !newScript ? undefined : sign}>
-              <NText
-                textStyle={{
-                  color: signing || !newScript ? colors.textMuted : colors.accent,
-                  fontWeight: "700",
-                }}
-              >
-                {signing ? "Signing…" : "Sign & copy"}
-              </NText>
-            </NListItem>
-            <NListItem onPress={() => router.back()}>
-              <NText textStyle={{ color: colors.textSecondary }}>Cancel</NText>
-            </NListItem>
-          </NFieldGroup.Section>
         </NFieldGroup>
       </Host>
+      <ActionFooter
+        primary={{
+          label: signing ? "Signing…" : "Sign & copy",
+          onPress: sign,
+          disabled: signing || !newScript,
+        }}
+        secondary={{ label: "Cancel", onPress: () => router.back() }}
+      />
     </>
   );
 }

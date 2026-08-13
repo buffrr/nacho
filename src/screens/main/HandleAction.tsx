@@ -10,6 +10,7 @@ import {
   useNativeState,
 } from "@expo/ui";
 import { useTheme } from "@/theme";
+import { ActionFooter } from "@/ui/actionFooter";
 import { encodeSignRequest, extractReqParam, SignRequest } from "@/signRequest";
 
 // User-initiated Sell / Transfer / Rotate, off any QR/deeplink: the user supplies
@@ -116,13 +117,9 @@ export default function HandleAction() {
             </FieldGroup.Section>
           ) : null}
 
-          <FieldGroup.Section>
-            <ListItem onPress={proceed}>
-              <Text textStyle={{ color: colors.accent, fontWeight: "700" }}>Review</Text>
-            </ListItem>
-          </FieldGroup.Section>
         </FieldGroup>
       </Host>
+      <ActionFooter primary={{ label: "Review", onPress: proceed }} />
     </>
   );
 }
