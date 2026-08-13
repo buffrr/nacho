@@ -51,6 +51,7 @@ import { loadCert, saveCert } from "@/certStore";
 import { recordsGet } from "@/db";
 import { tierFor, warningLine, needsAck } from "@/recordTiers";
 import { lookupRecord } from "@/recordRegistry";
+import { sfFor } from "@/ui/handleProfileNative";
 import { remainingValidity, formatBtc } from "@/format";
 import { signMessage } from "@/messageSign";
 import { scriptForHandle } from "@/keys";
@@ -412,6 +413,7 @@ function RecordsConfirm({
   colors: Colors;
 }) {
   const router = useRouter();
+  const { scheme } = useTheme();
   const { handles, getSigningKey } = useStore();
   const owned = useMemo(() => (handles ? Object.keys(handles) : []), [handles]);
   const [handle, setHandle] = useState<string | null>(request.handle ?? null);
@@ -528,273 +530,282 @@ function RecordsConfirm({
 
   if (phase === "picking" || !handle) {
     return (
-      <Layout underHeader>
+      <>
         <Stack.Screen options={{ title: "Sign in" }} />
-        <Text style={styles.prompt}>Choose the handle to use:</Text>
-        {error && (
-          <View style={styles.mb}>
-            <Message message={error} type="error" />
-          </View>
-        )}
-        {owned.map((h, i) => (
-          <React.Fragment key={h}>
-            {i > 0 && <View style={styles.divider} />}
-            <TouchableOpacity
-              style={styles.pickRow}
-              onPress={() => {
-                setError(null);
-                setHandle(h);
-                setPhase("review");
-              }}
-            >
-              <View style={styles.pickIcon}>
-                <AtSign size={18} color={colors.accent} />
-              </View>
-              <Text style={styles.pickName}>{h}</Text>
-              <ChevronRight size={18} color={colors.iconDefault} />
-            </TouchableOpacity>
-          </React.Fragment>
-        ))}
-      </Layout>
+        <Host style={{ flex: 1 }} colorScheme={scheme}>
+          <NFieldGroup>
+            {error ? (
+              <NFieldGroup.Section>
+                <NListItem
+                  leading={
+                    <NIcon name="exclamationmark.triangle.fill" size={18} color={colors.dangerText} />
+                  }
+                >
+                  <NText textStyle={{ color: colors.textSecondary }}>{error}</NText>
+                </NListItem>
+              </NFieldGroup.Section>
+            ) : null}
+            <NFieldGroup.Section title="Choose the handle to use">
+              {owned.map((h) => (
+                <NListItem
+                  key={h}
+                  leading={<NIcon name="at" size={22} color={colors.accent} />}
+                  trailing={<NIcon name="chevron.forward" size={14} color={colors.chevron} />}
+                  onPress={() => {
+                    setError(null);
+                    setHandle(h);
+                    setPhase("review");
+                  }}
+                >
+                  <NText>{h}</NText>
+                </NListItem>
+              ))}
+            </NFieldGroup.Section>
+          </NFieldGroup>
+        </Host>
+      </>
     );
   }
 
   if (phase === "done") {
     return (
-      <Layout underHeader>
+      <>
         <Stack.Screen options={{ title: "Done" }} />
-        <View style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <Check size={30} color={colors.statusGreenFg} />
-          </View>
-          <Text style={styles.heroH}>Records published</Text>
-          <Text style={styles.heroS}>{handle} was updated.</Text>
-        </View>
-        {request.return ? (
-          <TouchableOpacity
-            style={styles.primaryBtn}
-            onPress={() => {
-              Linking.openURL(request.return!).catch(() => {});
-              router.back();
-            }}
-          >
-            <Text style={styles.primaryBtnText}>
-              Return to {hostOf(request.return)}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.back()}>
-            <Text style={styles.primaryBtnText}>Done</Text>
-          </TouchableOpacity>
-        )}
-      </Layout>
+        <Host style={{ flex: 1 }} colorScheme={scheme}>
+          <NFieldGroup>
+            <NFieldGroup.Section>
+              <NFieldGroup.SectionHeader>
+                <NRow alignment="center">
+                  <NSpacer />
+                  <NColumn alignment="center" spacing={8}>
+                    <NIcon name="checkmark.circle.fill" size={46} color={colors.statusGreenFg} />
+                    <NText textStyle={{ fontSize: 20, fontWeight: "700" }}>
+                      Records published
+                    </NText>
+                    <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
+                      {`${handle} was updated.`}
+                    </NText>
+                  </NColumn>
+                  <NSpacer />
+                </NRow>
+              </NFieldGroup.SectionHeader>
+            </NFieldGroup.Section>
+            <NFieldGroup.Section>
+              {request.return ? (
+                <NListItem
+                  onPress={() => {
+                    Linking.openURL(request.return!).catch(() => {});
+                    router.back();
+                  }}
+                >
+                  <NText textStyle={{ color: colors.accent, fontWeight: "700" }}>
+                    {`Return to ${hostOf(request.return)}`}
+                  </NText>
+                </NListItem>
+              ) : (
+                <NListItem onPress={() => router.back()}>
+                  <NText textStyle={{ color: colors.accent, fontWeight: "700" }}>
+                    Done
+                  </NText>
+                </NListItem>
+              )}
+            </NFieldGroup.Section>
+          </NFieldGroup>
+        </Host>
+      </>
     );
   }
 
   const changed = phase === "changed";
   const busy = phase === "publishing";
+  const canApprove = !busy && (changed || allAcked);
 
   return (
-    <Layout
-      underHeader
-      footer={
-        <>
-          {error && (
-            <View style={styles.mb}>
-              <Message message={error} type="error" />
-            </View>
-          )}
-          <TouchableOpacity
-            style={[
-              styles.primaryBtn,
-              (busy || (!changed && !allAcked)) && styles.btnDisabled,
-            ]}
-            onPress={changed ? publishAnyway : approve}
-            disabled={busy || (!changed && !allAcked)}
-          >
-            {busy ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryBtnText}>
-                {changed ? "Publish anyway" : "Approve & publish"}
-              </Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.secondaryBtn}
-            onPress={() => router.back()}
-            disabled={busy}
-          >
-            <Text style={styles.secondaryBtnText}>Cancel</Text>
-          </TouchableOpacity>
-        </>
-      }
-    >
+    <>
       <Stack.Screen
         options={{ title: changed ? "Records changed" : "Approve record change" }}
       />
-      {changed && (
-        <View style={styles.noteWarn}>
-          <AlertCircle size={18} color={colors.statusAmberFg} />
-          <Text style={styles.noteText}>
-            This handle changed since the last screen. Here's what would actually
-            happen now.
-          </Text>
-        </View>
-      )}
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <NFieldGroup>
+          {changed ? (
+            <NFieldGroup.Section>
+              <NListItem
+                leading={
+                  <NIcon name="exclamationmark.triangle.fill" size={18} color={colors.statusAmberFg} />
+                }
+              >
+                <NText textStyle={{ color: colors.textSecondary }}>
+                  This handle changed since the last screen. Here’s what would
+                  actually happen now.
+                </NText>
+              </NListItem>
+            </NFieldGroup.Section>
+          ) : null}
 
-      {diff && (
-        <RecordDiffView
-          diff={diff}
-          acks={acks}
-          setAck={(i, v) => setAcks((a) => ({ ...a, [i]: v }))}
-          styles={styles}
-          colors={colors}
-        />
-      )}
+          {diff ? (
+            <RecordDiffView
+              diff={diff}
+              acks={acks}
+              setAck={(i, v) => setAcks((a) => ({ ...a, [i]: v }))}
+              colors={colors}
+            />
+          ) : null}
 
-      <View style={styles.cardTop}>
-        <View style={styles.kv}>
-          <Text style={styles.kvK}>Publishing to</Text>
-          <Text style={styles.kvV}>{handle}</Text>
-        </View>
-        {request.exp !== undefined && (
-          <>
-            <View style={styles.divider} />
-            <View style={styles.kv}>
-              <Text style={styles.kvK}>Expires</Text>
-              <Text style={styles.kvV}>{remainingValidity(request.exp)}</Text>
-            </View>
-          </>
-        )}
-      </View>
-    </Layout>
-  );
-}
+          <NFieldGroup.Section title="Publishing to">
+            <NListItem trailing={<NText textStyle={{ color: colors.textSecondary }}>{handle}</NText>}>
+              <NText>Handle</NText>
+            </NListItem>
+            {request.exp !== undefined ? (
+              <NListItem
+                trailing={
+                  <NText textStyle={{ color: colors.textSecondary }}>
+                    {remainingValidity(request.exp)}
+                  </NText>
+                }
+              >
+                <NText>Expires</NText>
+              </NListItem>
+            ) : null}
+          </NFieldGroup.Section>
 
-// The registry icon + friendly label for a record, with the raw `type · key`
-// beneath it for transparency (the approval screen must always show exactly what
-// key is changing). Matches how records render on the resolve / handle screens.
-function RecMeta({
-  rtype,
-  rkey,
-  styles,
-}: {
-  rtype: string;
-  rkey: string;
-  styles: Styles;
-}) {
-  const { def } = lookupRecord(rtype, rkey);
-  return (
-    <>
-      <View style={[styles.recIco, { backgroundColor: def.color + "22" }]}>
-        <def.Icon size={16} color={def.color} />
-      </View>
-      <View style={styles.recMetaMid}>
-        <Text style={styles.recName}>{def.label}</Text>
-        <Text style={styles.recKey}>
-          {rtype} · {rkey}
-        </Text>
-      </View>
+          {error ? (
+            <NFieldGroup.Section>
+              <NListItem
+                leading={
+                  <NIcon name="exclamationmark.triangle.fill" size={18} color={colors.dangerText} />
+                }
+              >
+                <NText textStyle={{ color: colors.textSecondary }}>{error}</NText>
+              </NListItem>
+            </NFieldGroup.Section>
+          ) : null}
+
+          <NFieldGroup.Section>
+            <NListItem onPress={canApprove ? (changed ? publishAnyway : approve) : undefined}>
+              <NText
+                textStyle={{
+                  color: canApprove ? colors.accent : colors.textMuted,
+                  fontWeight: "700",
+                }}
+              >
+                {busy
+                  ? "Publishing…"
+                  : changed
+                    ? "Publish anyway"
+                    : "Approve & publish"}
+              </NText>
+            </NListItem>
+            <NListItem onPress={busy ? undefined : () => router.back()}>
+              <NText textStyle={{ color: colors.textSecondary }}>Cancel</NText>
+            </NListItem>
+          </NFieldGroup.Section>
+        </NFieldGroup>
+      </Host>
     </>
   );
 }
 
+// The record diff, rendered as native grouped sections — one section per op so
+// the exact key + value the user is approving is always visible. Destination /
+// identity records show a warning + an ack the user must tick.
 function RecordDiffView({
   diff,
   acks,
   setAck,
-  styles,
   colors,
 }: {
   diff: RecordDiff;
   acks: Record<number, boolean>;
   setAck: (i: number, v: boolean) => void;
-  styles: Styles;
   colors: Colors;
 }) {
   return (
-    <View>
-      {diff.added.length > 0 && (
-        <Text style={styles.lbl}>A request asks to add</Text>
-      )}
+    <>
       {diff.added.map((r, i) => {
-        const tier = tierFor(r.type, r.key);
-        const warn = warningLine(tier);
-        const mustAck = needsAck(tier);
+        const { def } = lookupRecord(r.type, r.key);
+        const warn = warningLine(tierFor(r.type, r.key));
+        const mustAck = needsAck(tierFor(r.type, r.key));
         return (
-          <View key={`a${i}`} style={styles.recBlock}>
-            <View style={styles.recHead}>
-              <RecMeta rtype={r.type} rkey={r.key} styles={styles} />
-              <View style={[styles.opTag, { backgroundColor: colors.statusGreenBg }]}>
-                <Plus size={12} color={colors.statusGreenFg} />
-                <Text style={[styles.opTagText, { color: colors.statusGreenFg }]}>
-                  add
-                </Text>
-              </View>
-            </View>
-            {tier === "generic" ? (
-              <Text style={styles.recVal}>{r.value.join(", ")}</Text>
-            ) : (
-              <ChunkedValue value={r.value.join(" ")} style={styles.recChunk} />
-            )}
-            {warn && (
-              <View style={styles.noteWarn}>
-                <AlertCircle size={16} color={colors.statusAmberFg} />
-                <Text style={styles.noteText}>{warn}</Text>
-              </View>
-            )}
-            {mustAck && (
-              <TouchableOpacity
-                style={styles.ackRow}
-                onPress={() => setAck(i, !acks[i])}
-              >
-                <View style={[styles.checkbox, acks[i] && styles.checkboxOn]}>
-                  {acks[i] && <Check size={14} color="#FFFFFF" />}
-                </View>
-                <Text style={styles.ackText}>
-                  I've read this address and it's the one I meant to add
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <NFieldGroup.Section key={`a${i}`} title={`Add · ${r.type} · ${r.key}`}>
+            <NListItem
+              leading={<NIcon name={sfFor(def.key)} size={22} color={def.color} />}
+              trailing={
+                <NText textStyle={{ color: colors.statusGreenFg, fontWeight: "700" }}>
+                  ADD
+                </NText>
+              }
+            >
+              <NText>{def.label}</NText>
+            </NListItem>
+            <NListItem>
+              <NText>{r.value.join(" ")}</NText>
+            </NListItem>
+            {warn ? (
+              <NFieldGroup.SectionFooter>
+                <NText textStyle={{ fontSize: 12, color: colors.statusAmberFg }}>
+                  {warn}
+                </NText>
+              </NFieldGroup.SectionFooter>
+            ) : null}
+            {mustAck ? (
+              <NCheckbox
+                value={!!acks[i]}
+                onValueChange={(v) => setAck(i, v)}
+                label="I’ve read this and it’s the one I meant to add"
+              />
+            ) : null}
+          </NFieldGroup.Section>
         );
       })}
 
-      {diff.replaced.length > 0 && (
-        <Text style={styles.lbl}>A request asks to replace</Text>
-      )}
-      {diff.replaced.map((r, i) => (
-        <View key={`r${i}`} style={styles.recBlock}>
-          <View style={styles.recHead}>
-            <RecMeta rtype={r.after.type} rkey={r.after.key} styles={styles} />
-            <View style={[styles.opTag, { backgroundColor: colors.statusGreenBg }]}>
-              <Text style={[styles.opTagText, { color: colors.statusGreenFg }]}>
-                replace
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.recValOld}>{r.before.value.join(", ")}</Text>
-          <Text style={styles.recVal}>{r.after.value.join(", ")}</Text>
-        </View>
-      ))}
+      {diff.replaced.map((r, i) => {
+        const { def } = lookupRecord(r.after.type, r.after.key);
+        return (
+          <NFieldGroup.Section
+            key={`r${i}`}
+            title={`Replace · ${r.after.type} · ${r.after.key}`}
+          >
+            <NListItem
+              leading={<NIcon name={sfFor(def.key)} size={22} color={def.color} />}
+              trailing={<NText textStyle={{ color: colors.textSecondary }}>was</NText>}
+            >
+              <NText textStyle={{ color: colors.textSecondary }}>
+                {r.before.value.join(" ")}
+              </NText>
+            </NListItem>
+            <NListItem
+              trailing={
+                <NText textStyle={{ color: colors.statusGreenFg, fontWeight: "700" }}>
+                  now
+                </NText>
+              }
+            >
+              <NText>{r.after.value.join(" ")}</NText>
+            </NListItem>
+          </NFieldGroup.Section>
+        );
+      })}
 
-      {diff.removed.length > 0 && (
-        <Text style={styles.lbl}>Removes {diff.removed.length} record{diff.removed.length === 1 ? "" : "s"}</Text>
-      )}
-      {diff.removed.map((r, i) => (
-        <View key={`d${i}`} style={styles.recBlock}>
-          <View style={styles.recHead}>
-            <RecMeta rtype={r.type} rkey={r.key} styles={styles} />
-            <View style={[styles.opTag, { backgroundColor: "#DC262622" }]}>
-              <Trash size={12} color="#DC2626" />
-              <Text style={[styles.opTagText, { color: "#DC2626" }]}>remove</Text>
-            </View>
-          </View>
-          <Text style={styles.recValOld}>{r.value.join(", ")}</Text>
-        </View>
-      ))}
-    </View>
+      {diff.removed.map((r, i) => {
+        const { def } = lookupRecord(r.type, r.key);
+        return (
+          <NFieldGroup.Section key={`d${i}`} title={`Remove · ${r.type} · ${r.key}`}>
+            <NListItem
+              leading={<NIcon name={sfFor(def.key)} size={22} color={def.color} />}
+              trailing={
+                <NText textStyle={{ color: colors.dangerText, fontWeight: "700" }}>
+                  REMOVE
+                </NText>
+              }
+            >
+              <NText textStyle={{ color: colors.textSecondary }}>
+                {r.value.join(" ")}
+              </NText>
+            </NListItem>
+          </NFieldGroup.Section>
+        );
+      })}
+    </>
   );
 }
 
