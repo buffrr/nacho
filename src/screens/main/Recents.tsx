@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Alert } from "react-native";
+import { Alert } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
 import {
@@ -15,7 +15,7 @@ import { listRowBackground } from "@expo/ui/swift-ui/modifiers";
 import type { SFSymbol } from "sf-symbols-typescript";
 import { Colors, useTheme } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
-import { Clock } from "@/ui/icons";
+import { NativeEmpty } from "@/ui/nativeEmpty";
 import {
   listHistory,
   removeHistory,
@@ -36,7 +36,6 @@ function trustGlyph(
 export default function Recents() {
   const router = useRouter();
   const { scheme, colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [entries, setEntries] = useState<ResolveHistoryEntry[]>([]);
   const [editing, setEditing] = useState(false);
 
@@ -101,18 +100,14 @@ export default function Recents() {
 
   if (entries.length === 0) {
     return (
-      <View style={styles.emptyWrap}>
+      <>
         {screen}
-        <View style={styles.empty}>
-          <View style={styles.emptyIcon}>
-            <Clock size={28} color={colors.textMuted} strokeWidth={2} />
-          </View>
-          <Text style={styles.emptyTitle}>No recents yet</Text>
-          <Text style={styles.emptySub}>
-            Handles you resolve from Search appear here, with their trust status.
-          </Text>
-        </View>
-      </View>
+        <NativeEmpty
+          sf="clock.arrow.circlepath"
+          title="No recents yet"
+          message="Handles you resolve from Search appear here, with their trust status."
+        />
+      </>
     );
   }
 
@@ -177,27 +172,3 @@ export default function Recents() {
     </>
   );
 }
-
-const makeStyles = (c: Colors) =>
-  StyleSheet.create({
-    emptyWrap: { flex: 1, backgroundColor: c.background },
-    empty: { alignItems: "center", marginTop: 56, paddingHorizontal: 32 },
-    emptyIcon: {
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      borderCurve: "continuous",
-      backgroundColor: c.surfaceSunken,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 18,
-    },
-    emptyTitle: { fontSize: 20, fontWeight: "700", color: c.text },
-    emptySub: {
-      fontSize: 14,
-      color: c.textSecondary,
-      textAlign: "center",
-      lineHeight: 20,
-      marginTop: 8,
-    },
-  });
