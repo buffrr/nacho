@@ -95,7 +95,7 @@ export default function CreateRequest() {
     setError(null);
     if (handle in handles!) return setError("handleExists");
     if (registered) {
-      router.push({ pathname: "/(main)/import-keypair", params: { handle } });
+      router.push({ pathname: "/(main)/(tabs)/handles/import-keypair", params: { handle } });
       return;
     }
     setIsLoading(true);
@@ -107,7 +107,7 @@ export default function CreateRequest() {
     }
     try {
       await createHandle(handle);
-      router.replace({ pathname: "/(main)/show-handle", params: { handle } });
+      router.replace({ pathname: "/(main)/(tabs)/handles/show-handle", params: { handle } });
     } catch (err) {
       setIsLoading(false);
       throw err;

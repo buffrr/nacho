@@ -126,7 +126,7 @@ export default function ImportCertificate() {
       return;
     }
     setHandleCertData(handle, certData).then(() =>
-      router.replace({ pathname: "/(main)/show-handle", params: { handle } }),
+      router.replace({ pathname: "/(main)/(tabs)/handles/show-handle", params: { handle } }),
     );
   };
 

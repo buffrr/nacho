@@ -77,7 +77,7 @@ export default function Recents() {
   }, [load]);
 
   const open = (handle: string) =>
-    router.push({ pathname: "/(main)/view-handle", params: { handle } });
+    router.push({ pathname: "/(main)/(tabs)/recents/view-handle", params: { handle } });
 
   const headerItems: NativeStackHeaderItem[] = useMemo(
     () =>

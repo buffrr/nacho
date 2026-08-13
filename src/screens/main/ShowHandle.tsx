@@ -438,7 +438,7 @@ export default function ShowHandle() {
   refreshRef.current = refreshResolution;
 
   const handleImportCertificate = () => {
-    router.push({ pathname: "/(main)/import-certificate", params: { handle } });
+    router.push({ pathname: "/(main)/(tabs)/handles/import-certificate", params: { handle } });
   };
 
   const handleExportCertificate = async () => {
@@ -747,7 +747,7 @@ export default function ShowHandle() {
 
   const replaceWithImport = async () => {
     await removeHandle(handle);
-    router.replace({ pathname: "/(main)/import-keypair", params: { handle } });
+    router.replace({ pathname: "/(main)/(tabs)/handles/import-keypair", params: { handle } });
   };
 
   const records = getRecords(handle);
@@ -775,7 +775,7 @@ export default function ShowHandle() {
       <TouchableOpacity
         onPress={() =>
           router.push({
-            pathname: "/(main)/edit-record",
+            pathname: "/(main)/(tabs)/handles/edit-record",
             params: { handle, index: String(i) },
           })
         }
@@ -807,11 +807,26 @@ export default function ShowHandle() {
   // flag first so the re-pushed screen reads it as true and opens straight into
   // the normal editor — no onboarding flash. Doing the reset here, on an explicit
   // tap, means the only stack transition is one the user asked for.
-  // Finishing onboarding just flips the flag — the SAME screen re-renders in
-  // place into the manage view (no stack rebuild, so no slide/flash). Back goes
-  // to wherever this was opened from, which is fine post-purchase.
+  // Finishing onboarding flips the flag AND re-roots to the Handles tab, so this
+  // handle's manage view sits directly on the Handles list — Back now goes to the
+  // Handles page, not back to the Shop/Search results this was bought from. The
+  // onboarding itself played in place (finalizePurchase doesn't navigate), so this
+  // is the only stack transition and it's one the user asked for (no double-slide).
   const dismissOnboarding = () => {
     setHandleOnboarded(handle, true);
+    if (router.canDismiss()) router.dismissAll();
+    router.navigate({
+      pathname: "/(main)/(tabs)/handles/show-handle",
+      params: { handle },
+    });
+  };
+
+  // Back from the post-purchase onboarding goes to the Handles list — the handle
+  // is now theirs, so returning to the Shop/Search results it was bought from
+  // would be confusing. Used for the onboarding screen's back affordance.
+  const goToHandlesList = () => {
+    if (router.canDismiss()) router.dismissAll();
+    router.navigate("/(main)/(tabs)/handles");
   };
 
   // Bought through nacho's IAP → show the reassuring "Purchase complete /
@@ -1060,28 +1075,28 @@ export default function ShowHandle() {
     label: "Sell handle",
     icon: { type: "sfSymbol", name: "tag" },
     onPress: () =>
-      router.push({ pathname: "/(main)/handle-action", params: { handle, action: "sale" } }),
+      router.push({ pathname: "/(main)/(tabs)/handles/handle-action", params: { handle, action: "sale" } }),
   });
   menuActions.push({
     type: "action",
     label: "Transfer handle",
     icon: { type: "sfSymbol", name: "arrow.right" },
     onPress: () =>
-      router.push({ pathname: "/(main)/handle-action", params: { handle, action: "transfer" } }),
+      router.push({ pathname: "/(main)/(tabs)/handles/handle-action", params: { handle, action: "transfer" } }),
   });
   menuActions.push({
     type: "action",
     label: "Rotate key",
     icon: { type: "sfSymbol", name: "arrow.triangle.2.circlepath" },
     onPress: () =>
-      router.push({ pathname: "/(main)/handle-action", params: { handle, action: "rotate" } }),
+      router.push({ pathname: "/(main)/(tabs)/handles/handle-action", params: { handle, action: "rotate" } }),
   });
   menuActions.push({
     type: "action",
     label: "Cancel offers",
     icon: { type: "sfSymbol", name: "xmark.circle" },
     onPress: () =>
-      router.push({ pathname: "/(main)/cancel-offers", params: { handle } }),
+      router.push({ pathname: "/(main)/(tabs)/handles/cancel-offers", params: { handle } }),
   });
   menuActions.push({
     type: "action",
@@ -1103,7 +1118,7 @@ export default function ShowHandle() {
                 icon: { type: "sfSymbol", name: "plus" },
                 onPress: () =>
                   router.push({
-                    pathname: "/(main)/add-record",
+                    pathname: "/(main)/(tabs)/handles/add-record",
                     params: { handle },
                   }),
               },
@@ -1196,7 +1211,24 @@ export default function ShowHandle() {
 
     return (
       <>
-        <Stack.Screen options={{ title: headerTitle }} />
+        <Stack.Screen
+          options={{
+            title: headerTitle,
+            // The handle is now theirs — Back (and the swipe) go to the Handles
+            // list, not back to the Shop/Search results it was bought from.
+            headerBackVisible: false,
+            gestureEnabled: false,
+            unstable_headerLeftItems: () => [
+              {
+                type: "button",
+                label: "Handles",
+                icon: { type: "sfSymbol", name: "chevron.backward" },
+                tintColor: colors.text,
+                onPress: goToHandlesList,
+              },
+            ],
+          }}
+        />
         <HandleStatusNative
           handle={handle}
           icon={sIcon}
@@ -1268,12 +1300,12 @@ export default function ShowHandle() {
           copied={copiedId}
           onEditRecord={(i) =>
             router.push({
-              pathname: "/(main)/edit-record",
+              pathname: "/(main)/(tabs)/handles/edit-record",
               params: { handle, index: String(i) },
             })
           }
           onAddRecord={() =>
-            router.push({ pathname: "/(main)/add-record", params: { handle } })
+            router.push({ pathname: "/(main)/(tabs)/handles/add-record", params: { handle } })
           }
           onCopy={copyWithFeedback}
         />

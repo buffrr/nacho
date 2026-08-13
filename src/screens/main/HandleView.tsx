@@ -84,7 +84,7 @@ export default function HandleView() {
           primary={{
             label: "Buy this handle",
             onPress: () =>
-              router.push({ pathname: "/(main)/shop", params: { prefill: name } }),
+              router.push({ pathname: "/(main)/(tabs)/handles/shop", params: { prefill: name } }),
           }}
         />
       )}

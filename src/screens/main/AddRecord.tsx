@@ -25,11 +25,11 @@ export default function AddRecord() {
 
   const pick = (d: RecordDef) =>
     router.push({
-      pathname: "/(main)/edit-record",
+      pathname: "/(main)/(tabs)/handles/edit-record",
       params: { handle, rtype: d.rtype, key: d.key },
     });
   const custom = () =>
-    router.push({ pathname: "/(main)/edit-record", params: { handle } });
+    router.push({ pathname: "/(main)/(tabs)/handles/edit-record", params: { handle } });
 
   const q = query.trim().toLowerCase();
   const matches = (d: RecordDef) =>

@@ -108,7 +108,7 @@ export default function ListHandles() {
           label: "Register a handle",
           onPress: () => router.push("/(main)/register-hub"),
         }}
-        secondary={{ label: "Shop handles", onPress: () => router.push("/(main)/shop") }}
+        secondary={{ label: "Shop handles", onPress: () => router.push("/(main)/(tabs)/handles/shop") }}
       />
     );
   }
@@ -164,7 +164,7 @@ export default function ListHandles() {
               }
               trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
               onPress={() =>
-                router.push({ pathname: "/(main)/show-handle", params: { handle: name } })
+                router.push({ pathname: "/(main)/(tabs)/handles/show-handle", params: { handle: name } })
               }
             >
               <UIText textStyle={{ fontSize: 17, fontWeight: "600" }}>{name}</UIText>
@@ -177,7 +177,7 @@ export default function ListHandles() {
         <ListItem
           modifiers={[...rowBg, listRowSeparator("hidden", "bottom")]}
           leading={<Icon name="bag" size={22} color={colors.textSecondary} />}
-          onPress={() => router.push("/(main)/shop")}
+          onPress={() => router.push("/(main)/(tabs)/handles/shop")}
         >
           <UIText textStyle={{ color: colors.textSecondary }}>Shop handles</UIText>
         </ListItem>

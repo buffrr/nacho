@@ -40,7 +40,7 @@ export default function RegisterHub() {
           title: "Shop for a handle",
           subtitle: "Browse and buy",
           Icon: Storefront,
-          go: () => router.push("/(main)/shop"),
+          go: () => router.push("/(main)/(tabs)/handles/shop"),
         },
         {
           title: "Redeem a code",
@@ -63,7 +63,7 @@ export default function RegisterHub() {
           title: "Import a private key",
           subtitle: "Restore a handle you own elsewhere",
           Icon: Key,
-          go: () => router.push("/(main)/import-keypair"),
+          go: () => router.push("/(main)/(tabs)/handles/import-keypair"),
         },
       ],
     },

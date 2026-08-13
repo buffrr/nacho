@@ -50,7 +50,7 @@ export default function Redeem() {
       if (router.canDismiss()) router.dismissAll();
       router.navigate("/(main)/(tabs)/handles");
       router.push({
-        pathname: "/(main)/show-handle",
+        pathname: "/(main)/(tabs)/handles/show-handle",
         params: { handle: result.handle },
       });
     } catch {

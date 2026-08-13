@@ -140,7 +140,7 @@ export default function Resolve() {
         {searchScreen}
         <ShopResults
           query={q}
-          onBuy={(h) => router.push({ pathname: "/(main)/show-handle", params: { handle: h } })}
+          onBuy={(h) => router.push({ pathname: "/(main)/(tabs)/resolve/show-handle", params: { handle: h } })}
         />
       </>
     );
@@ -180,7 +180,7 @@ export default function Resolve() {
           primary={{
             label: "Buy this handle",
             onPress: () =>
-              router.push({ pathname: "/(main)/shop", params: { prefill: notFound } }),
+              router.push({ pathname: "/(main)/(tabs)/handles/shop", params: { prefill: notFound } }),
           }}
         />
       )}
