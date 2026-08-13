@@ -1,23 +1,66 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
+import { Alert } from "react-native";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
 import {
-  View,
+  Host,
+  FieldGroup,
+  ListItem,
+  Icon,
   Text,
   TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
-import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { Colors, useTheme } from "@/theme";
+  Picker,
+  useNativeState,
+} from "@expo/ui";
+import { useTheme } from "@/theme";
 import { useRecordsDraft } from "@/RecordsDraft";
-import { Layout } from "@/ui/Layout";
-import { Button } from "@/ui/Button";
-import { Message } from "@/ui/Message";
 import { lookupRecord } from "@/recordRegistry";
+import { sfFor } from "@/ui/handleProfileNative";
 
-const TYPES = ["ADDR", "TXT"] as const;
+// One editable field, extracted so useNativeState is called once per component
+// (a hook can't run in a loop). It owns its native text state and reports each
+// change up to the parent's values map; the parent only tracks a list of ids.
+function Field({
+  initial,
+  placeholder,
+  onChangeText,
+  onRemove,
+  removeColor,
+}: {
+  initial: string;
+  placeholder?: string;
+  onChangeText: (t: string) => void;
+  onRemove?: () => void;
+  removeColor: string;
+}) {
+  const text = useNativeState(initial);
+  return (
+    <ListItem
+      trailing={
+        onRemove ? (
+          <Icon
+            name="minus.circle.fill"
+            size={20}
+            color={removeColor}
+            onPress={onRemove}
+          />
+        ) : undefined
+      }
+    >
+      <TextInput
+        value={text}
+        placeholder={placeholder}
+        onChangeText={onChangeText}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+    </ListItem>
+  );
+}
 
 export default function EditRecord() {
   const router = useRouter();
+  const { scheme, colors } = useTheme();
   const params = useLocalSearchParams<{
     handle: string;
     index?: string;
@@ -25,78 +68,91 @@ export default function EditRecord() {
     key?: string;
   }>();
   const handle = params.handle;
-  // useLocalSearchParams returns strings; parse the record index back to a
-  // number (absent/empty → "append new record").
   const index =
     params.index !== undefined && params.index !== ""
       ? Number(params.index)
       : undefined;
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { getRecords, setRecord, deleteRecord } = useRecordsDraft();
 
   const existing = index !== undefined ? getRecords(handle)[index] : undefined;
-
-  // The record's type + key come from (in priority): the existing record being
-  // edited, or the type the Add-record picker preset via params. Absent both,
-  // it's a freeform "Other" record and the user picks type + key by hand.
   const presetType = existing?.type ?? (params.rtype as "addr" | "txt" | undefined);
   const presetKey = existing?.key ?? params.key;
   const { def, known } =
     presetType && presetKey
       ? lookupRecord(presetType, presetKey)
       : { def: null, known: false };
-  // Slot-based form for recognised types; freeform for custom / unknown keys.
   const useSlots = !!def && known;
 
-  const [type, setType] = useState<string>(
-    (presetType ?? "addr").toUpperCase(),
+  // Current text per field id (seeded with initials, updated via onChangeText).
+  const values = useRef<Map<string, string>>(new Map());
+  const idCounter = useRef(0);
+  const mkId = () => `v${idCounter.current++}`;
+
+  const initVals = existing?.value ?? [];
+
+  // ── Known-type slots ────────────────────────────────────────────────────
+  const singleSlots = useMemo(
+    () =>
+      def
+        ? def.slots.map((s, i) => ({ s, i })).filter((x) => !x.s.multi)
+        : [],
+    [def],
   );
-  const [key, setKey] = useState(presetKey ?? "");
+  const multiSlotIdx = def ? def.slots.findIndex((s) => s.multi) : -1;
+  const multiSlot = multiSlotIdx >= 0 ? def!.slots[multiSlotIdx] : null;
+  const multiStart = multiSlotIdx >= 0 ? multiSlotIdx : def ? def.slots.length : 0;
 
-  // Index of the single "multi" slot (repeatable, e.g. relay hints), if any.
-  const multiIdx = def ? def.slots.findIndex((s) => s.multi) : -1;
-
-  const [values, setValues] = useState<string[]>(() => {
-    if (existing && existing.value.length) return existing.value;
-    if (def) {
-      // One empty field per slot; a leading single slot + trailing multi both
-      // start with one empty input.
-      return def.slots.map(() => "");
-    }
-    return [""];
+  const [multiIds, setMultiIds] = useState<string[]>(() => {
+    if (!multiSlot) return [];
+    const seeded = initVals.slice(multiStart);
+    return (seeded.length ? seeded : multiSlot.optional ? [] : [""]).map(() => mkId());
   });
-  const [error, setError] = useState<string | null>(null);
 
-  const updateValue = (i: number, text: string) =>
-    setValues((prev) => prev.map((v, j) => (j === i ? text : v)));
-  const addValue = () => setValues((prev) => [...prev, ""]);
-  const removeValue = (i: number) =>
-    setValues((prev) => prev.filter((_, j) => j !== i));
+  // ── Freeform (Other / unknown) ──────────────────────────────────────────
+  const [ftype, setFtype] = useState<string>((presetType ?? "addr").toUpperCase());
+  const [valueIds, setValueIds] = useState<string[]>(() =>
+    (initVals.length ? initVals : [""]).map(() => mkId()),
+  );
+
+  // Seed the values map once, in field order.
+  useMemo(() => {
+    if (useSlots) {
+      singleSlots.forEach(({ i }) => values.current.set(`s${i}`, initVals[i] ?? ""));
+      const seeded = initVals.slice(multiStart);
+      multiIds.forEach((id, k) => values.current.set(id, seeded[k] ?? ""));
+    } else {
+      values.current.set("key", presetKey ?? "");
+      valueIds.forEach((id, k) => values.current.set(id, initVals[k] ?? ""));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const set = (id: string) => (t: string) => values.current.set(id, t);
 
   const save = () => {
-    setError(null);
-    const cleanKey = (useSlots ? def!.key : key).trim();
-    const cleanValues = values.map((v) => v.trim()).filter(Boolean);
-    if (!cleanKey) {
-      setError("Enter a key.");
-      return;
+    if (useSlots && def) {
+      const singles = singleSlots.map(({ i }) => values.current.get(`s${i}`) ?? "");
+      const multis = multiIds.map((id) => values.current.get(id) ?? "");
+      const clean = [...singles, ...multis].map((v) => v.trim()).filter(Boolean);
+      if (!singles[0]?.trim()) {
+        Alert.alert("Missing value", `Enter the ${def.slots[0].label.toLowerCase()}.`);
+        return;
+      }
+      setRecord(handle, index ?? null, { type: def.rtype, key: def.key, value: clean });
+    } else {
+      const key = (values.current.get("key") ?? "").trim();
+      const clean = valueIds
+        .map((id) => values.current.get(id) ?? "")
+        .map((v) => v.trim())
+        .filter(Boolean);
+      if (!key) return Alert.alert("Missing key", "Enter a key.");
+      if (clean.length === 0) return Alert.alert("Missing value", "Enter at least one value.");
+      setRecord(handle, index ?? null, {
+        type: ftype.toLowerCase() as "txt" | "addr",
+        key,
+        value: clean,
+      });
     }
-    if (cleanValues.length === 0) {
-      setError("Enter at least one value.");
-      return;
-    }
-    // The first slot is the required one (address / public key / text). If it's
-    // blank but a later optional slot is filled, the shape is wrong.
-    if (useSlots && !values[0]?.trim()) {
-      setError(`Enter the ${def!.slots[0].label.toLowerCase()}.`);
-      return;
-    }
-    setRecord(handle, index ?? null, {
-      type: (useSlots ? def!.rtype : type.toLowerCase()) as "txt" | "addr",
-      key: cleanKey,
-      value: cleanValues,
-    });
     router.back();
   };
 
@@ -105,237 +161,138 @@ export default function EditRecord() {
     router.back();
   };
 
-  const title = index !== undefined ? "Edit record" : "Add record";
+  const addMulti = () => {
+    const id = mkId();
+    values.current.set(id, "");
+    setMultiIds((ids) => [...ids, id]);
+  };
+  const removeMulti = (id: string) => {
+    values.current.delete(id);
+    setMultiIds((ids) => ids.filter((x) => x !== id));
+  };
+  const addValue = () => {
+    const id = mkId();
+    values.current.set(id, "");
+    setValueIds((ids) => [...ids, id]);
+  };
+  const removeValue = (id: string) => {
+    values.current.delete(id);
+    setValueIds((ids) => ids.filter((x) => x !== id));
+  };
+
+  const title = useSlots && def ? def.label : index !== undefined ? "Edit record" : "Add record";
+  const headerItems: NativeStackHeaderItem[] = [
+    { type: "button", label: "Save", tintColor: colors.accent, onPress: save },
+  ];
 
   return (
-    <Layout
-      underHeader
-      keyboardAware
-      footer={<Button text="Save record" onPress={save} type="main" />}
-    >
-      <Stack.Screen options={{ title }} />
+    <>
+      <Stack.Screen
+        options={{ title, unstable_headerRightItems: () => headerItems }}
+      />
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <FieldGroup>
+          {useSlots && def ? (
+            <>
+              {/* Type header */}
+              <FieldGroup.Section>
+                <ListItem leading={<Icon name={sfFor(def.key)} size={24} color={def.color} />}>
+                  <Text>{def.label}</Text>
+                </ListItem>
+              </FieldGroup.Section>
 
-      {useSlots && def ? (
-        // ── Recognised type: header + one labelled field per value slot ──────
-        <>
-          <View style={styles.typeHead}>
-            <View style={[styles.typeIco, { backgroundColor: def.color + "22" }]}>
-              <def.Icon size={20} color={def.color} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.typeName}>{def.label}</Text>
-              <Text style={styles.typeKey}>
-                {def.rtype} · {def.key}
-              </Text>
-            </View>
-          </View>
-
-          {def.slots.map((slot, si) => {
-            // A trailing multi slot renders every value from its index onward as
-            // a repeatable list; single slots render one field bound to values[si].
-            if (slot.multi) {
-              const start = multiIdx >= 0 ? multiIdx : si;
-              return (
-                <View key={si}>
-                  <Text style={styles.label}>
-                    {slot.label.toUpperCase()}
-                    {slot.optional ? (
-                      <Text style={styles.optional}> · optional</Text>
-                    ) : null}
-                  </Text>
-                  {values
-                    .slice(start)
-                    .map((v, k) => {
-                      const vi = start + k;
-                      return (
-                        <View key={vi} style={styles.valueRow}>
-                          <TextInput
-                            value={v}
-                            onChangeText={(t) => updateValue(vi, t)}
-                            placeholder={slot.placeholder ?? slot.label}
-                            placeholderTextColor={colors.placeholder}
-                            style={[styles.input, styles.valueInput]}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                          />
-                          {values.length > start + 1 && (
-                            <TouchableOpacity
-                              onPress={() => removeValue(vi)}
-                              hitSlop={8}
-                            >
-                              <Text style={styles.remove}>✕</Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      );
-                    })}
-                  <TouchableOpacity onPress={addValue}>
-                    <Text style={styles.addValue}>+ Add {slot.label.toLowerCase()}</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            }
-            return (
-              <View key={si}>
-                <Text style={styles.label}>
-                  {slot.label.toUpperCase()}
-                  {slot.optional ? (
-                    <Text style={styles.optional}> · optional</Text>
-                  ) : null}
-                </Text>
-                <TextInput
-                  value={values[si] ?? ""}
-                  onChangeText={(t) => updateValue(si, t)}
-                  placeholder={slot.placeholder ?? slot.label}
-                  placeholderTextColor={colors.placeholder}
-                  style={styles.input}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-            );
-          })}
-        </>
-      ) : (
-        // ── Freeform "Other" / unknown key: choose type, key, values by hand ──
-        <>
-          <Text style={styles.label}>TYPE</Text>
-          <View style={styles.segment}>
-            {TYPES.map((t) => (
-              <TouchableOpacity
-                key={t}
-                style={[styles.segItem, type === t && styles.segItemActive]}
-                onPress={() => setType(t)}
-              >
-                <Text
-                  style={[styles.segText, type === t && styles.segTextActive]}
+              {singleSlots.map(({ s, i }) => (
+                <FieldGroup.Section
+                  key={`s${i}`}
+                  title={s.optional ? `${s.label} · optional` : s.label}
                 >
-                  {t}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+                  <Field
+                    initial={initVals[i] ?? ""}
+                    placeholder={s.placeholder ?? s.label}
+                    onChangeText={set(`s${i}`)}
+                    removeColor={colors.danger}
+                  />
+                </FieldGroup.Section>
+              ))}
 
-          <Text style={styles.label}>KEY</Text>
-          <TextInput
-            value={key}
-            onChangeText={setKey}
-            placeholder="e.g. age"
-            placeholderTextColor={colors.placeholder}
-            style={styles.input}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+              {multiSlot ? (
+                <FieldGroup.Section
+                  title={multiSlot.optional ? `${multiSlot.label} · optional` : multiSlot.label}
+                >
+                  {multiIds.map((id, k) => (
+                    <Field
+                      key={id}
+                      initial={initVals[multiStart + k] ?? ""}
+                      placeholder={multiSlot.placeholder ?? multiSlot.label}
+                      onChangeText={set(id)}
+                      onRemove={multiIds.length > 1 || multiSlot.optional ? () => removeMulti(id) : undefined}
+                      removeColor={colors.danger}
+                    />
+                  ))}
+                  <ListItem
+                    leading={<Icon name="plus.circle.fill" size={20} color={colors.accent} />}
+                    onPress={addMulti}
+                  >
+                    <Text textStyle={{ color: colors.accent }}>
+                      {`Add ${multiSlot.label.toLowerCase()}`}
+                    </Text>
+                  </ListItem>
+                </FieldGroup.Section>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {/* Freeform "Other" record */}
+              <FieldGroup.Section title="Type">
+                <Picker
+                  selectedValue={ftype}
+                  onValueChange={(v) => setFtype(v)}
+                >
+                  <Picker.Item label="Address" value="ADDR" />
+                  <Picker.Item label="Text" value="TXT" />
+                </Picker>
+              </FieldGroup.Section>
+              <FieldGroup.Section title="Key">
+                <Field
+                  initial={presetKey ?? ""}
+                  placeholder="e.g. age"
+                  onChangeText={set("key")}
+                  removeColor={colors.danger}
+                />
+              </FieldGroup.Section>
+              <FieldGroup.Section title="Values">
+                {valueIds.map((id, k) => (
+                  <Field
+                    key={id}
+                    initial={initVals[k] ?? ""}
+                    placeholder="value"
+                    onChangeText={set(id)}
+                    onRemove={valueIds.length > 1 ? () => removeValue(id) : undefined}
+                    removeColor={colors.danger}
+                  />
+                ))}
+                <ListItem
+                  leading={<Icon name="plus.circle.fill" size={20} color={colors.accent} />}
+                  onPress={addValue}
+                >
+                  <Text textStyle={{ color: colors.accent }}>Add value</Text>
+                </ListItem>
+              </FieldGroup.Section>
+            </>
+          )}
 
-          <Text style={styles.label}>VALUES</Text>
-          {values.map((v, i) => (
-            <View key={i} style={styles.valueRow}>
-              <TextInput
-                value={v}
-                onChangeText={(t) => updateValue(i, t)}
-                placeholder="value"
-                placeholderTextColor={colors.placeholder}
-                style={[styles.input, styles.valueInput]}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {values.length > 1 && (
-                <TouchableOpacity onPress={() => removeValue(i)} hitSlop={8}>
-                  <Text style={styles.remove}>✕</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
-          <TouchableOpacity onPress={addValue}>
-            <Text style={styles.addValue}>+ Add value</Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      {error && <Message message={error} type="error" />}
-
-      {index !== undefined && (
-        <TouchableOpacity onPress={remove} style={styles.deleteBtn}>
-          <Text style={styles.deleteText}>Delete record</Text>
-        </TouchableOpacity>
-      )}
-    </Layout>
+          {index !== undefined ? (
+            <FieldGroup.Section>
+              <ListItem
+                leading={<Icon name="trash" size={22} color={colors.danger} />}
+                onPress={remove}
+              >
+                <Text textStyle={{ color: colors.danger }}>Delete record</Text>
+              </ListItem>
+            </FieldGroup.Section>
+          ) : null}
+        </FieldGroup>
+      </Host>
+    </>
   );
 }
-
-const makeStyles = (c: Colors) =>
-  StyleSheet.create({
-    typeHead: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      marginTop: 6,
-      marginBottom: 4,
-    },
-    typeIco: {
-      width: 38,
-      height: 38,
-      borderRadius: 10,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    typeName: { fontSize: 19, fontWeight: "600", color: c.text },
-    typeKey: {
-      fontSize: 12,
-      color: c.textMuted,
-      fontFamily: "monospace",
-      marginTop: 1,
-    },
-    label: {
-      fontSize: 12,
-      fontWeight: "700",
-      letterSpacing: 0.5,
-      color: c.textMuted,
-      marginTop: 20,
-      marginBottom: 10,
-    },
-    optional: { fontWeight: "500", color: c.textFaint },
-    segment: {
-      flexDirection: "row",
-      backgroundColor: c.field,
-      borderRadius: 12,
-      padding: 4,
-      gap: 4,
-    },
-    segItem: {
-      flex: 1,
-      paddingVertical: 10,
-      borderRadius: 8,
-      alignItems: "center",
-    },
-    segItemActive: { backgroundColor: c.accent },
-    segText: { color: c.textMuted, fontSize: 14, fontWeight: "600" },
-    segTextActive: { color: c.accentText },
-    input: {
-      backgroundColor: c.field,
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      fontSize: 15,
-      color: c.text,
-      fontFamily: "monospace",
-      // @ts-ignore web-only
-      outlineStyle: "none",
-    } as any,
-    valueRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      marginBottom: 8,
-    },
-    valueInput: { flex: 1 },
-    remove: { color: c.textMuted, fontSize: 16 },
-    addValue: {
-      color: c.accent,
-      fontSize: 14,
-      fontWeight: "600",
-      marginTop: 2,
-    },
-    deleteBtn: { alignItems: "center", paddingVertical: 16, marginTop: 12 },
-    deleteText: { color: c.danger, fontSize: 15, fontWeight: "500" },
-  });

@@ -55,6 +55,8 @@ import {
 } from "@/ui/icons";
 import { lookupRecord } from "@/recordRegistry";
 import type { EditableRecord } from "@/fabricResolver";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { OwnerProfileNative } from "@/ui/ownerProfileNative";
 import {
   fetchHandleStatus,
   reserveHandle,
@@ -134,6 +136,8 @@ export default function ShowHandle() {
     getSigningKey,
   } = useStore();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const {
     ensureLoaded,
@@ -523,6 +527,12 @@ export default function ShowHandle() {
 
   const copy = (text: string) => {
     Clipboard.setStringAsync(text);
+  };
+  // Copy with row feedback (for the native owner view — flashes "Copied ✓").
+  const copyWithFeedback = (id: string, text: string) => {
+    Clipboard.setStringAsync(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1400);
   };
 
   const handleBuyHandle = async () => {
@@ -1017,6 +1027,12 @@ export default function ShowHandle() {
   // the manual-entry form (we have no chain view); Cancel uses saved offers.
   menuActions.push({
     type: "action",
+    label: resolving ? "Refreshing…" : "Refresh",
+    icon: { type: "sfSymbol", name: "arrow.clockwise" },
+    onPress: () => refreshResolution(),
+  });
+  menuActions.push({
+    type: "action",
     label: "Sell handle",
     icon: { type: "sfSymbol", name: "tag" },
     onPress: () =>
@@ -1076,6 +1092,68 @@ export default function ShowHandle() {
           menu: { items: menuActions },
         },
       ];
+
+  // ── Native manage view (@expo/ui) ──────────────────────────────────────────
+  // The common owner case renders with native grouped sections, matching the
+  // resolve/handle view. Buy / onboarding / edge states stay on the RN Layout
+  // below. The "Sign and publish" action sits in a pinned RN footer over the
+  // native content (only when there are unsaved edits).
+  if (!buyable && !showOnboarding && manageable) {
+    const banner: { text: string; tone: "error" | "success" | "muted" } | null =
+      error
+        ? { text: error, tone: "error" }
+        : published
+          ? { text: "Records published to certrelay.", tone: "success" }
+          : notice
+            ? { text: notice, tone: "muted" }
+            : null;
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <Stack.Screen
+          options={{ title: "", unstable_headerRightItems: () => headerItems }}
+        />
+        <OwnerProfileNative
+          handle={handle}
+          records={records}
+          pubkey={pubkey}
+          numId={numId}
+          alias={alias}
+          seq={seq}
+          pill={pill}
+          sovereign={isSovereign}
+          banner={banner}
+          copied={copiedId}
+          onEditRecord={(i) =>
+            router.push({
+              pathname: "/(main)/edit-record",
+              params: { handle, index: String(i) },
+            })
+          }
+          onAddRecord={() =>
+            router.push({ pathname: "/(main)/add-record", params: { handle } })
+          }
+          onCopy={copyWithFeedback}
+        />
+        {isDirty(handle) && (
+          <View
+            style={{
+              paddingHorizontal: 20,
+              paddingTop: 10,
+              paddingBottom: insets.bottom + 10,
+              backgroundColor: colors.background,
+            }}
+          >
+            <Button
+              text={publishing ? "Publishing…" : "Sign and publish"}
+              onPress={signAndPublish}
+              type="main"
+              disabled={publishing}
+            />
+          </View>
+        )}
+      </View>
+    );
+  }
 
   return (
     <Layout
@@ -1313,6 +1391,7 @@ const makeStyles = (c: Colors) =>
       width: 72,
       height: 72,
       borderRadius: 999,
+      borderCurve: "continuous",
       alignItems: "center",
       justifyContent: "center",
       marginBottom: 18,
@@ -1342,6 +1421,7 @@ const makeStyles = (c: Colors) =>
       gap: 12,
       backgroundColor: c.field,
       borderRadius: 14,
+      borderCurve: "continuous",
       padding: 16,
     },
     onboardCardText: {
@@ -1393,6 +1473,7 @@ const makeStyles = (c: Colors) =>
       width: 64,
       height: 64,
       borderRadius: 18,
+      borderCurve: "continuous",
       alignItems: "center",
       justifyContent: "center",
       marginTop: 8,
@@ -1412,6 +1493,7 @@ const makeStyles = (c: Colors) =>
       paddingHorizontal: 10,
       paddingVertical: 4,
       borderRadius: 20,
+      borderCurve: "continuous",
     },
     availText: {
       fontSize: 13,
@@ -1432,6 +1514,7 @@ const makeStyles = (c: Colors) =>
       alignSelf: "stretch",
       backgroundColor: c.field,
       borderRadius: 16,
+      borderCurve: "continuous",
       padding: 16,
       gap: 14,
       marginBottom: 12,
@@ -1450,6 +1533,7 @@ const makeStyles = (c: Colors) =>
       alignSelf: "stretch",
       backgroundColor: c.field,
       borderRadius: 16,
+      borderCurve: "continuous",
       padding: 16,
       marginBottom: 20,
     },
@@ -1536,6 +1620,7 @@ const makeStyles = (c: Colors) =>
       width: 40,
       height: 40,
       borderRadius: 12,
+      borderCurve: "continuous",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -1567,11 +1652,13 @@ const makeStyles = (c: Colors) =>
       paddingHorizontal: 10,
       paddingVertical: 4,
       borderRadius: 999,
+      borderCurve: "continuous",
     },
     dot: {
       width: 7,
       height: 7,
       borderRadius: 999,
+      borderCurve: "continuous",
     },
     statusText: {
       fontSize: 12,
@@ -1585,6 +1672,7 @@ const makeStyles = (c: Colors) =>
     card: {
       backgroundColor: c.card,
       borderRadius: 16,
+      borderCurve: "continuous",
       marginBottom: 22,
       overflow: "hidden",
     },
@@ -1641,6 +1729,7 @@ const makeStyles = (c: Colors) =>
       width: 30,
       height: 30,
       borderRadius: 8,
+      borderCurve: "continuous",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -1679,6 +1768,7 @@ const makeStyles = (c: Colors) =>
       width: 30,
       height: 30,
       borderRadius: 8,
+      borderCurve: "continuous",
       backgroundColor: c.surfaceSunken,
       alignItems: "center",
       justifyContent: "center",

@@ -65,7 +65,10 @@ export type Colors = {
 };
 
 export const darkColors: Colors = {
-  background: "#0E0E11",
+  // Matches iOS's dark grouped background (systemGroupedBackground = pure black),
+  // so RN screens + the native @expo/ui Form share one seamless backdrop and
+  // cards (≈ secondarySystemGroupedBackground #1C1C1E) lift off it like native.
+  background: "#000000",
   card: "#1B1B1F",
   surface: "#1B1B1F",
   surfaceSunken: "#27272B",

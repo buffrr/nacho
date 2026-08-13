@@ -112,6 +112,7 @@ const makeStyles = (c: Colors) =>
       width: 60,
       height: 60,
       borderRadius: 30,
+      borderCurve: "continuous",
       backgroundColor: c.accent + "1F",
       alignItems: "center",
       justifyContent: "center",
@@ -130,6 +131,7 @@ const makeStyles = (c: Colors) =>
     card: {
       backgroundColor: c.card,
       borderRadius: 16,
+      borderCurve: "continuous",
       padding: 16,
       marginBottom: 22,
     },
@@ -145,6 +147,7 @@ const makeStyles = (c: Colors) =>
       alignItems: "flex-start",
       backgroundColor: c.statusAmberBg,
       borderRadius: 12,
+      borderCurve: "continuous",
       padding: 14,
     },
     warnText: { flex: 1, fontSize: 13, color: c.textSecondary, lineHeight: 19 },

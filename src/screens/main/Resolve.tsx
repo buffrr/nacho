@@ -195,6 +195,7 @@ const makeStyles = (c: Colors) =>
       width: 60,
       height: 60,
       borderRadius: 30,
+      borderCurve: "continuous",
       backgroundColor: c.surfaceSunken,
       alignItems: "center",
       justifyContent: "center",

@@ -212,6 +212,7 @@ const makeStyles = (c: Colors) =>
       width: 60,
       height: 60,
       borderRadius: 30,
+      borderCurve: "continuous",
       backgroundColor: c.surfaceSunken,
       alignItems: "center",
       justifyContent: "center",
@@ -229,6 +230,7 @@ const makeStyles = (c: Colors) =>
     retryBtn: {
       backgroundColor: c.accentMuted,
       borderRadius: 12,
+      borderCurve: "continuous",
       paddingVertical: 13,
       paddingHorizontal: 32,
       marginTop: 18,
@@ -247,6 +249,7 @@ const makeStyles = (c: Colors) =>
     card: {
       backgroundColor: c.card,
       borderRadius: 16,
+      borderCurve: "continuous",
       overflow: "hidden",
     },
     row: {
@@ -267,6 +270,7 @@ const makeStyles = (c: Colors) =>
     buyBtn: {
       backgroundColor: c.accent,
       borderRadius: 10,
+      borderCurve: "continuous",
       paddingHorizontal: 18,
       paddingVertical: 8,
     },
@@ -274,6 +278,7 @@ const makeStyles = (c: Colors) =>
     takenChip: {
       backgroundColor: c.chip,
       borderRadius: 10,
+      borderCurve: "continuous",
       paddingHorizontal: 14,
       paddingVertical: 8,
     },

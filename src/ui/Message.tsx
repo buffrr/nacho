@@ -34,6 +34,7 @@ const makeStyles = (c: Colors) =>
   StyleSheet.create({
     container: {
       borderRadius: 8,
+      borderCurve: "continuous",
       paddingVertical: 12,
       paddingHorizontal: 16,
       marginTop: 20,

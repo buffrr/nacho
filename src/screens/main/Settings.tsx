@@ -1,20 +1,10 @@
-import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { Alert } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
+import { Host, FieldGroup, ListItem, Icon, Text } from "@expo/ui";
 import { saveBinary } from "@/file";
 import { exportDbBytes } from "@/db";
-import { Colors, useTheme } from "@/theme";
-import { Layout } from "@/ui/Layout";
-import { Message } from "@/ui/Message";
-import {
-  Anchor,
-  AlertCircle,
-  QrCode,
-  Download,
-  Eye,
-  ChevronRight,
-  ShieldCheck,
-} from "@/ui/icons";
+import { useTheme } from "@/theme";
 import {
   ensureSemiTrust,
   refreshSemiTrust,
@@ -44,9 +34,7 @@ function stalenessText(trustedHeight: number | null, tip: number | null): string
 
 export default function Settings() {
   const router = useRouter();
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [error, setError] = useState<string | null>(null);
+  const { scheme, colors } = useTheme();
 
   const [anchor, setAnchor] = useState<TrustAnchor | null>(getTrustAnchor());
   const [trust, setTrust] = useState<TrustState>(getTrustState());
@@ -90,7 +78,6 @@ export default function Settings() {
   };
 
   const backupKeystore = async () => {
-    setError(null);
     try {
       const bytes = await exportDbBytes();
       await saveBinary(
@@ -99,11 +86,10 @@ export default function Settings() {
         "application/x-sqlite3",
       );
     } catch {
-      setError("Failed to export backup");
+      Alert.alert("Backup failed", "Couldn't export the backup file.");
     }
   };
 
-  const semiPinned = !!trust.semiTrusted;
   const safetyIdSet = !!trust.trusted;
   const trustedHeight = trustedAnchor?.height ?? null;
   const gap = trustedHeight != null && tip != null ? tip - trustedHeight : null;
@@ -111,308 +97,105 @@ export default function Settings() {
   const expiryColor =
     gap != null && gap > 0 ? colors.statusAmberFg : colors.statusGreenFg;
 
+  const anchorLine = refreshing
+    ? "Refreshing…"
+    : anchor
+      ? formatAnchor(anchor)
+      : "Not set — tap to fetch";
+
   return (
-    <Layout tabBarInset underHeader>
-      {/* YOUR TRUST ID — the trusted anchor scanned from a local Veritas
-          client. First on the page: it's the strongest guarantee a resolved
-          handle is genuine (verified against an anchor you scanned yourself). */}
-      <Text style={styles.sectionLabel}>YOUR TRUST ID</Text>
+    <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <FieldGroup>
+        {/* YOUR TRUST ID — strongest guarantee; first on the page. */}
+        <FieldGroup.Section title="Your Trust ID">
+          {safetyIdSet ? (
+            <>
+              <ListItem
+                leading={
+                  <Icon name="checkmark.shield.fill" size={22} color={colors.statusGreenFg} />
+                }
+                supportingText={
+                  trustedAnchor ? formatAnchor(trustedAnchor) : "Pinned"
+                }
+                trailing={
+                  <Icon name="checkmark.circle.fill" size={18} color={colors.statusGreenFg} />
+                }
+              >
+                <Text>Trust ID</Text>
+              </ListItem>
+              {staleness ? (
+                <ListItem
+                  trailing={
+                    <Text textStyle={{ fontSize: 13, color: expiryColor }}>
+                      {staleness}
+                    </Text>
+                  }
+                >
+                  <Text textStyle={{ color: colors.textSecondary }}>Freshness</Text>
+                </ListItem>
+              ) : null}
+              <ListItem
+                leading={<Icon name="qrcode.viewfinder" size={22} color={colors.accent} />}
+                trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
+                onPress={() => router.push("/(main)/verify-anchor")}
+              >
+                <Text textStyle={{ color: colors.accent }}>Rescan Trust ID</Text>
+              </ListItem>
+            </>
+          ) : (
+            <ListItem
+              leading={<Icon name="qrcode.viewfinder" size={22} color={colors.accent} />}
+              supportingText="Scan from a local Veritas client to fully verify sovereign handles against your own anchor."
+              trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
+              onPress={() => router.push("/(main)/verify-anchor")}
+            >
+              <Text>Set a Trust ID</Text>
+            </ListItem>
+          )}
+        </FieldGroup.Section>
 
-      {safetyIdSet ? (
-        <>
-          <View style={styles.anchorRow}>
-            <View style={[styles.iconTile, { backgroundColor: colors.tileOrangeBg }]}>
-              <ShieldCheck size={18} color={colors.text} />
-            </View>
-            <View style={styles.anchorMid}>
-              <Text style={styles.rowTitle}>Trust ID</Text>
-              <Text style={styles.rowSub} numberOfLines={1}>
-                {trustedAnchor ? formatAnchor(trustedAnchor) : "Pinned"}
-              </Text>
-              {staleness && (
-                <Text style={[styles.rowSub, { color: expiryColor }]} numberOfLines={1}>
-                  {staleness}
-                </Text>
-              )}
-            </View>
-            <View style={styles.anchorRight}>
-              <View style={[styles.dot, { backgroundColor: colors.statusGreenFg }]} />
-            </View>
-          </View>
-          <TouchableOpacity
-            style={styles.rescanRow}
-            onPress={() => router.push("/(main)/verify-anchor")}
-            activeOpacity={0.7}
+        {/* TRUST FALLBACK SOURCES — the default anchor from public relays. */}
+        <FieldGroup.Section title="Trust fallback sources">
+          <ListItem
+            leading={<Icon name="shield.lefthalf.filled" size={22} color={colors.textSecondary} />}
+            supportingText={anchorLine}
+            trailing={<Icon name="arrow.clockwise" size={16} color={colors.chevron} />}
+            onPress={onRefreshAnchor}
           >
-            <QrCode size={16} color={colors.accent} />
-            <Text style={styles.rescanText}>Rescan Trust ID</Text>
-          </TouchableOpacity>
-        </>
-      ) : (
-        <View style={styles.safetyCard}>
-          <View style={styles.safetyHead}>
-            <AlertCircle size={18} color={colors.text} />
-            <Text style={styles.safetyTitle}>Trust ID</Text>
-          </View>
-          <Text style={styles.safetyText}>
-            No Trust ID set. Scan from a local Veritas client to fully verify
-            sovereign handles against your own anchor.
-          </Text>
-          <TouchableOpacity
-            style={styles.scanQr}
-            onPress={() => router.push("/(main)/verify-anchor")}
-            activeOpacity={0.85}
+            <Text>Default anchor</Text>
+          </ListItem>
+          <FieldGroup.SectionFooter>
+            <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+              Fetched from public relays and refreshed only when you tap it. Scan
+              your own Trust ID above for self-verification.
+            </Text>
+          </FieldGroup.SectionFooter>
+        </FieldGroup.Section>
+
+        {/* KEYSTORE */}
+        <FieldGroup.Section title="Keystore">
+          <ListItem
+            leading={<Icon name="square.and.arrow.down" size={22} color={colors.textSecondary} />}
+            trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
+            onPress={backupKeystore}
           >
-            <QrCode size={17} color={colors.accentText} />
-            <Text style={styles.scanQrText}>Scan QR</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      <View style={styles.spacer} />
-
-      {/* TRUST FALLBACK SOURCES — the default anchor fetched from public relays,
-          used to verify when no Trust ID is pinned. */}
-      <Text style={styles.sectionLabel}>TRUST FALLBACK SOURCES</Text>
-
-      <TouchableOpacity
-        style={styles.anchorRow}
-        onPress={onRefreshAnchor}
-        activeOpacity={0.8}
-      >
-        <View style={[styles.iconTile, { backgroundColor: colors.tileOrangeBg }]}>
-          <Anchor size={18} color={colors.text} />
-        </View>
-        <View style={styles.anchorMid}>
-          <Text style={styles.rowTitle}>Default anchor</Text>
-          <Text style={styles.rowSub} numberOfLines={1}>
-            {refreshing
-              ? "Refreshing…"
-              : anchor
-                ? formatAnchor(anchor)
-                : "Not set — tap to fetch"}
-          </Text>
-        </View>
-        <View style={styles.anchorRight}>
-          <View
-            style={[
-              styles.dot,
-              { backgroundColor: semiPinned ? colors.statusGreenFg : colors.textMuted },
-            ]}
-          />
-          <ChevronRight size={18} color={colors.iconDefault} />
-        </View>
-      </TouchableOpacity>
-      <Text style={styles.note}>
-        Fetched from a set of public relays and refreshed only when you pull to
-        refresh. Scan your own Trust ID above for self-verification.
-      </Text>
-
-      <View style={styles.spacer} />
-
-      {/* KEYSTORE */}
-      <Text style={styles.sectionLabel}>KEYSTORE</Text>
-      <View style={styles.card}>
-        <TouchableOpacity style={styles.cardRow} onPress={backupKeystore} activeOpacity={0.8}>
-          <View style={[styles.iconTile, { backgroundColor: colors.tileOrangeBg }]}>
-            <Download size={18} color={colors.text} />
-          </View>
-          <Text style={styles.cardRowText}>Backup keystore</Text>
-          <ChevronRight size={18} color={colors.iconDefault} />
-        </TouchableOpacity>
-        <View style={styles.divider} />
-        <TouchableOpacity
-          style={styles.cardRow}
-          onPress={() => router.push("/(main)/reveal-seed")}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.iconTile, { backgroundColor: colors.tileOrangeBg }]}>
-            <Eye size={18} color={colors.text} />
-          </View>
-          <Text style={styles.cardRowText}>Reveal seed phrase</Text>
-          <ChevronRight size={18} color={colors.iconDefault} />
-        </TouchableOpacity>
-      </View>
-
-      {error && <Message message={error} type="error" />}
-
-      <Text style={styles.note}>
-        Your keystore holds your public key and handles — never your private key,
-        which stays in secure storage.
-      </Text>
-    </Layout>
+            <Text>Backup keystore</Text>
+          </ListItem>
+          <ListItem
+            leading={<Icon name="eye" size={22} color={colors.textSecondary} />}
+            trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
+            onPress={() => router.push("/(main)/reveal-seed")}
+          >
+            <Text>Reveal seed phrase</Text>
+          </ListItem>
+          <FieldGroup.SectionFooter>
+            <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+              Your keystore holds your public key and handles — never your private
+              key, which stays in secure storage.
+            </Text>
+          </FieldGroup.SectionFooter>
+        </FieldGroup.Section>
+      </FieldGroup>
+    </Host>
   );
 }
-
-const makeStyles = (c: Colors) =>
-  StyleSheet.create({
-    titleRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginTop: 4,
-      marginBottom: 24,
-    },
-    screenTitle: {
-      fontSize: 24,
-      fontWeight: "700",
-      color: c.text,
-    },
-    sectionLabel: {
-      fontSize: 12,
-      fontWeight: "500",
-      letterSpacing: 0.6,
-      color: c.textMuted,
-      marginBottom: 10,
-    },
-    iconTile: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    rowTitle: {
-      fontSize: 16,
-      fontWeight: "500",
-      color: c.text,
-    },
-    rowSub: {
-      fontSize: 13,
-      color: c.textSecondary,
-      marginTop: 2,
-    },
-    anchorRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
-      borderRadius: 14,
-      paddingLeft: 12,
-      paddingRight: 14,
-      paddingVertical: 12,
-    },
-    anchorMid: {
-      flex: 1,
-    },
-    anchorRight: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-    },
-    dot: {
-      width: 8,
-      height: 8,
-      borderRadius: 999,
-    },
-    safetyCard: {
-      backgroundColor: c.statusAmberBg,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
-      borderRadius: 14,
-      padding: 14,
-      gap: 10,
-      marginTop: 10,
-    },
-    safetyHead: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-    },
-    safetyTitle: {
-      fontSize: 16,
-      fontWeight: "700",
-      color: c.text,
-    },
-    safetyText: {
-      fontSize: 13,
-      color: c.textSecondary,
-      lineHeight: 18,
-    },
-    scanQr: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      backgroundColor: c.accent,
-      borderRadius: 10,
-      paddingVertical: 11,
-    },
-    scanQrText: {
-      color: c.accentText,
-      fontSize: 15,
-      fontWeight: "500",
-    },
-    rescanRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      paddingVertical: 12,
-      marginTop: 4,
-    },
-    rescanText: {
-      color: c.accent,
-      fontSize: 14,
-      fontWeight: "500",
-    },
-    spacer: {
-      height: 20,
-    },
-    card: {
-      backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.borderWarm,
-      borderRadius: 14,
-      overflow: "hidden",
-    },
-    cardRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      paddingLeft: 12,
-      paddingRight: 14,
-      paddingVertical: 12,
-    },
-    cardRowText: {
-      flex: 1,
-      fontSize: 16,
-      fontWeight: "500",
-      color: c.text,
-    },
-    divider: {
-      height: 1,
-      backgroundColor: c.border,
-    },
-    note: {
-      fontSize: 13,
-      color: c.textSecondary,
-      lineHeight: 19,
-      marginTop: 12,
-    },
-    segment: {
-      flexDirection: "row",
-      backgroundColor: c.field,
-      borderRadius: 12,
-      padding: 4,
-    },
-    segmentItem: {
-      flex: 1,
-      paddingVertical: 9,
-      borderRadius: 9,
-      alignItems: "center",
-    },
-    segmentItemActive: {
-      backgroundColor: c.accent,
-    },
-    segmentText: {
-      color: c.textSecondary,
-      fontSize: 14,
-      fontWeight: "500",
-    },
-    segmentTextActive: {
-      color: c.accentText,
-    },
-  });

@@ -71,6 +71,7 @@ const makeStyles = (c: Colors) =>
   StyleSheet.create({
     button: {
       borderRadius: 14,
+      borderCurve: "continuous",
       paddingVertical: 18,
       paddingHorizontal: 24,
       marginBottom: 16,

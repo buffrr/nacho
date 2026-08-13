@@ -6,12 +6,12 @@ import { ResolvedHandle } from "@/fabricResolver";
 import { recordResolve } from "@/resolveHistory";
 import {
   ProfileShell,
-  ResolvedProfile,
   NotFoundState,
   NetworkErrorState,
   VerifyErrorState,
   recordCountOf,
 } from "@/ui/handleProfile";
+import { ResolvedProfileNative } from "@/ui/handleProfileNative";
 
 // A standalone, read-only view of a resolved handle — opened from Recents by
 // tapping a row. Unlike the Search tab it auto-resolves on entry and shows no
@@ -60,15 +60,27 @@ export default function HandleView() {
     void run();
   }, [run]);
 
+  // Handle shown big under the avatar, so the bar carries no title.
+  const screen = <Stack.Screen options={{ title: "" }} />;
+
+  // Result → the native @expo/ui view, which is its own scroll container (fills
+  // the screen directly, not inside the RN Layout ScrollView). Header + native
+  // Form now share the theme background (see theme.ts — dark bg matches iOS's
+  // grouped background), so no seam and no per-screen override needed.
+  if (!pending && result) {
+    return (
+      <>
+        {screen}
+        <ResolvedProfileNative result={result} />
+      </>
+    );
+  }
+
+  // Loading / not-found / error stay on the RN states inside Layout.
   return (
     <Layout underHeader>
-      {/* Handle shown big under the avatar, so the bar carries no title. */}
-      <Stack.Screen options={{ title: "" }} />
-
+      {screen}
       {pending && <ProfileShell handle={name} />}
-
-      {!pending && result && <ResolvedProfile result={result} />}
-
       {!pending && notFound && (
         <NotFoundState
           name={name}
@@ -77,7 +89,6 @@ export default function HandleView() {
           }
         />
       )}
-
       {!pending && error === "network" && (
         <NetworkErrorState
           handle={name}
@@ -85,7 +96,6 @@ export default function HandleView() {
           onRelaySettings={() => router.push("/(main)/trust")}
         />
       )}
-
       {!pending && error === "verify" && (
         <VerifyErrorState
           handle={name}

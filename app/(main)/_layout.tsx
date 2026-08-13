@@ -47,6 +47,7 @@ export default function MainLayout() {
           name="import-certificate"
           options={{ title: "Import certificate" }}
         />
+        <Stack.Screen name="add-record" options={{ title: "Add a record" }} />
         <Stack.Screen name="redeem" options={{ title: "Redeem code" }} />
         <Stack.Screen name="sign" options={{ title: "Approve request" }} />
         <Stack.Screen name="handle-action" options={{ title: "Handle" }} />
@@ -54,6 +55,7 @@ export default function MainLayout() {
         <Stack.Screen name="preferences" options={{ title: "Settings" }} />
         <Stack.Screen name="verify-anchor" options={{ title: "Verify anchor" }} />
         <Stack.Screen name="trust-approve" options={{ title: "Trust ID" }} />
+        <Stack.Screen name="native-demo" options={{ title: "Native preview" }} />
         <Stack.Screen name="reveal-seed" options={{ title: "Seed phrase" }} />
       </Stack>
     </RecordsDraftProvider>
