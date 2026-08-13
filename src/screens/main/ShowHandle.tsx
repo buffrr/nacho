@@ -57,6 +57,8 @@ import { lookupRecord } from "@/recordRegistry";
 import type { EditableRecord } from "@/fabricResolver";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { OwnerProfileNative } from "@/ui/ownerProfileNative";
+import { HandleStatusNative, StatusDetail } from "@/ui/handleStatusNative";
+import { PurchaseNative } from "@/ui/purchaseNative";
 import {
   fetchHandleStatus,
   reserveHandle,
@@ -1093,12 +1095,109 @@ export default function ShowHandle() {
         },
       ];
 
+  const shortPk = `${pubkey.slice(0, 8)}…${pubkey.slice(-8)}`;
+
+  // ── Native onboarding (issuing → ready → sovereign) ─────────────────────────
+  if (showOnboarding) {
+    let sIcon: Parameters<typeof HandleStatusNative>[0]["icon"] = "clock";
+    let iconColor = colors.textMuted;
+    let statusLabel = "Waiting for certificate";
+    let statusColor = colors.textMuted;
+    let message = "";
+    let details: StatusDetail[] | undefined;
+    let primary: { label: string; onPress: () => void } | undefined;
+    let secondary: { label: string; onPress: () => void } | undefined;
+
+    if (onboardStage === "issuing" && boughtViaNacho) {
+      sIcon = "checkmark.seal.fill";
+      iconColor = colors.statusGreenFg;
+      statusLabel = "is yours";
+      statusColor = colors.statusGreenFg;
+      message =
+        "Issuing your certificate — usually a few minutes. You’ll be able to publish records as soon as it lands.";
+      details = [
+        ...(handleData.purchase?.amountCents != null
+          ? [{ label: "Paid", value: formatPrice(handleData.purchase.amountCents) }]
+          : []),
+        { label: "Bound to", value: shortPk },
+        ...(handleData.purchase?.orderId
+          ? [{ label: "Order", value: handleData.purchase.orderId }]
+          : []),
+      ];
+    } else if (onboardStage === "issuing") {
+      message =
+        "The handle is registered to your key. We’ll pull the certificate as soon as a relay has it.";
+      secondary = {
+        label: resolving ? "Checking…" : "Check now",
+        onPress: () => refreshResolution(),
+      };
+    } else if (onboardStage === "ready") {
+      sIcon = "checkmark.seal.fill";
+      iconColor = colors.statusGreenFg;
+      statusLabel = "Yours — ready to use";
+      statusColor = colors.statusGreenFg;
+      message =
+        "Anchoring to Bitcoin — usually within a day. Nothing to do; you can use the handle now.";
+      primary = { label: "Set up records", onPress: dismissOnboarding };
+    } else {
+      sIcon = "checkmark.shield.fill";
+      iconColor = colors.statusBlueFg;
+      statusLabel = "Sovereign";
+      statusColor = colors.statusBlueFg;
+      message =
+        "Ownership is proven on-chain and can’t be revoked. Back up your certificate.";
+      primary = { label: "Continue", onPress: dismissOnboarding };
+      secondary = { label: "View proof", onPress: handleExportCertificate };
+    }
+
+    return (
+      <>
+        <Stack.Screen options={{ title: headerTitle }} />
+        <HandleStatusNative
+          handle={handle}
+          icon={sIcon}
+          iconColor={iconColor}
+          statusLabel={statusLabel}
+          statusColor={statusColor}
+          message={message}
+          details={details}
+          primary={primary}
+          secondary={secondary}
+        />
+      </>
+    );
+  }
+
+  // ── Native waiting-for-certificate (paid, no cert, not manageable yet) ──────
+  if (awaitingCert && !manageable && !buyable) {
+    return (
+      <>
+        <Stack.Screen
+          options={{ title: "", unstable_headerRightItems: () => headerItems }}
+        />
+        <HandleStatusNative
+          handle={handle}
+          icon="clock"
+          iconColor={colors.textMuted}
+          statusLabel={pill.label}
+          statusColor={pill.fg}
+          message="Waiting for your certificate to appear on certrelay. You can add records once it’s live."
+          details={[{ label: "Bound to", value: shortPk }]}
+          secondary={{
+            label: resolving ? "Checking…" : "Check now",
+            onPress: () => refreshResolution(),
+          }}
+        />
+      </>
+    );
+  }
+
   // ── Native manage view (@expo/ui) ──────────────────────────────────────────
   // The common owner case renders with native grouped sections, matching the
-  // resolve/handle view. Buy / onboarding / edge states stay on the RN Layout
-  // below. The "Sign and publish" action sits in a pinned RN footer over the
-  // native content (only when there are unsaved edits).
-  if (!buyable && !showOnboarding && manageable) {
+  // resolve/handle view. Buy / edge states stay on the RN Layout below. The
+  // "Sign and publish" action sits in a pinned RN footer over the native content
+  // (only when there are unsaved edits).
+  if (!buyable && manageable) {
     const banner: { text: string; tone: "error" | "success" | "muted" } | null =
       error
         ? { text: error, tone: "error" }
@@ -1152,6 +1251,24 @@ export default function ShowHandle() {
           </View>
         )}
       </View>
+    );
+  }
+
+  // ── Native purchase / buy view ──────────────────────────────────────────────
+  if (buyable) {
+    return (
+      <>
+        <Stack.Screen options={{ title: headerTitle }} />
+        <PurchaseNative
+          handle={handle}
+          pubkey={pubkey}
+          price={price}
+          purchasing={purchasing}
+          onBuy={handleBuyHandle}
+          onCopyRequest={handleCopyRequest}
+          onCopyKey={() => copy(pubkey)}
+        />
+      </>
     );
   }
 
