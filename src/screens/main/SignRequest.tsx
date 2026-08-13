@@ -10,6 +10,17 @@ import {
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
+import {
+  Host,
+  FieldGroup as NFieldGroup,
+  ListItem as NListItem,
+  Icon as NIcon,
+  Text as NText,
+  Column as NColumn,
+  Row as NRow,
+  Spacer as NSpacer,
+  Checkbox as NCheckbox,
+} from "@expo/ui";
 import { Colors, useTheme } from "@/theme";
 import { Layout } from "@/ui/Layout";
 import { Message } from "@/ui/Message";
@@ -165,60 +176,76 @@ function ResultView({
     }
   };
 
-  const actions =
-    host && !sent ? (
-      <>
-        {error && (
-          <View style={styles.mb}>
-            <Message message={error} type="error" />
-          </View>
-        )}
-        <TouchableOpacity
-          style={[styles.primaryBtn, sending && styles.btnDisabled]}
-          onPress={send}
-          disabled={sending}
-        >
-          {sending ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.primaryBtnText}>Send to {host}</Text>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={copy}>
-          <Text style={styles.secondaryBtnText}>
-            {copied ? "Copied ✓" : "Copy response"}
-          </Text>
-        </TouchableOpacity>
-      </>
-    ) : (
-      <>
-        <TouchableOpacity style={styles.primaryBtn} onPress={copy}>
-          <Text style={styles.primaryBtnText}>
-            {copied ? "Copied ✓" : "Copy response"}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
-          <Text style={styles.secondaryBtnText}>Done</Text>
-        </TouchableOpacity>
-      </>
-    );
+  const { scheme } = useTheme();
 
   return (
-    <Layout underHeader footer={actions}>
+    <>
       <Stack.Screen options={{ title: "Signed" }} />
-      <View style={styles.hero}>
-        <View style={styles.heroIcon}>
-          <Check size={30} color={colors.statusGreenFg} />
-        </View>
-        <Text style={styles.heroH}>{heading}</Text>
-        <Text style={styles.heroS}>{sent ? `Sent to ${host}` : sub}</Text>
-      </View>
-      <View style={styles.blob}>
-        <Text style={styles.blobText} numberOfLines={4}>
-          {blob}
-        </Text>
-      </View>
-    </Layout>
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <NFieldGroup>
+          <NFieldGroup.Section>
+            <NFieldGroup.SectionHeader>
+              <NRow alignment="center">
+                <NSpacer />
+                <NColumn alignment="center" spacing={8}>
+                  <NIcon name="checkmark.circle.fill" size={46} color={colors.statusGreenFg} />
+                  <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
+                    {heading}
+                  </NText>
+                  <NText textStyle={{ fontSize: 20, fontWeight: "700" }}>
+                    {sent ? `Sent to ${host}` : sub}
+                  </NText>
+                </NColumn>
+                <NSpacer />
+              </NRow>
+            </NFieldGroup.SectionHeader>
+            <NListItem>
+              <NText textStyle={{ color: colors.textSecondary }}>{blob}</NText>
+            </NListItem>
+          </NFieldGroup.Section>
+
+          {error ? (
+            <NFieldGroup.Section>
+              <NListItem
+                leading={
+                  <NIcon name="exclamationmark.triangle.fill" size={18} color={colors.dangerText} />
+                }
+              >
+                <NText textStyle={{ color: colors.textSecondary }}>{error}</NText>
+              </NListItem>
+            </NFieldGroup.Section>
+          ) : null}
+
+          <NFieldGroup.Section>
+            {host && !sent ? (
+              <>
+                <NListItem onPress={sending ? undefined : send}>
+                  <NText textStyle={{ color: colors.accent, fontWeight: "700" }}>
+                    {sending ? "Sending…" : `Send to ${host}`}
+                  </NText>
+                </NListItem>
+                <NListItem onPress={copy}>
+                  <NText textStyle={{ color: colors.textSecondary }}>
+                    {copied ? "Copied ✓" : "Copy response"}
+                  </NText>
+                </NListItem>
+              </>
+            ) : (
+              <>
+                <NListItem onPress={copy}>
+                  <NText textStyle={{ color: colors.accent, fontWeight: "700" }}>
+                    {copied ? "Copied ✓" : "Copy response"}
+                  </NText>
+                </NListItem>
+                <NListItem onPress={() => router.back()}>
+                  <NText textStyle={{ color: colors.textSecondary }}>Done</NText>
+                </NListItem>
+              </>
+            )}
+          </NFieldGroup.Section>
+        </NFieldGroup>
+      </Host>
+    </>
   );
 }
 
@@ -234,6 +261,7 @@ function MessageConfirm({
   colors: Colors;
 }) {
   const router = useRouter();
+  const { scheme } = useTheme();
   const { handles, getSigningKey } = useStore();
   const owned = useMemo(() => (handles ? Object.keys(handles) : []), [handles]);
   const [handle, setHandle] = useState<string | null>(request.handle ?? null);
@@ -274,86 +302,101 @@ function MessageConfirm({
 
   if (!handle) {
     return (
-      <Layout underHeader>
+      <>
         <Stack.Screen options={{ title: "Sign in" }} />
-        <Text style={styles.prompt}>Choose the handle to prove you own:</Text>
-        {owned.map((h, i) => (
-          <React.Fragment key={h}>
-            {i > 0 && <View style={styles.divider} />}
-            <TouchableOpacity style={styles.pickRow} onPress={() => setHandle(h)}>
-              <View style={styles.pickIcon}>
-                <AtSign size={18} color={colors.accent} />
-              </View>
-              <Text style={styles.pickName}>{h}</Text>
-              <ChevronRight size={18} color={colors.iconDefault} />
-            </TouchableOpacity>
-          </React.Fragment>
-        ))}
-      </Layout>
+        <Host style={{ flex: 1 }} colorScheme={scheme}>
+          <NFieldGroup>
+            <NFieldGroup.Section title="Choose the handle to prove you own">
+              {owned.map((h) => (
+                <NListItem
+                  key={h}
+                  leading={<NIcon name="at" size={22} color={colors.accent} />}
+                  trailing={<NIcon name="chevron.forward" size={14} color={colors.chevron} />}
+                  onPress={() => setHandle(h)}
+                >
+                  <NText>{h}</NText>
+                </NListItem>
+              ))}
+            </NFieldGroup.Section>
+          </NFieldGroup>
+        </Host>
+      </>
     );
   }
 
   return (
-    <Layout
-      underHeader
-      footer={
-        <>
-          {error && (
-            <View style={styles.mb}>
-              <Message message={error} type="error" />
-            </View>
-          )}
-          <TouchableOpacity
-            style={[styles.primaryBtn, signing && styles.btnDisabled]}
-            onPress={sign}
-            disabled={signing}
-          >
-            {signing ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryBtnText}>
-                {host ? `Sign & send to ${host}` : "Sign"}
-              </Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
-            <Text style={styles.secondaryBtnText}>Cancel</Text>
-          </TouchableOpacity>
-        </>
-      }
-    >
+    <>
       <Stack.Screen options={{ title: "Sign in" }} />
-      <View style={styles.hero}>
-        <View style={styles.heroIconAccent}>
-          <AtSign size={26} color={colors.accent} />
-        </View>
-        <Text style={styles.heroH}>Prove you own</Text>
-        <Text style={styles.heroS}>{handle}</Text>
-      </View>
-      <View style={styles.card}>
-        <View style={styles.kv}>
-          <Text style={styles.kvK}>Signs</Text>
-          <Text style={styles.kvV}>A one-time challenge</Text>
-        </View>
-        {request.exp !== undefined && (
-          <>
-            <View style={styles.divider} />
-            <View style={styles.kv}>
-              <Text style={styles.kvK}>Expires</Text>
-              <Text style={styles.kvV}>{remainingValidity(request.exp)}</Text>
-            </View>
-          </>
-        )}
-      </View>
-      {host && (
-        <View style={styles.notePlain}>
-          <Text style={styles.noteText}>
-            Your signature will be sent to <Text style={styles.noteStrong}>{host}</Text>{" "}
-            when you tap below. Nothing is sent before that.
-          </Text>
-        </View>
-      )}
-    </Layout>
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <NFieldGroup>
+          <NFieldGroup.Section>
+            <NFieldGroup.SectionHeader>
+              <NRow alignment="center">
+                <NSpacer />
+                <NColumn alignment="center" spacing={8}>
+                  <NIcon name="at" size={40} color={colors.accent} />
+                  <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
+                    Prove you own
+                  </NText>
+                  <NText textStyle={{ fontSize: 20, fontWeight: "700" }}>{handle}</NText>
+                </NColumn>
+                <NSpacer />
+              </NRow>
+            </NFieldGroup.SectionHeader>
+            <NListItem
+              trailing={
+                <NText textStyle={{ color: colors.textSecondary }}>
+                  A one-time challenge
+                </NText>
+              }
+            >
+              <NText>Signs</NText>
+            </NListItem>
+            {request.exp !== undefined ? (
+              <NListItem
+                trailing={
+                  <NText textStyle={{ color: colors.textSecondary }}>
+                    {remainingValidity(request.exp)}
+                  </NText>
+                }
+              >
+                <NText>Expires</NText>
+              </NListItem>
+            ) : null}
+            {host ? (
+              <NFieldGroup.SectionFooter>
+                <NText textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                  {`Your signature is sent to ${host} only when you tap Sign. Nothing is sent before that.`}
+                </NText>
+              </NFieldGroup.SectionFooter>
+            ) : null}
+          </NFieldGroup.Section>
+
+          {error ? (
+            <NFieldGroup.Section>
+              <NListItem
+                leading={
+                  <NIcon name="exclamationmark.triangle.fill" size={18} color={colors.dangerText} />
+                }
+              >
+                <NText textStyle={{ color: colors.textSecondary }}>{error}</NText>
+              </NListItem>
+            </NFieldGroup.Section>
+          ) : null}
+
+          <NFieldGroup.Section>
+            <NListItem onPress={signing ? undefined : sign}>
+              <NText textStyle={{ color: colors.accent, fontWeight: "700" }}>
+                {signing ? "Signing…" : host ? `Sign & send to ${host}` : "Sign"}
+              </NText>
+            </NListItem>
+            <NListItem onPress={() => router.back()}>
+              <NText textStyle={{ color: colors.textSecondary }}>Cancel</NText>
+            </NListItem>
+          </NFieldGroup.Section>
+        </NFieldGroup>
+      </Host>
+    </>
   );
 }
 
