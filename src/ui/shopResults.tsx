@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Host, ListItem, Text, Button, RNHostView } from "@expo/ui";
+import { Host, ListItem, Icon, Text, Button, RNHostView } from "@expo/ui";
 import {
   listRowBackground,
   listRowSeparator,
@@ -16,13 +16,16 @@ import { searchHandles, formatPrice, SearchMatch } from "@/api";
 // The shop search results (native list + searching / error / empty states),
 // driven by a query string. Shared by the Shop screen and the Search tab (which
 // falls back to shopping when the query isn't a handle). Debounces and filters
-// out handles already in the keystore; taps on an available handle call onBuy.
+// out handles already in the keystore. Tapping an available handle (row or the
+// Buy button) calls onBuy; tapping a taken handle calls onOpen to resolve it.
 export function ShopResults({
   query,
   onBuy,
+  onOpen,
 }: {
   query: string;
   onBuy: (handle: string) => void;
+  onOpen: (handle: string) => void;
 }) {
   const { handles } = useStore();
   const { scheme, colors } = useTheme();
@@ -121,6 +124,7 @@ export function ShopResults({
                   <Avatar handle={item.handle} size={50} />
                 </RNHostView>
               }
+              supportingText={isAvailable ? undefined : "Taken · tap to resolve"}
               trailing={
                 isAvailable ? (
                   <Button
@@ -130,10 +134,12 @@ export function ShopResults({
                     onPress={() => onBuy(item.handle)}
                   />
                 ) : (
-                  <Text textStyle={{ color: colors.textMuted }}>Taken</Text>
+                  <Icon name="chevron.forward" size={14} color={colors.chevron} />
                 )
               }
-              onPress={() => isAvailable && onBuy(item.handle)}
+              onPress={() =>
+                isAvailable ? onBuy(item.handle) : onOpen(item.handle)
+              }
             >
               <Text textStyle={{ fontSize: 17, fontWeight: "600" }}>{item.handle}</Text>
             </ListItem>

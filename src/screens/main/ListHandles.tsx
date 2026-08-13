@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { useFocusEffect, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useRouter } from "expo-router";
 import {
   Host,
   ListItem,
@@ -30,8 +30,13 @@ export default function ListHandles() {
   const { colors, scheme } = useTheme();
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [, setRefreshing] = useState(false);
+  const [query, setQuery] = useState("");
 
-  const handlesList = Object.entries(handles || {});
+  const q = query.trim().toLowerCase();
+  const allHandles = Object.entries(handles || {});
+  const handlesList = q
+    ? allHandles.filter(([name]) => name.toLowerCase().includes(q))
+    : allHandles;
 
   // Pull-to-refresh: EXPLICITLY refresh the semi-trusted anchor (the only place we
   // re-fetch it — never automatically), then re-resolve each handle so the tiles'
@@ -98,7 +103,7 @@ export default function ListHandles() {
     });
   };
 
-  if (handlesList.length === 0) {
+  if (allHandles.length === 0) {
     return (
       <NativeEmpty
         sf="at"
@@ -110,6 +115,36 @@ export default function ListHandles() {
         }}
         secondary={{ label: "Shop handles", onPress: () => router.push("/(main)/(tabs)/handles/shop") }}
       />
+    );
+  }
+
+  // Native header search that filters the list (merges with the large title +
+  // header items set in handles/_layout — same feel as Add record).
+  const searchScreen = (
+    <Stack.Screen
+      options={{
+        headerSearchBarOptions: {
+          placeholder: "Search handles",
+          autoCapitalize: "none",
+          hideWhenScrolling: true,
+          textColor: colors.text,
+          tintColor: colors.accent,
+          onChangeText: (e) => setQuery(e.nativeEvent.text),
+        },
+      }}
+    />
+  );
+
+  if (handlesList.length === 0) {
+    return (
+      <>
+        {searchScreen}
+        <NativeEmpty
+          sf="magnifyingglass"
+          title="No matches"
+          message={`No handle matches “${query.trim()}”.`}
+        />
+      </>
     );
   }
 
@@ -131,11 +166,19 @@ export default function ListHandles() {
   // The first row also hides its TOP separator — a plain-style List draws a
   // hairline above the first cell, which reads as a stray divider under the header.
   const rowBg = [listRowBackground(colors.background)];
-  const rowMods = (i: number) =>
-    i === 0 ? [...rowBg, listRowSeparator("hidden", "top")] : rowBg;
+  // First row hides its top separator; while filtering (no Shop row) the last
+  // handle hides its bottom separator so the list doesn't trail off with a divider.
+  const rowMods = (i: number) => {
+    const m = [...rowBg];
+    if (i === 0) m.push(listRowSeparator("hidden", "top"));
+    if (q && i === handlesList.length - 1) m.push(listRowSeparator("hidden", "bottom"));
+    return m;
+  };
 
   return (
-    <Host style={{ flex: 1 }} colorScheme={scheme}>
+    <>
+      {searchScreen}
+      <Host style={{ flex: 1 }} colorScheme={scheme}>
       <PlainList onRefresh={onRefresh}>
         {handlesList.map(([name, handleData], i) => {
           const info = infoFor(name, handleData);
@@ -172,16 +215,19 @@ export default function ListHandles() {
           );
         })}
 
-        {/* Shop entry at the end of the list. Hide its bottom separator so the
-            list doesn't trail off with a stray divider. */}
-        <ListItem
-          modifiers={[...rowBg, listRowSeparator("hidden", "bottom")]}
-          leading={<Icon name="bag" size={22} color={colors.textSecondary} />}
-          onPress={() => router.push("/(main)/(tabs)/handles/shop")}
-        >
-          <UIText textStyle={{ color: colors.textSecondary }}>Shop handles</UIText>
-        </ListItem>
+        {/* Shop entry at the end of the list (hidden while filtering). Hide its
+            bottom separator so the list doesn't trail off with a stray divider. */}
+        {q ? null : (
+          <ListItem
+            modifiers={[...rowBg, listRowSeparator("hidden", "bottom")]}
+            leading={<Icon name="bag" size={22} color={colors.textSecondary} />}
+            onPress={() => router.push("/(main)/(tabs)/handles/shop")}
+          >
+            <UIText textStyle={{ color: colors.textSecondary }}>Shop handles</UIText>
+          </ListItem>
+        )}
       </PlainList>
-    </Host>
+      </Host>
+    </>
   );
 }

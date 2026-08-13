@@ -1,6 +1,7 @@
 import React from "react";
 import { Stack } from "expo-router";
 import { useTheme } from "@/theme";
+import { solidNativeHeader } from "@/ui/nativeHeader";
 import { appMenuLeftItems } from "@/ui/appMenu";
 
 // Recents: handles the user has resolved before (src/screens/main/Recents).
@@ -27,9 +28,13 @@ export default function RecentsTabLayout() {
     [colors.text, colors.background, leftItems],
   );
 
+  // view-handle lives in THIS tab's stack (not as a sibling of the tab group) so
+  // Recents → view-handle is a native in-stack push (tab bar stays, shared nav
+  // bar). Transparent glass detail header applied per screen (see nativeHeader).
   return (
-    <Stack>
+    <Stack screenOptions={{ headerBackButtonDisplayMode: "minimal" }}>
       <Stack.Screen name="index" options={options} />
+      <Stack.Screen name="view-handle" options={{ ...solidNativeHeader(colors), title: "" }} />
     </Stack>
   );
 }

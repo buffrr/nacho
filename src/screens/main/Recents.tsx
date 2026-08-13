@@ -38,6 +38,12 @@ export default function Recents() {
   const { scheme, colors } = useTheme();
   const [entries, setEntries] = useState<ResolveHistoryEntry[]>([]);
   const [editing, setEditing] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const q = query.trim().toLowerCase();
+  const shown = q
+    ? entries.filter((e) => e.handle.toLowerCase().includes(q))
+    : entries;
 
   const load = useCallback(async () => setEntries(await listHistory()), []);
 
@@ -95,7 +101,26 @@ export default function Recents() {
   );
 
   const screen = (
-    <Stack.Screen options={{ unstable_headerRightItems: () => headerItems }} />
+    <Stack.Screen
+      options={{
+        unstable_headerRightItems: () => headerItems,
+        // Native header search filters the list (only when there's something to
+        // filter). Same feel as the Handles list.
+        ...(entries.length > 0
+          ? {
+              headerSearchBarOptions: {
+                placeholder: "Search recents",
+                autoCapitalize: "none" as const,
+                hideWhenScrolling: true,
+                textColor: colors.text,
+                tintColor: colors.accent,
+                onChangeText: (e: { nativeEvent: { text: string } }) =>
+                  setQuery(e.nativeEvent.text),
+              },
+            }
+          : {}),
+      }}
+    />
   );
 
   if (entries.length === 0) {
@@ -111,14 +136,28 @@ export default function Recents() {
     );
   }
 
+  if (shown.length === 0) {
+    return (
+      <>
+        {screen}
+        <NativeEmpty
+          sf="magnifyingglass"
+          title="No matches"
+          message={`No recent matches “${query.trim()}”.`}
+        />
+      </>
+    );
+  }
+
   // Hide the plain-style List's hairline above the first cell and below the last
-  // (stray dividers at the ends). When editing, the trailing "Clear All" row is
-  // the last one, so the entries don't hide their bottom then.
+  // (stray dividers at the ends). While filtering, the "Clear All" row is hidden,
+  // so the last shown entry hides its bottom.
+  const showClearAll = editing && !q;
   const rowBg = [listRowBackground(colors.background)];
   const rowMods = (i: number) => {
     const m = [...rowBg];
     if (i === 0) m.push(listRowSeparator("hidden", "top"));
-    if (!editing && i === entries.length - 1) m.push(listRowSeparator("hidden", "bottom"));
+    if (!showClearAll && i === shown.length - 1) m.push(listRowSeparator("hidden", "bottom"));
     return m;
   };
 
@@ -127,7 +166,7 @@ export default function Recents() {
       {screen}
       <Host style={{ flex: 1 }} colorScheme={scheme}>
         <PlainList>
-          {entries.map((item, i) => {
+          {shown.map((item, i) => {
             const count =
               item.recordCount > 0
                 ? `${item.recordCount} record${item.recordCount === 1 ? "" : "s"}`
@@ -171,7 +210,7 @@ export default function Recents() {
             );
           })}
 
-          {editing ? (
+          {showClearAll ? (
             <ListItem
               modifiers={[...rowBg, listRowSeparator("hidden", "bottom")]}
               onPress={confirmClear}

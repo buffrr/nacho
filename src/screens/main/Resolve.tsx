@@ -117,12 +117,12 @@ export default function Resolve() {
           },
           onSearchButtonPress: (e) => onResolve(e.nativeEvent.text),
           onCancelButtonPress: () => {
-            const noSearch = !result && !notFound && !error;
+            // Just clear the search — don't auto-navigate to Handles (it felt
+            // laggy). The user can tab back if they want.
             setHandle("");
             setError(null);
             setNotFound(null);
             setResult(null);
-            if (noSearch) router.navigate("/(main)/(tabs)/handles");
           },
         },
       }}
@@ -141,6 +141,7 @@ export default function Resolve() {
         <ShopResults
           query={q}
           onBuy={(h) => router.push({ pathname: "/(main)/(tabs)/resolve/show-handle", params: { handle: h } })}
+          onOpen={(h) => router.push({ pathname: "/(main)/(tabs)/resolve/view-handle", params: { handle: h } })}
         />
       </>
     );

@@ -10,11 +10,16 @@ import { solidNativeHeader } from "@/ui/nativeHeader";
 // by default; (tabs) has its own headers and register-hub is a native sheet.
 export default function MainLayout() {
   const { colors } = useTheme();
+
+  // Transparent (glass) detail header — applied PER screen, NOT in screenOptions,
+  // because `headerTransparent: true` leaks onto any large-title child and kills
+  // its scroll-edge glass + collapse.
+  const detail = solidNativeHeader(colors);
+
   return (
     <RecordsDraftProvider>
       <Stack
         screenOptions={{
-          ...solidNativeHeader(colors),
           headerShown: true,
           headerBackButtonDisplayMode: "minimal",
           // Native content bg = theme, so no white flashes behind the header
@@ -37,26 +42,18 @@ export default function MainLayout() {
             contentStyle: { backgroundColor: "transparent" },
           }}
         />
-        {/* show-handle + edit-record + view-handle set their titles in-component. */}
-        <Stack.Screen name="view-handle" options={{ title: "" }} />
-        <Stack.Screen name="shop" options={{ title: "Shop" }} />
-        <Stack.Screen name="trust" options={{ title: "Trust" }} />
-        <Stack.Screen name="create-request" options={{ title: "Create a request" }} />
-        <Stack.Screen name="import-keypair" options={{ title: "Import keypair" }} />
-        <Stack.Screen
-          name="import-certificate"
-          options={{ title: "Import certificate" }}
-        />
-        <Stack.Screen name="add-record" options={{ title: "Add a record" }} />
-        <Stack.Screen name="redeem" options={{ title: "Redeem code" }} />
-        <Stack.Screen name="sign" options={{ title: "Approve request" }} />
-        <Stack.Screen name="handle-action" options={{ title: "Handle" }} />
-        <Stack.Screen name="cancel-offers" options={{ title: "Cancel offers" }} />
-        <Stack.Screen name="preferences" options={{ title: "Settings" }} />
-        <Stack.Screen name="verify-anchor" options={{ title: "Verify anchor" }} />
-        <Stack.Screen name="trust-approve" options={{ title: "Trust ID" }} />
-        <Stack.Screen name="native-demo" options={{ title: "Native preview" }} />
-        <Stack.Screen name="reveal-seed" options={{ title: "Seed phrase" }} />
+        {/* Handle-detail subtree lives in the Handles tab stack; view-handle in
+            the Recents tab stack; shop in the Handles tab stack — so each pushes
+            in-stack with the tab bar visible (see the tab _layouts). */}
+        <Stack.Screen name="trust" options={{ ...detail, title: "Trust" }} />
+        <Stack.Screen name="create-request" options={{ ...detail, title: "Create a request" }} />
+        <Stack.Screen name="redeem" options={{ ...detail, title: "Redeem code" }} />
+        <Stack.Screen name="sign" options={{ ...detail, title: "Approve request" }} />
+        <Stack.Screen name="preferences" options={{ ...detail, title: "Settings" }} />
+        <Stack.Screen name="verify-anchor" options={{ ...detail, title: "Verify anchor" }} />
+        <Stack.Screen name="trust-approve" options={{ ...detail, title: "Trust ID" }} />
+        <Stack.Screen name="native-demo" options={{ ...detail, title: "Native preview" }} />
+        <Stack.Screen name="reveal-seed" options={{ ...detail, title: "Seed phrase" }} />
       </Stack>
     </RecordsDraftProvider>
   );

@@ -2,7 +2,7 @@ import React from "react";
 import { Stack, router } from "expo-router";
 import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
 import { useTheme } from "@/theme";
-import { nativeHeader } from "@/ui/nativeHeader";
+import { nativeHeader, solidNativeHeader } from "@/ui/nativeHeader";
 
 export default function ResolveTabLayout() {
   const { colors } = useTheme();
@@ -29,9 +29,15 @@ export default function ResolveTabLayout() {
     }),
     [colors, leftItems],
   );
+  // A buyable handle opened from search results pushes WITHIN this stack so Back
+  // returns to the results. Once purchased, ShowHandle re-roots to the Handles
+  // tab (see dismissOnboarding) so Back then goes to the Handles list.
   return (
-    <Stack>
+    <Stack screenOptions={{ headerBackButtonDisplayMode: "minimal" }}>
       <Stack.Screen name="index" options={options} />
+      <Stack.Screen name="show-handle" options={solidNativeHeader(colors)} />
+      {/* Read-only resolved view (e.g. tapping a taken shop result). */}
+      <Stack.Screen name="view-handle" options={{ ...solidNativeHeader(colors), title: "" }} />
     </Stack>
   );
 }

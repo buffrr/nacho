@@ -21,6 +21,8 @@ export default function Shop() {
 
   const buy = (handle: string) =>
     router.push({ pathname: "/(main)/(tabs)/handles/show-handle", params: { handle } });
+  const view = (handle: string) =>
+    router.push({ pathname: "/(main)/(tabs)/handles/view-handle", params: { handle } });
 
   // Focus the native search field once the screen is settled. `autoFocus` on the
   // search bar is unreliable across a push transition (the keyboard is dismissed
@@ -57,7 +59,7 @@ export default function Shop() {
     <>
       {searchScreen}
       {query ? (
-        <ShopResults query={query} onBuy={buy} />
+        <ShopResults query={query} onBuy={buy} onOpen={view} />
       ) : (
         <NativeEmpty
           sf="bag"
