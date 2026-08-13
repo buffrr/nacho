@@ -1,17 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { Layout } from "@/ui/Layout";
+import { useTheme } from "@/theme";
 import { resolveHandle } from "@/fabric";
 import { ResolvedHandle } from "@/fabricResolver";
 import { recordResolve } from "@/resolveHistory";
-import {
-  ProfileShell,
-  NotFoundState,
-  NetworkErrorState,
-  VerifyErrorState,
-  recordCountOf,
-} from "@/ui/handleProfile";
-import { ResolvedProfileNative } from "@/ui/handleProfileNative";
+import { ResolvedProfileNative, recordCountOf } from "@/ui/handleProfileNative";
+import { NativeEmpty } from "@/ui/nativeEmpty";
 
 // A standalone, read-only view of a resolved handle — opened from Recents by
 // tapping a row. Unlike the Search tab it auto-resolves on entry and shows no
@@ -19,6 +13,7 @@ import { ResolvedProfileNative } from "@/ui/handleProfileNative";
 // state), under a plain back header.
 export default function HandleView() {
   const router = useRouter();
+  const { colors } = useTheme();
   const { handle } = useLocalSearchParams<{ handle: string }>();
   const name = (handle ?? "").trim().toLowerCase();
 
@@ -61,7 +56,7 @@ export default function HandleView() {
   }, [run]);
 
   // Handle shown big under the avatar, so the bar carries no title.
-  const screen = <Stack.Screen options={{ title: "" }} />;
+  const screen = <Stack.Screen options={{ title: "", headerLargeTitle: false }} />;
 
   // Result → the native @expo/ui view, which is its own scroll container (fills
   // the screen directly, not inside the RN Layout ScrollView). Header + native
@@ -76,33 +71,42 @@ export default function HandleView() {
     );
   }
 
-  // Loading / not-found / error stay on the RN states inside Layout.
+  // Loading / not-found / error → native centered states.
   return (
-    <Layout underHeader>
+    <>
       {screen}
-      {pending && <ProfileShell handle={name} />}
+      {pending && <NativeEmpty sf="magnifyingglass" title="Resolving…" />}
       {!pending && notFound && (
-        <NotFoundState
-          name={name}
-          onBuy={() =>
-            router.push({ pathname: "/(main)/shop", params: { prefill: name } })
-          }
+        <NativeEmpty
+          sf="questionmark.circle"
+          title={name}
+          message="Not registered, or no records published yet."
+          primary={{
+            label: "Buy this handle",
+            onPress: () =>
+              router.push({ pathname: "/(main)/shop", params: { prefill: name } }),
+          }}
         />
       )}
       {!pending && error === "network" && (
-        <NetworkErrorState
-          handle={name}
-          onRetry={run}
-          onRelaySettings={() => router.push("/(main)/trust")}
+        <NativeEmpty
+          sf="wifi.slash"
+          title="Couldn’t reach any relay"
+          message="We can’t tell if it exists — not the same as “not found”."
+          primary={{ label: "Try again", onPress: run }}
+          secondary={{ label: "Relay settings", onPress: () => router.push("/(main)/trust") }}
         />
       )}
       {!pending && error === "verify" && (
-        <VerifyErrorState
-          handle={name}
-          onRetry={run}
-          onTrustSettings={() => router.push("/(main)/trust")}
+        <NativeEmpty
+          sf="exclamationmark.shield.fill"
+          iconColor={colors.accent}
+          title={name || "This handle"}
+          message="Couldn’t verify against a trust anchor, so records are hidden."
+          primary={{ label: "Try again", onPress: run }}
+          secondary={{ label: "Trust settings", onPress: () => router.push("/(main)/trust") }}
         />
       )}
-    </Layout>
+    </>
   );
 }

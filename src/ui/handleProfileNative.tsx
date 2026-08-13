@@ -48,6 +48,19 @@ export const sfFor = (key: string): SFSymbol => SF[key] ?? "doc.text";
 export function shorten(v: string): string {
   return v.length <= 22 ? v : `${v.slice(0, 9)}…${v.slice(-7)}`;
 }
+
+// Count of renderable records (addr/txt with non-empty values) — for the Recents
+// snapshot / any caller that needs the number without rendering.
+export function recordCountOf(result: ResolvedHandle): number {
+  let n = 0;
+  for (const rec of result.zone.records ?? []) {
+    if (rec.type !== "addr" && rec.type !== "txt") continue;
+    if (typeof rec.key !== "string") continue;
+    if ((rec.value ?? []).map(String).filter(Boolean).length === 0) continue;
+    n++;
+  }
+  return n;
+}
 function pubkeyFromZone(zone: ResolvedHandle["zone"]): string | null {
   const spk = zone.script_pubkey;
   if (typeof spk !== "string") return null;
@@ -155,11 +168,11 @@ export function ResolvedProfileNative({ result }: { result: ResolvedHandle }) {
           left-aligns and the column shrink-wraps, so alignment alone won't. */}
       <Row alignment="center">
         <Spacer />
-        <Column alignment="center" spacing={7}>
+        <Column alignment="center" spacing={8} style={{ paddingTop: 10, paddingBottom: 14 }}>
           <RNHostView matchContents style={{ width: 76, height: 76 }}>
             <Avatar handle={result.handle} size={76} />
           </RNHostView>
-          <Text textStyle={{ fontSize: 22, fontWeight: "700" }}>
+          <Text textStyle={{ fontSize: 22, fontWeight: "700", color: colors.text }}>
             {result.handle}
           </Text>
           <Row alignment="center" spacing={5}>
@@ -251,6 +264,17 @@ export function ResolvedProfileNative({ result }: { result: ResolvedHandle }) {
                 <Text>{d.label}</Text>
               </ListItem>
             ))}
+            <ListItem
+              trailing={
+                <Text
+                  textStyle={{ color: sovereign ? colors.statusGreenFg : colors.textSecondary }}
+                >
+                  {sovereign ? "Yes" : "Not yet"}
+                </Text>
+              }
+            >
+              <Text>Anchored on-chain</Text>
+            </ListItem>
           </FieldGroup.Section>
         ) : null}
       </FieldGroup>

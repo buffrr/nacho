@@ -2,7 +2,6 @@ import React, { useState, useCallback } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import {
   Host,
-  List,
   ListItem,
   Icon,
   Text as UIText,
@@ -10,6 +9,7 @@ import {
   RNHostView,
 } from "@expo/ui";
 import { listRowBackground } from "@expo/ui/swift-ui/modifiers";
+import { PlainList } from "@/ui/PlainList";
 import { HandleData, useStore } from "@/Store";
 import { useTheme } from "@/theme";
 import { scriptForHandle } from "@/keys";
@@ -118,8 +118,6 @@ export default function ListHandles() {
     switch (info.status) {
       case "sovereign":
         return { sf: "checkmark.seal.fill", color: colors.statusGreenFg };
-      case "anchoring":
-        return { sf: "clock", color: colors.statusAmberFg };
       case "attention":
         return { sf: "exclamationmark.triangle.fill", color: colors.statusAmberFg };
       default:
@@ -134,7 +132,7 @@ export default function ListHandles() {
 
   return (
     <Host style={{ flex: 1 }} colorScheme={scheme}>
-      <List onRefresh={onRefresh}>
+      <PlainList onRefresh={onRefresh}>
         {handlesList.map(([name, handleData]) => {
           const info = infoFor(name, handleData);
           const glyph = glyphFor(info);
@@ -178,7 +176,7 @@ export default function ListHandles() {
         >
           <UIText textStyle={{ color: colors.textSecondary }}>Shop handles</UIText>
         </ListItem>
-      </List>
+      </PlainList>
     </Host>
   );
 }

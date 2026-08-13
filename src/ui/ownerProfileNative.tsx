@@ -77,11 +77,11 @@ export function OwnerProfileNative({
     <FieldGroup.SectionHeader>
       <Row alignment="center">
         <Spacer />
-        <Column alignment="center" spacing={7}>
+        <Column alignment="center" spacing={8} style={{ paddingTop: 10, paddingBottom: 14 }}>
           <RNHostView matchContents style={{ width: 76, height: 76 }}>
             <Avatar handle={handle} size={76} />
           </RNHostView>
-          <Text textStyle={{ fontSize: 22, fontWeight: "700" }}>{handle}</Text>
+          <Text textStyle={{ fontSize: 22, fontWeight: "700", color: colors.text }}>{handle}</Text>
           <Row alignment="center" spacing={5}>
             <Icon
               name={sovereign ? "checkmark.seal.fill" : "circle.fill"}
@@ -179,6 +179,17 @@ export function OwnerProfileNative({
                 <Text>{d.label}</Text>
               </ListItem>
             ))}
+            <ListItem
+              trailing={
+                <Text
+                  textStyle={{ color: sovereign ? colors.statusGreenFg : colors.textSecondary }}
+                >
+                  {sovereign ? "Yes" : "Not yet"}
+                </Text>
+              }
+            >
+              <Text>Anchored on-chain</Text>
+            </ListItem>
             {published ? (
               <ListItem
                 trailing={

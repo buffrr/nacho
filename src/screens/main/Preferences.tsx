@@ -137,7 +137,7 @@ export default function Preferences() {
     {
       type: "button",
       label: savedTick ? "Saved ✓" : "Save",
-      tintColor: colors.accent,
+      tintColor: colors.text,
       onPress: onSave,
     },
   ];
@@ -149,6 +149,7 @@ export default function Preferences() {
         <FieldGroup>
           <FieldGroup.Section title="Appearance">
             <Picker
+              appearance="menu"
               selectedValue={mode}
               onValueChange={(v) => setMode(v as ThemeMode)}
             >
@@ -170,10 +171,10 @@ export default function Preferences() {
               />
             ))}
             <ListItem
-              leading={<Icon name="plus.circle.fill" size={20} color={colors.accent} />}
+              leading={<Icon name="plus.circle.fill" size={20} color={colors.textSecondary} />}
               onPress={addRelay}
             >
-              <Text textStyle={{ color: colors.accent }}>Add relay</Text>
+              <Text textStyle={{ color: colors.text }}>Add relay</Text>
             </ListItem>
           </FieldGroup.Section>
 
@@ -189,10 +190,10 @@ export default function Preferences() {
               />
             ))}
             <ListItem
-              leading={<Icon name="plus.circle.fill" size={20} color={colors.accent} />}
+              leading={<Icon name="plus.circle.fill" size={20} color={colors.textSecondary} />}
               onPress={addSeed}
             >
-              <Text textStyle={{ color: colors.accent }}>Add seed</Text>
+              <Text textStyle={{ color: colors.text }}>Add seed</Text>
             </ListItem>
             <FieldGroup.SectionFooter>
               <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>

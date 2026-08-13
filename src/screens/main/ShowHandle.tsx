@@ -186,6 +186,12 @@ export default function ShowHandle() {
   // flapping between "issuing" and "ready" every tick).
   const refreshRef = React.useRef<(fresh?: boolean) => void>(() => {});
 
+  // True while a prospective handle has been committed to the keystore for an
+  // in-flight purchase that hasn't completed. If the user cancels the IAP sheet
+  // (or it errors), we roll the handle back out of the list — it was never paid
+  // for, so it shouldn't linger as a "pending" entry the user can't remove.
+  const purchaseRollbackRef = React.useRef(false);
+
   // A handle reached from Shop ("Buy") isn't in the keystore yet — we show it in
   // a prospective state using the next derivation we *would* use, and only
   // persist it once the purchase is actually reserved (see handleBuyHandle).
@@ -220,6 +226,8 @@ export default function ShowHandle() {
             setError(result.error);
             fetchAndUpdateHandleStatus();
           } else {
+            // Paid and claimed — the handle stays, no rollback.
+            purchaseRollbackRef.current = false;
             await applyHandleStatus(result.handle_status);
             if (result.handle_status.status === "taken") {
               await finishTransaction({
@@ -240,6 +248,12 @@ export default function ShowHandle() {
             console.log("[nacho/iap] onPurchaseError:", error.code, error.message);
           if (error.code !== "user-cancelled") {
             setError("Purchase failed: " + error.message);
+          }
+          // No payment happened — undo the speculative createHandle so a
+          // cancelled buy doesn't leave an un-removable "pending" handle.
+          if (purchaseRollbackRef.current) {
+            purchaseRollbackRef.current = false;
+            removeHandle(handle);
           }
           setPurchasing(false);
         },
@@ -346,6 +360,7 @@ export default function ShowHandle() {
   // flashing the "handle is yours" state twice. The Back → Your handles reset
   // happens once the user finishes onboarding (see dismissOnboarding).
   const finalizePurchase = async () => {
+    purchaseRollbackRef.current = false; // committed for good now
     await fetchAndUpdateHandleStatus();
     // The purchase advanced the chain, so pin the latest anchor before resolving
     // — otherwise the just-bought handle is newer than the pinned anchor.
@@ -549,9 +564,11 @@ export default function ShowHandle() {
     }
 
     // The reservation succeeded under our next-derived key, so commit the handle
-    // to the keystore now (not on mere navigation from Shop).
+    // to the keystore now (not on mere navigation from Shop). Arm the rollback so
+    // a cancelled/failed IAP flow removes it again.
     if (isProspective) {
       await createHandle(handle);
+      purchaseRollbackRef.current = true;
     }
 
     // The purchase outcome arrives via the useIAP onPurchaseSuccess/onPurchaseError
@@ -571,6 +588,11 @@ export default function ShowHandle() {
       if (__DEV__) console.log("[nacho/iap] requestPurchase threw:", code, msg);
       if (code !== "user-cancelled" && !/cancel/i.test(msg)) {
         setError("Failed purchase: " + msg);
+      }
+      // Failed to even start the IAP flow — roll the speculative handle back out.
+      if (purchaseRollbackRef.current) {
+        purchaseRollbackRef.current = false;
+        await removeHandle(handle);
       }
       setPurchasing(false);
     }
@@ -785,11 +807,11 @@ export default function ShowHandle() {
   // flag first so the re-pushed screen reads it as true and opens straight into
   // the normal editor — no onboarding flash. Doing the reset here, on an explicit
   // tap, means the only stack transition is one the user asked for.
-  const dismissOnboarding = async () => {
-    await setHandleOnboarded(handle, true);
-    if (router.canDismiss()) router.dismissAll();
-    router.navigate("/(main)/(tabs)/handles");
-    router.push({ pathname: "/(main)/show-handle", params: { handle } });
+  // Finishing onboarding just flips the flag — the SAME screen re-renders in
+  // place into the manage view (no stack rebuild, so no slide/flash). Back goes
+  // to wherever this was opened from, which is fine post-purchase.
+  const dismissOnboarding = () => {
+    setHandleOnboarded(handle, true);
   };
 
   // Bought through nacho's IAP → show the reassuring "Purchase complete /
@@ -1095,6 +1117,28 @@ export default function ShowHandle() {
         },
       ];
 
+  // Minimal ⋯ menu (just Remove) for terminal states that aren't manageable —
+  // e.g. "Different key": the handle is in the keystore but we can't manage it,
+  // so the only useful action is removing it from this device.
+  const removeHeaderItems: NativeStackHeaderItem[] = [
+    {
+      type: "menu",
+      label: "Options",
+      icon: { type: "sfSymbol", name: "ellipsis" },
+      menu: {
+        items: [
+          {
+            type: "action",
+            label: "Remove handle",
+            icon: { type: "sfSymbol", name: "trash" },
+            destructive: true,
+            onPress: confirmRemoveHandle,
+          },
+        ],
+      },
+    },
+  ];
+
   const shortPk = `${pubkey.slice(0, 8)}…${pubkey.slice(-8)}`;
 
   // ── Native onboarding (issuing → ready → sovereign) ─────────────────────────
@@ -1152,7 +1196,7 @@ export default function ShowHandle() {
 
     return (
       <>
-        <Stack.Screen options={{ title: headerTitle }} />
+        <Stack.Screen options={{ title: headerTitle, headerLargeTitle: false }} />
         <HandleStatusNative
           handle={handle}
           icon={sIcon}
@@ -1173,7 +1217,7 @@ export default function ShowHandle() {
     return (
       <>
         <Stack.Screen
-          options={{ title: "", unstable_headerRightItems: () => headerItems }}
+          options={{ title: "", headerLargeTitle: false, unstable_headerRightItems: () => headerItems }}
         />
         <HandleStatusNative
           handle={handle}
@@ -1209,7 +1253,7 @@ export default function ShowHandle() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Stack.Screen
-          options={{ title: "", unstable_headerRightItems: () => headerItems }}
+          options={{ title: "", headerLargeTitle: false, unstable_headerRightItems: () => headerItems }}
         />
         <OwnerProfileNative
           handle={handle}
@@ -1258,7 +1302,7 @@ export default function ShowHandle() {
   if (buyable) {
     return (
       <>
-        <Stack.Screen options={{ title: headerTitle }} />
+        <Stack.Screen options={{ title: headerTitle, headerLargeTitle: false }} />
         <PurchaseNative
           handle={handle}
           pubkey={pubkey}
@@ -1272,228 +1316,68 @@ export default function ShowHandle() {
     );
   }
 
-  return (
-    <Layout
-      underHeader
-      footer={
-        buyable ? (
-          <>
-            <Button
-              text={
-                purchasing
-                  ? "Processing…"
-                  : price !== null
-                    ? `Buy handle · ${formatPrice(price)}`
-                    : "Buy handle"
-              }
-              onPress={handleBuyHandle}
-              type="main"
-              disabled={purchasing}
-            />
-            <TouchableOpacity
-              onPress={() => setShowAdvanced((v) => !v)}
-              style={styles.advLink}
-            >
-              <Text style={styles.advText}>Advanced options</Text>
-            </TouchableOpacity>
-            {showAdvanced && (
-              <Button
-                text="Copy request"
-                onPress={handleCopyRequest}
-                type="secondary"
-              />
-            )}
-          </>
-        ) : showOnboarding ? (
-          // "issuing" has no action — it advances on its own once the cert lands.
-          onboardStage === "issuing" ? undefined : (
-            <Button
-              text={onboardStage === "sovereign" ? "Continue" : "Set up records"}
-              onPress={dismissOnboarding}
-              type="main"
-            />
-          )
-        ) : manageable ? (
-          // Only offer to publish when there are unsaved record edits.
-          isDirty(handle) ? (
-            <Button
-              text={publishing ? "Publishing…" : "Sign and publish"}
-              onPress={signAndPublish}
-              type="main"
-              disabled={publishing}
-            />
-          ) : undefined
-        ) : (
-          renderActions()
-        )
-      }
-    >
-      <Stack.Screen
-        options={{
-          title: headerTitle,
-          unstable_headerRightItems: () => headerItems,
-        }}
-      />
-
-      {error && <Message message={error} type="error" />}
-      {notice && !error && <Message message={notice} type="success" />}
-
-      {buyable ? (
-        renderPurchase()
-      ) : showOnboarding ? (
-        renderOnboarding()
-      ) : (
-        <>
-      <View style={styles.profile}>
-        <Avatar handle={handle} size={76} />
-        <Text style={styles.profileName} numberOfLines={1}>
-          {handle}
-        </Text>
-        <View style={styles.statusRow}>
-          <View style={[styles.statusChip, { backgroundColor: pill.bg }]}>
-            <View style={[styles.dot, { backgroundColor: pill.fg }]} />
-            <Text style={[styles.statusText, { color: pill.fg }]}>
-              {pill.label}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => refreshResolution()}
-            disabled={resolving}
-            hitSlop={8}
-          >
-            <Text style={styles.refreshText}>
-              {resolving ? "Refreshing…" : "Refresh"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {published && !error && (
-        <Message message="Records published to certrelay." type="success" />
-      )}
-
-      {keyMismatch && !error && (
-        <Message
-          message="This handle is registered to a different public key. Import its private key to manage it."
-          type="error"
+  // ── Native key-mismatch / owned-by-other / request states ──────────────────
+  if (keyMismatch) {
+    return (
+      <>
+        <Stack.Screen
+          options={{ title: "", headerLargeTitle: false, unstable_headerRightItems: () => removeHeaderItems }}
         />
-      )}
+        <HandleStatusNative
+          handle={handle}
+          icon="exclamationmark.triangle.fill"
+          iconColor={colors.dangerText}
+          statusLabel="Different key"
+          statusColor={colors.dangerText}
+          message="This handle is registered to a different public key. Import its private key to manage it."
+          primary={{ label: "Import private key", onPress: replaceWithImport }}
+        />
+      </>
+    );
+  }
 
-      {ownedByOther && !error && (
-        <Message
+  if (ownedByOther) {
+    return (
+      <>
+        <Stack.Screen options={{ title: "", headerLargeTitle: false }} />
+        <HandleStatusNative
+          handle={handle}
+          icon="exclamationmark.triangle.fill"
+          iconColor={colors.statusAmberFg}
+          statusLabel={pill.label}
+          statusColor={pill.fg}
           message={
             handleStatusString === "taken"
               ? "This handle is taken by a different public key."
               : "This handle is currently reserved by another user."
           }
-          type="error"
         />
-      )}
+      </>
+    );
+  }
 
-      {!owned &&
-        !ownedByOther &&
-        !keyMismatch &&
-        !error &&
-        purchaseSupport === "unsupported" && (
-          <Text style={styles.note}>
-            This space isn't available to buy here. Copy the request and send it
-            to an operator — the certificate will appear once it's issued.
-          </Text>
-        )}
-
-      <View style={styles.card}>
-        {detailRow(
-          "Public key",
-          `${pubkey.slice(0, 8)}…${pubkey.slice(-8)}`,
-          () => copy(pubkey),
-        )}
-        {numId && (
-          <>
-            <View style={styles.divider} />
-            {detailRow("Num ID", `${numId.slice(0, 8)}…${numId.slice(-6)}`, () =>
-              copy(numId),
-            )}
-          </>
-        )}
-        {resolvable && (
-          <>
-            <View style={styles.divider} />
-            <View style={styles.row}>
-              <Text style={styles.rowLabel}>Alias</Text>
-              <Text
-                style={[styles.rowValue, !alias && { color: colors.textMuted }]}
-                numberOfLines={1}
-              >
-                {alias || "Not set"}
-              </Text>
-            </View>
-          </>
-        )}
-        {manageable && seq > 0 && (
-          <>
-            <View style={styles.divider} />
-            <View style={styles.row}>
-              <Text style={styles.rowLabel}>Last published</Text>
-              <Text style={[styles.rowValue, { fontFamily: undefined }]}>
-                {formatSeq(seq).replace(/^Updated /, "")}
-              </Text>
-            </View>
-          </>
-        )}
-      </View>
-
-      {manageable && (
-        <>
-          <View style={styles.recordsHead}>
-            <Text style={styles.recordsTitle}>Records</Text>
-          </View>
-          {records.length > 0 ? (
-            <View style={styles.card}>
-              {records.map((r, i) => (
-                <React.Fragment key={i}>
-                  {i > 0 && <View style={styles.recDivider} />}
-                  {registryRow(r, i)}
-                </React.Fragment>
-              ))}
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.card, styles.emptyRecords]}
-              activeOpacity={0.7}
-              onPress={() =>
-                router.push({
-                  pathname: "/(main)/add-record",
-                  params: { handle },
-                })
-              }
-            >
-              <View style={styles.emptyRecordsIco}>
-                <Plus size={18} color={colors.textSecondary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.emptyRecordsTitle}>Add your first record</Text>
-                <Text style={styles.emptyRecordsSub}>
-                  A payment address, Nostr key, website…
-                </Text>
-              </View>
-              <ChevronRight size={18} color={colors.chevron} />
-            </TouchableOpacity>
-          )}
-        </>
-      )}
-
-      {awaitingCert && (
-        <View style={styles.card}>
-          <Text style={styles.waiting}>
-            Waiting for your certificate to appear on certrelay. You can add
-            records once it's live.
-          </Text>
-        </View>
-      )}
-        </>
-      )}
-
-    </Layout>
+  // Not owned and not purchasable here → request / unsupported / processing.
+  return (
+    <>
+      <Stack.Screen options={{ title: headerTitle, headerLargeTitle: false }} />
+      <HandleStatusNative
+        handle={handle}
+        icon={isProcessingPurchase ? "clock" : "paperplane"}
+        iconColor={colors.textMuted}
+        statusLabel={pill.label}
+        statusColor={pill.fg}
+        message={
+          isProcessingPurchase
+            ? "Your reservation is being processed. This can take a little while."
+            : "This space isn’t available to buy here. Copy the request and send it to an operator — the certificate will appear once it’s issued."
+        }
+        primary={
+          isProcessingPurchase
+            ? undefined
+            : { label: "Copy request", onPress: handleCopyRequest }
+        }
+      />
+    </>
   );
 }
 

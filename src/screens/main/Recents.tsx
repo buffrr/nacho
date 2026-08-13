@@ -4,7 +4,6 @@ import { Stack, useFocusEffect, useRouter } from "expo-router";
 import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
 import {
   Host,
-  List,
   ListItem,
   Icon,
   Text as UIText,
@@ -12,6 +11,7 @@ import {
   RNHostView,
 } from "@expo/ui";
 import { listRowBackground } from "@expo/ui/swift-ui/modifiers";
+import { PlainList } from "@/ui/PlainList";
 import type { SFSymbol } from "sf-symbols-typescript";
 import { Colors, useTheme } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
@@ -117,7 +117,7 @@ export default function Recents() {
     <>
       {screen}
       <Host style={{ flex: 1 }} colorScheme={scheme}>
-        <List>
+        <PlainList>
           {entries.map((item) => {
             const count =
               item.recordCount > 0
@@ -167,7 +167,7 @@ export default function Recents() {
               <UIText textStyle={{ color: colors.danger }}>Clear All</UIText>
             </ListItem>
           ) : null}
-        </List>
+        </PlainList>
       </Host>
     </>
   );

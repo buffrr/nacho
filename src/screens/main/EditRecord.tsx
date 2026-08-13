@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
-import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter, Stack } from "expo-router";
 import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
 import {
   Host,
@@ -60,6 +60,7 @@ function Field({
 
 export default function EditRecord() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { scheme, colors } = useTheme();
   const params = useLocalSearchParams<{
     handle: string;
@@ -129,13 +130,35 @@ export default function EditRecord() {
 
   const set = (id: string) => (t: string) => values.current.set(id, t);
 
+  // After adding a NEW record we came via the Add-record picker, so pop past it
+  // too (back → the handle, not the picker). Editing an existing record was
+  // pushed straight from the handle, so a single back is right.
+  const done = () => {
+    const nav = navigation as unknown as { pop?: (n?: number) => void };
+    if (index === undefined && typeof nav.pop === "function") nav.pop(2);
+    else router.back();
+  };
+
   const save = () => {
     if (useSlots && def) {
-      const singles = singleSlots.map(({ i }) => values.current.get(`s${i}`) ?? "");
-      const multis = multiIds.map((id) => values.current.get(id) ?? "");
-      const clean = [...singles, ...multis].map((v) => v.trim()).filter(Boolean);
-      if (!singles[0]?.trim()) {
-        Alert.alert("Missing value", `Enter the ${def.slots[0].label.toLowerCase()}.`);
+      const singles = singleSlots.map(({ i }) => (values.current.get(`s${i}`) ?? "").trim());
+      const multis = multiIds
+        .map((id) => (values.current.get(id) ?? "").trim())
+        .filter(Boolean);
+      // Validate required slots — the first slot may be the multi one (e.g. Note),
+      // so don't assume singles[0] exists.
+      const missing = singleSlots.find(({ s }, k) => !s.optional && !singles[k]);
+      if (missing) {
+        Alert.alert("Missing value", `Enter the ${missing.s.label.toLowerCase()}.`);
+        return;
+      }
+      if (multiSlot && !multiSlot.optional && multis.length === 0) {
+        Alert.alert("Missing value", `Enter the ${multiSlot.label.toLowerCase()}.`);
+        return;
+      }
+      const clean = [...singles.filter(Boolean), ...multis];
+      if (clean.length === 0) {
+        Alert.alert("Missing value", "Enter a value.");
         return;
       }
       setRecord(handle, index ?? null, { type: def.rtype, key: def.key, value: clean });
@@ -153,7 +176,7 @@ export default function EditRecord() {
         value: clean,
       });
     }
-    router.back();
+    done();
   };
 
   const remove = () => {
@@ -182,7 +205,7 @@ export default function EditRecord() {
 
   const title = useSlots && def ? def.label : index !== undefined ? "Edit record" : "Add record";
   const headerItems: NativeStackHeaderItem[] = [
-    { type: "button", label: "Save", tintColor: colors.accent, onPress: save },
+    { type: "button", label: "Save", tintColor: colors.text, onPress: save },
   ];
 
   return (
@@ -230,10 +253,10 @@ export default function EditRecord() {
                     />
                   ))}
                   <ListItem
-                    leading={<Icon name="plus.circle.fill" size={20} color={colors.accent} />}
+                    leading={<Icon name="plus.circle.fill" size={20} color={colors.textSecondary} />}
                     onPress={addMulti}
                   >
-                    <Text textStyle={{ color: colors.accent }}>
+                    <Text textStyle={{ color: colors.text }}>
                       {`Add ${multiSlot.label.toLowerCase()}`}
                     </Text>
                   </ListItem>
@@ -272,10 +295,10 @@ export default function EditRecord() {
                   />
                 ))}
                 <ListItem
-                  leading={<Icon name="plus.circle.fill" size={20} color={colors.accent} />}
+                  leading={<Icon name="plus.circle.fill" size={20} color={colors.textSecondary} />}
                   onPress={addValue}
                 >
-                  <Text textStyle={{ color: colors.accent }}>Add value</Text>
+                  <Text textStyle={{ color: colors.text }}>Add value</Text>
                 </ListItem>
               </FieldGroup.Section>
             </>

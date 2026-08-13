@@ -29,10 +29,11 @@ export function handlePill(
     switch (resolution.sovereignty) {
       case "sovereign":
         return { label: "Sovereign", ...green };
+      // Registered but not yet anchored on-chain — shown neutrally as
+      // "Registered"; the "Anchored: Not yet" detail carries the nuance.
       case "dependent":
-        return { label: "Anchoring in progress", ...amber };
       case "pending":
-        return { label: "Anchoring in progress", ...amber };
+        return { label: "Registered", ...blue };
       default:
         return { label: resolution.sovereignty, ...grey };
     }

@@ -1,36 +1,21 @@
-import React, {
-  useState,
-  useMemo,
-  useEffect,
-  useCallback,
-  useRef,
-} from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Stack,
   useLocalSearchParams,
   useRouter,
   useFocusEffect,
 } from "expo-router";
-import { Colors, useTheme } from "@/theme";
-import { Layout } from "@/ui/Layout";
-import { AtSign } from "@/ui/icons";
+import { useTheme } from "@/theme";
 import { resolveHandle } from "@/fabric";
 import { ResolvedHandle } from "@/fabricResolver";
 import { recordResolve } from "@/resolveHistory";
-import {
-  ProfileShell,
-  NotFoundState,
-  NetworkErrorState,
-  VerifyErrorState,
-  recordCountOf,
-} from "@/ui/handleProfile";
-import { ResolvedProfileNative } from "@/ui/handleProfileNative";
+import { ResolvedProfileNative, recordCountOf } from "@/ui/handleProfileNative";
+import { NativeEmpty } from "@/ui/nativeEmpty";
+import { ShopResults } from "@/ui/shopResults";
 
 export default function Resolve() {
   const { colors } = useTheme();
   const router = useRouter();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [handle, setHandle] = useState("");
   const [pending, setPending] = useState<string | null>(null); // name being resolved
@@ -144,8 +129,24 @@ export default function Resolve() {
     />
   );
 
-  // Result → the native @expo/ui profile (its own scroll container), matching
-  // the Recents handle view. Other phases stay on the RN Layout.
+  // A query without an "@" isn't a handle — treat it as a name to shop for, and
+  // show buyable results inline (mirrors the Shop tab). Handles (with "@") go
+  // through the resolve phases below.
+  const q = handle.trim();
+  const shopMode = q.length > 0 && !q.includes("@");
+  if (shopMode) {
+    return (
+      <>
+        {searchScreen}
+        <ShopResults
+          query={q}
+          onBuy={(h) => router.push({ pathname: "/(main)/show-handle", params: { handle: h } })}
+        />
+      </>
+    );
+  }
+
+  // Result → the native @expo/ui profile (its own scroll container).
   if (phase === "result" && result) {
     return (
       <>
@@ -156,72 +157,54 @@ export default function Resolve() {
   }
 
   return (
-    <Layout tabBarInset underHeader keyboardAware={false}>
+    <>
       {searchScreen}
 
       {phase === "idle" && (
-        <View style={styles.centerState}>
-          <View style={styles.bigIcon}>
-            <AtSign size={30} color={colors.textMuted} />
-          </View>
-          <Text style={styles.centerTitle}>Resolve a handle</Text>
-          <Text style={styles.centerSub}>
-            Try <Text style={styles.mono}>satoshi@bitcoin</Text>
-          </Text>
-        </View>
+        <NativeEmpty
+          sf="at"
+          title="Resolve a handle"
+          message="Try satoshi@bitcoin, or a name to buy."
+        />
       )}
 
-      {phase === "loading" && pending && <ProfileShell handle={pending} />}
+      {phase === "loading" && (
+        <NativeEmpty sf="magnifyingglass" title="Resolving…" />
+      )}
 
       {phase === "notfound" && notFound && (
-        <NotFoundState
-          name={notFound}
-          onBuy={() =>
-            router.push({ pathname: "/(main)/shop", params: { prefill: notFound } })
-          }
+        <NativeEmpty
+          sf="questionmark.circle"
+          title={notFound}
+          message="Not registered, or no records published yet."
+          primary={{
+            label: "Buy this handle",
+            onPress: () =>
+              router.push({ pathname: "/(main)/shop", params: { prefill: notFound } }),
+          }}
         />
       )}
 
       {phase === "error" && error === "network" && (
-        <NetworkErrorState
-          handle={handle}
-          onRetry={() => onResolve(handle)}
-          onRelaySettings={() => router.push("/(main)/trust")}
+        <NativeEmpty
+          sf="wifi.slash"
+          title="Couldn’t reach any relay"
+          message="We can’t tell if it exists — not the same as “not found”."
+          primary={{ label: "Try again", onPress: () => onResolve(handle) }}
+          secondary={{ label: "Relay settings", onPress: () => router.push("/(main)/trust") }}
         />
       )}
 
       {phase === "error" && error === "verify" && (
-        <VerifyErrorState
-          handle={handle}
-          onRetry={() => onResolve(handle)}
-          onTrustSettings={() => router.push("/(main)/trust")}
+        <NativeEmpty
+          sf="exclamationmark.shield.fill"
+          iconColor={colors.accent}
+          title={handle || "This handle"}
+          message="Couldn’t verify against a trust anchor, so records are hidden."
+          primary={{ label: "Try again", onPress: () => onResolve(handle) }}
+          secondary={{ label: "Trust settings", onPress: () => router.push("/(main)/trust") }}
         />
       )}
-    </Layout>
+    </>
   );
 }
-
-const makeStyles = (c: Colors) =>
-  StyleSheet.create({
-    centerState: { alignItems: "center", paddingTop: 48, paddingHorizontal: 8 },
-    bigIcon: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      borderCurve: "continuous",
-      backgroundColor: c.surfaceSunken,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 16,
-    },
-    centerTitle: { fontSize: 19, fontWeight: "600", color: c.text },
-    centerSub: {
-      fontSize: 14,
-      color: c.textSecondary,
-      textAlign: "center",
-      lineHeight: 20,
-      marginTop: 8,
-      maxWidth: 300,
-    },
-    mono: { fontFamily: "monospace", color: c.textSecondary },
-  });

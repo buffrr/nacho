@@ -196,7 +196,7 @@ function ResultView({
                   <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
                     {heading}
                   </NText>
-                  <NText textStyle={{ fontSize: 20, fontWeight: "700" }}>
+                  <NText textStyle={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
                     {sent ? `Sent to ${host}` : sub}
                   </NText>
                 </NColumn>
@@ -327,7 +327,7 @@ function MessageConfirm({
                   <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
                     Prove you own
                   </NText>
-                  <NText textStyle={{ fontSize: 20, fontWeight: "700" }}>{handle}</NText>
+                  <NText textStyle={{ fontSize: 20, fontWeight: "700", color: colors.text }}>{handle}</NText>
                 </NColumn>
                 <NSpacer />
               </NRow>
@@ -565,7 +565,7 @@ function RecordsConfirm({
                   <NSpacer />
                   <NColumn alignment="center" spacing={8}>
                     <NIcon name="checkmark.circle.fill" size={46} color={colors.statusGreenFg} />
-                    <NText textStyle={{ fontSize: 20, fontWeight: "700" }}>
+                    <NText textStyle={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
                       Records published
                     </NText>
                     <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
@@ -870,7 +870,7 @@ function TransferConfirm({
                 <NSpacer />
                 <NColumn alignment="center" spacing={8}>
                   <NIcon name="arrow.right.circle.fill" size={40} color={colors.dangerText} />
-                  <NText textStyle={{ fontSize: 20, fontWeight: "700" }}>
+                  <NText textStyle={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
                     {`Give away ${request.handle}`}
                   </NText>
                   <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
@@ -1055,7 +1055,7 @@ function SaleConfirm({
                   <NText textStyle={{ fontSize: 13, color: colors.textSecondary }}>
                     Asking price
                   </NText>
-                  <NText textStyle={{ fontSize: 34, fontWeight: "800" }}>
+                  <NText textStyle={{ fontSize: 34, fontWeight: "800", color: colors.text }}>
                     {formatBtc(request.price)}
                   </NText>
                   <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
@@ -1204,7 +1204,7 @@ function RotateConfirm({
                 <NSpacer />
                 <NColumn alignment="center" spacing={8}>
                   <NIcon name="arrow.triangle.2.circlepath" size={40} color={colors.accent} />
-                  <NText textStyle={{ fontSize: 20, fontWeight: "700" }}>
+                  <NText textStyle={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
                     Move to a new key
                   </NText>
                   <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>

@@ -45,11 +45,11 @@ export function PurchaseNative({
           <FieldGroup.SectionHeader>
             <Row alignment="center">
               <Spacer />
-              <Column alignment="center" spacing={8}>
+              <Column alignment="center" spacing={8} style={{ paddingTop: 10, paddingBottom: 14 }}>
                 <RNHostView matchContents style={{ width: 72, height: 72 }}>
                   <Avatar handle={handle} size={72} />
                 </RNHostView>
-                <Text textStyle={{ fontSize: 22, fontWeight: "700" }}>{handle}</Text>
+                <Text textStyle={{ fontSize: 22, fontWeight: "700", color: colors.text }}>{handle}</Text>
                 <Row alignment="center" spacing={5}>
                   <Icon name="checkmark.circle.fill" size={14} color={colors.statusGreenFg} />
                   <Text textStyle={{ fontSize: 14, fontWeight: "600", color: colors.statusGreenFg }}>
