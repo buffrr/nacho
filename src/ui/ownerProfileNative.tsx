@@ -1,4 +1,5 @@
 import React from "react";
+import { WEB_TOP_INSET } from "@/ui/webInset";
 import {
   Host,
   FieldGroup,
@@ -10,12 +11,23 @@ import {
   Spacer,
   RNHostView,
 } from "@expo/ui";
+import { refreshable } from "@/ui/rowModifiers";
 import { useTheme } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
 import type { EditableRecord } from "@/fabricResolver";
+import type { CertState } from "@/certState";
 import { lookupRecord } from "@/recordRegistry";
-import { sfFor } from "@/ui/handleProfileNative";
+import { RecordGlyph } from "@/ui/handleProfileNative";
+import { formatBtc } from "@/format";
 import type { Pill } from "@/handleTile";
+
+const CERT_LABEL: Record<CertState, string> = {
+  provisional: "Provisional",
+  confirming: "Confirming",
+  final: "Final",
+};
+
+export type ListingSummary = { id: string; kind: "sale" | "transfer"; price?: number };
 
 // The OWNER's handle view (ShowHandle manage state) rendered with @expo/ui's
 // cross-platform native widgets, matching the resolve/handle view. Records tap
@@ -43,11 +55,20 @@ export function OwnerProfileNative({
   seq,
   pill,
   sovereign,
+  unverified,
+  reordering,
+  onMoveUp,
+  onMoveDown,
   banner,
   copied,
+  certState,
+  listings,
   onEditRecord,
   onAddRecord,
   onCopy,
+  onOpenCert,
+  onCancelListings,
+  onRefresh,
 }: {
   handle: string;
   records: EditableRecord[];
@@ -57,11 +78,20 @@ export function OwnerProfileNative({
   seq: number;
   pill: Pill;
   sovereign: boolean;
+  unverified?: boolean;
+  reordering?: boolean;
+  onMoveUp?: (index: number) => void;
+  onMoveDown?: (index: number) => void;
   banner?: { text: string; tone: "error" | "success" | "muted" } | null;
   copied: string | null;
+  certState: CertState;
+  listings: ListingSummary[];
   onEditRecord: (index: number) => void;
   onAddRecord: () => void;
   onCopy: (id: string, value: string) => void;
+  onOpenCert: () => void;
+  onCancelListings: () => void;
+  onRefresh: () => Promise<void>;
 }) {
   const { scheme, colors } = useTheme();
 
@@ -76,22 +106,34 @@ export function OwnerProfileNative({
   const profileHeader = (
     <FieldGroup.SectionHeader>
       <Row alignment="center">
-        <Spacer />
+        <Spacer flexible />
         <Column alignment="center" spacing={8} style={{ paddingTop: 10, paddingBottom: 14 }}>
           <RNHostView matchContents style={{ width: 76, height: 76 }}>
             <Avatar handle={handle} size={76} />
           </RNHostView>
           <Text textStyle={{ fontSize: 22, fontWeight: "700", color: colors.text }}>{handle}</Text>
           <Row alignment="center" spacing={5}>
+            {/* Unverified overrides the seal — a handle we couldn't verify never
+                shows a trust badge, even if its zone claims sovereignty. */}
             <Icon
-              name={sovereign ? "checkmark.seal.fill" : "circle.fill"}
-              size={sovereign ? 14 : 9}
-              color={pill.fg}
+              name={
+                unverified
+                  ? "exclamationmark.triangle.fill"
+                  : sovereign
+                    ? "checkmark.seal.fill"
+                    : "circle.fill"
+              }
+              size={unverified || sovereign ? 14 : 9}
+              color={unverified ? colors.dangerText : pill.fg}
             />
-            <Text textStyle={{ fontSize: 13, color: pill.fg }}>{pill.label}</Text>
+            <Text
+              textStyle={{ fontSize: 13, color: unverified ? colors.dangerText : pill.fg }}
+            >
+              {unverified ? "Unverified" : pill.label}
+            </Text>
           </Row>
         </Column>
-        <Spacer />
+        <Spacer flexible />
       </Row>
     </FieldGroup.SectionHeader>
   );
@@ -99,8 +141,8 @@ export function OwnerProfileNative({
   const hasRecords = records.length > 0;
 
   return (
-    <Host style={{ flex: 1 }} colorScheme={scheme} matchContents={false}>
-      <FieldGroup>
+    <Host style={{ flex: 1, paddingTop: WEB_TOP_INSET }} colorScheme={scheme} matchContents={false}>
+      <FieldGroup modifiers={[refreshable(onRefresh)]}>
         {/* Optional status banner (published / key mismatch / etc.) */}
         {banner ? (
           <FieldGroup.Section>
@@ -139,13 +181,41 @@ export function OwnerProfileNative({
           {hasRecords ? (
             records.map((r, i) => {
               const { def, known } = lookupRecord(r.type, r.key);
+              const first = i === 0;
+              const last = i === records.length - 1;
               return (
                 <ListItem
                   key={`${r.key}:${i}`}
-                  leading={<Icon name={sfFor(def.key)} size={22} color={def.color} />}
+                  leading={<RecordGlyph def={def} size={28} color={def.color} />}
                   supportingText={r.value.join(", ")}
-                  trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
-                  onPress={() => onEditRecord(i)}
+                  trailing={
+                    reordering ? (
+                      // Up/down in filled-circle chevrons (row isn't tappable in
+                      // this mode). Omit up on the first row and down on the last
+                      // — no dead/disabled controls. Neutral color, never accent.
+                      <Row spacing={14} alignment="center">
+                        {!first ? (
+                          <Icon
+                            name="chevron.up.circle.fill"
+                            size={26}
+                            color={colors.textSecondary}
+                            onPress={() => onMoveUp?.(i)}
+                          />
+                        ) : null}
+                        {!last ? (
+                          <Icon
+                            name="chevron.down.circle.fill"
+                            size={26}
+                            color={colors.textSecondary}
+                            onPress={() => onMoveDown?.(i)}
+                          />
+                        ) : null}
+                      </Row>
+                    ) : (
+                      <Icon name="chevron.forward" size={14} color={colors.chevron} />
+                    )
+                  }
+                  onPress={reordering ? undefined : () => onEditRecord(i)}
                 >
                   <Text>{known ? def.label : r.key}</Text>
                 </ListItem>
@@ -153,18 +223,24 @@ export function OwnerProfileNative({
             })
           ) : (
             <ListItem
-              leading={<Icon name="plus.circle.fill" size={22} color={colors.accent} />}
-              supportingText="A payment address, Nostr key, website…"
+              leading={<Icon name="plus.circle.fill" size={22} color={colors.textSecondary} />}
               trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
               onPress={onAddRecord}
             >
               <Text>Add your first record</Text>
             </ListItem>
           )}
+          {!hasRecords ? (
+            <FieldGroup.SectionFooter>
+              <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                A payment address, Nostr key, website…
+              </Text>
+            </FieldGroup.SectionFooter>
+          ) : null}
         </FieldGroup.Section>
 
-        {/* Details */}
-        {details.length > 0 || published ? (
+        {/* Details — always present (carries the Certificate row). */}
+        {(
           <FieldGroup.Section title="Details">
             {details.map((d) => (
               <ListItem
@@ -179,16 +255,26 @@ export function OwnerProfileNative({
                 <Text>{d.label}</Text>
               </ListItem>
             ))}
+            {/* One Certificate row (replaces the old "Anchored on-chain" row +
+                collapsible cert group) — same vocabulary as the badge; opens the
+                full certificate screen. */}
             <ListItem
               trailing={
-                <Text
-                  textStyle={{ color: sovereign ? colors.statusGreenFg : colors.textSecondary }}
-                >
-                  {sovereign ? "Yes" : "Not yet"}
-                </Text>
+                <Row alignment="center" spacing={6}>
+                  <Text
+                    textStyle={{
+                      color:
+                        certState === "final" ? colors.statusGreenFg : colors.textSecondary,
+                    }}
+                  >
+                    {CERT_LABEL[certState]}
+                  </Text>
+                  <Icon name="chevron.forward" size={14} color={colors.chevron} />
+                </Row>
               }
+              onPress={onOpenCert}
             >
-              <Text>Anchored on-chain</Text>
+              <Text>Certificate</Text>
             </ListItem>
             {published ? (
               <ListItem
@@ -199,6 +285,44 @@ export function OwnerProfileNative({
                 <Text>Last published</Text>
               </ListItem>
             ) : null}
+          </FieldGroup.Section>
+        )}
+
+        {/* Signed listings — only when the user has live sale/transfer offers. */}
+        {listings.length > 0 ? (
+          <FieldGroup.Section title="Signed listings">
+            {listings.map((o) => (
+              <ListItem
+                key={o.id}
+                leading={
+                  <Icon
+                    name={o.kind === "sale" ? "tag.fill" : "arrow.right.circle.fill"}
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                }
+                trailing={
+                  <Text textStyle={{ color: colors.textSecondary }}>
+                    {o.kind === "sale" && o.price ? formatBtc(o.price) : "Transfer"}
+                  </Text>
+                }
+              >
+                <Text>{o.kind === "sale" ? "For sale" : "Transfer offer"}</Text>
+              </ListItem>
+            ))}
+            <ListItem
+              leading={<Icon name="xmark.circle" size={22} color={colors.danger} />}
+              trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
+              onPress={onCancelListings}
+            >
+              <Text textStyle={{ color: colors.danger }}>Cancel listings</Text>
+            </ListItem>
+            <FieldGroup.SectionFooter>
+              <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                Anyone with a signed listing can still take the handle until you
+                cancel it (by spending the UTXO back to yourself).
+              </Text>
+            </FieldGroup.SectionFooter>
           </FieldGroup.Section>
         ) : null}
       </FieldGroup>

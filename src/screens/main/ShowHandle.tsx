@@ -16,7 +16,6 @@ import {
   StyleSheet,
   Platform,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
 } from "react-native";
 import { useStore } from "@/Store";
@@ -46,9 +45,6 @@ import {
   Copy,
   Lock,
   Check,
-  Anchor,
-  ShieldCheck,
-  Clock,
   ChevronRight,
   Plus,
   Infinity as InfinityIcon,
@@ -57,6 +53,17 @@ import { lookupRecord } from "@/recordRegistry";
 import type { EditableRecord } from "@/fabricResolver";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { OwnerProfileNative } from "@/ui/ownerProfileNative";
+import { ActionFooter } from "@/ui/actionFooter";
+import { liveOffers, Offer } from "@/offers";
+import { resolveHandleWithCerts } from "@/fabric";
+import {
+  certStateOf,
+  certStateFromSovereignty,
+  getCachedCerts,
+  setCachedCerts,
+  isFinalCached,
+  CertState,
+} from "@/certState";
 import { HandleStatusNative, StatusDetail } from "@/ui/handleStatusNative";
 import { PurchaseNative } from "@/ui/purchaseNative";
 import {
@@ -149,8 +156,12 @@ export default function ShowHandle() {
     setSeq,
     isDirty,
     markClean,
+    moveRecord,
   } = useRecordsDraft();
   const [error, setError] = useState<string | null>(null);
+  // Records reorder mode: rows show up/down arrows instead of editing on tap
+  // (each @expo/ui row is one Button, so inline controls need edit-mode gating).
+  const [reordering, setReordering] = useState(false);
   const [handleStatusString, setHandleStatusString] = useState<
     HandleStatus["status"] | null
   >(null);
@@ -192,6 +203,21 @@ export default function ShowHandle() {
   // for, so it shouldn't linger as a "pending" entry the user can't remove.
   const purchaseRollbackRef = React.useRef(false);
 
+  // Live sale/transfer listings the user has signed for this handle (shown in the
+  // manage view; reloaded on focus so a just-signed sale appears).
+  const [liveListings, setLiveListings] = useState<Offer[]>([]);
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      liveOffers(handle).then((o) => {
+        if (active) setLiveListings(o);
+      });
+      return () => {
+        active = false;
+      };
+    }, [handle]),
+  );
+
   // A handle reached from Shop ("Buy") isn't in the keystore yet — we show it in
   // a prospective state using the next derivation we *would* use, and only
   // persist it once the purchase is actually reserved (see handleBuyHandle).
@@ -213,6 +239,13 @@ export default function ShowHandle() {
           if (__DEV__) console.log("[nacho/iap] onPurchaseSuccess");
           if (!purchase.purchaseToken) {
             setError("No purchase token received");
+            // Nothing to send the server, but StoreKit still holds this
+            // transaction — finish it so it doesn't replay on the next attempt.
+            try {
+              await finishTransaction({ purchase, isConsumable: true });
+            } catch (e) {
+              if (__DEV__) console.warn("[nacho/iap] finishTransaction failed", e);
+            }
             setPurchasing(false);
             return;
           }
@@ -229,17 +262,25 @@ export default function ShowHandle() {
             // Paid and claimed — the handle stays, no rollback.
             purchaseRollbackRef.current = false;
             await applyHandleStatus(result.handle_status);
-            if (result.handle_status.status === "taken") {
-              await finishTransaction({
-                purchase,
-                isConsumable: true,
-              });
-            }
             // The /claim status can be minimal (no script_pubkey), which leaves
             // the handle looking "Not registered". finalizePurchase re-fetches
             // the full status, pins the anchor, records the purchase, and resets
             // Back → Your handles.
             await finalizePurchase();
+          }
+          // Finish the StoreKit transaction whenever the server durably saw the
+          // receipt — on success OR a terminal server error. Only a transport
+          // failure (errorKind "network") leaves it queued so a genuine retry
+          // can replay it next launch. Gating this on status === "taken" (the
+          // old behaviour) stranded the transaction on every error/edge path,
+          // and StoreKit then replayed the stale receipt → duplicate-token
+          // conflict on the next purchase.
+          if (result.errorKind !== "network") {
+            try {
+              await finishTransaction({ purchase, isConsumable: true });
+            } catch (e) {
+              if (__DEV__) console.warn("[nacho/iap] finishTransaction failed", e);
+            }
           }
           setPurchasing(false);
         },
@@ -390,20 +431,28 @@ export default function ShowHandle() {
         return;
       }
       foundRef.current = true;
+      // A response that couldn't be verified against any anchor may be forged —
+      // record that it's unverified and DON'T act on it (no record cache, no
+      // cert re-export). We keep our last verified state instead.
+      const verified = resolved.badge !== "unverified";
       const sovereignty = resolved.zone.sovereignty ?? "unknown";
       await setHandleResolution(handle, {
         found: true,
         sovereignty,
         scriptPubkey: resolved.zone.script_pubkey,
+        unverified: !verified,
         updatedAt: Date.now(),
       });
-      setNumId(resolved.zone.num_id ?? null);
-      setAlias(resolved.zone.alias ?? null);
+      if (verified) {
+        setNumId(resolved.zone.num_id ?? null);
+        setAlias(resolved.zone.alias ?? null);
+      }
 
-      // Capture/refresh the certificate when it's ours. Re-export only when the
-      // sovereignty advances (e.g. dependent → sovereign) or we don't have it.
+      // Capture/refresh the certificate when it's ours AND verified. Re-export
+      // only when the sovereignty advances (e.g. dependent → sovereign) or we
+      // don't have it.
       const mine = resolved.zone.script_pubkey === script_pubkey;
-      if (mine) {
+      if (mine && verified) {
         const { records, seq } = editableFromZone(resolved.zone);
         if (__DEV__)
           console.log(
@@ -420,7 +469,7 @@ export default function ShowHandle() {
         }
       }
       const ref = handleData.certRef;
-      if (mine && (!ref || ref.sovereignty !== sovereignty)) {
+      if (mine && verified && (!ref || ref.sovereignty !== sovereignty)) {
         try {
           const bytes = await exportCert(handle);
           await saveCert(handle, bytes);
@@ -447,6 +496,21 @@ export default function ShowHandle() {
       // saveBinary opens the native share sheet on iOS/Android (save to Files,
       // send via an app, …) and downloads the file on web.
       await saveBinary(`${handle}.spacecert`, bytes);
+    }
+  };
+
+  // Pull-to-refresh for the manage view: re-resolve + reload signed listings, and
+  // refresh the cert chain unless it's already final (immutable).
+  const onManageRefresh = async () => {
+    await refreshResolution(true);
+    setLiveListings(await liveOffers(handle));
+    if (!isFinalCached(handle)) {
+      const r = await resolveHandleWithCerts(handle, true).catch(() => null);
+      // Never cache a cert chain we couldn't verify against an anchor.
+      if (r && r.badge !== "unverified") {
+        setCachedCerts(handle, r);
+        setCertNonce((n) => n + 1);
+      }
     }
   };
 
@@ -711,9 +775,12 @@ export default function ShowHandle() {
     handleData.certRef?.sovereignty ??
     null;
   const isSovereign = sovereignty === "sovereign";
-  // Post-purchase onboarding: a freshly PAID handle (onboarded === false) walks
-  // through issuing → ready-to-use → sovereign before dropping into the normal
-  // editor. Reserved/unpaid handles and pre-existing ones skip it.
+  // Post-purchase onboarding: issuing (no cert yet) → ready (cert landed, prompt
+  // to set up records) → sovereign (final, back-up nudge). We dropped the old
+  // "anchoring to Bitcoin — usually within a day" copy from the ready step (the
+  // Certificate view now carries Provisional/Confirming), but keep the step
+  // itself for its "Set up records" hand-off into the manage view.
+  // Reserved/unpaid handles and pre-existing ones skip onboarding entirely.
   const showOnboarding =
     isPaid && !keyMismatch && handleData.onboarded === false;
   const onboardStage: "issuing" | "ready" | "sovereign" = !hasCert
@@ -730,6 +797,36 @@ export default function ShowHandle() {
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showOnboarding]);
+
+  // Precise certificate state for the Details "Certificate" row: final from the
+  // sovereignty flag, else the cached resolveWithCerts result. Fetch once (one
+  // round trip, giving us the chain for the cert screen too) when not final —
+  // never re-fetch a final handle (its chain is immutable, the call is expensive).
+  // Precise state from the cached cert chain when we have it; otherwise the coarse
+  // state from the handle's known sovereignty — so a failed/offline fetch keeps
+  // the right word instead of flipping to Provisional.
+  const cachedCert = getCachedCerts(handle);
+  const certState: CertState = cachedCert
+    ? certStateOf(cachedCert.zone)
+    : certStateFromSovereignty(isSovereign ? "sovereign" : sovereignty);
+  const [, setCertNonce] = useState(0);
+  useEffect(() => {
+    if (!manageable || isSovereign || isFinalCached(handle)) return;
+    let active = true;
+    resolveHandleWithCerts(handle)
+      .then((r) => {
+        // Never cache a cert chain we couldn't verify against an anchor.
+        if (r && r.badge !== "unverified" && active) {
+          setCachedCerts(handle, r);
+          setCertNonce((n) => n + 1);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manageable, isSovereign, handle]);
 
   // Directly purchasable here → show the dedicated claim/purchase view.
   const buyable =
@@ -834,145 +931,6 @@ export default function ShowHandle() {
   // plain "Waiting for certificate" note.
   const boughtViaNacho = !!handleData.purchase;
 
-  // Post-purchase status card: issuing → ready-to-use → sovereign (see img_10).
-  const renderOnboarding = () => (
-    <View style={styles.onboard}>
-      {onboardStage === "issuing" ? (
-        boughtViaNacho ? (
-          <View
-            style={[styles.onboardIcon, { backgroundColor: colors.statusGreenBg }]}
-          >
-            <Check size={34} color={colors.statusGreenFg} />
-          </View>
-        ) : (
-          <View
-            style={[styles.onboardIcon, { backgroundColor: colors.statusGreyBg }]}
-          >
-            <Clock size={30} color={colors.statusGreyFg} strokeWidth={2} />
-          </View>
-        )
-      ) : onboardStage === "ready" ? (
-        <View style={[styles.onboardIcon, { backgroundColor: colors.statusGreenBg }]}>
-          <Check size={34} color={colors.statusGreenFg} />
-        </View>
-      ) : (
-        <View style={[styles.onboardIcon, { backgroundColor: colors.statusBlueBg }]}>
-          <ShieldCheck size={30} color={colors.statusBlueFg} />
-        </View>
-      )}
-
-      <Text style={styles.onboardName} numberOfLines={1}>
-        {handle}
-      </Text>
-
-      {onboardStage === "issuing" ? (
-        boughtViaNacho ? (
-          <>
-            <Text style={[styles.onboardStatus, { color: colors.statusGreenFg }]}>
-              is yours
-            </Text>
-            <View style={styles.onboardCard}>
-              <ActivityIndicator size="small" color={colors.accent} />
-              <View style={styles.onboardCardText}>
-                <Text style={styles.onboardCardTitle}>
-                  Issuing your certificate
-                </Text>
-                <Text style={styles.onboardCardBody}>
-                  Usually a few minutes. You'll be able to publish records as soon
-                  as it lands.
-                </Text>
-              </View>
-            </View>
-            <View style={styles.onboardDetails}>
-              {handleData.purchase?.amountCents != null && (
-                <View style={styles.onboardDetailRow}>
-                  <Text style={styles.onboardDetailLabel}>Paid</Text>
-                  <Text style={styles.onboardDetailValue}>
-                    {formatPrice(handleData.purchase.amountCents)}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.onboardDetailRow}>
-                <Text style={styles.onboardDetailLabel}>Bound to</Text>
-                <Text style={styles.onboardDetailValue}>
-                  {`${pubkey.slice(0, 8)}…${pubkey.slice(-8)}`}
-                </Text>
-              </View>
-              {handleData.purchase?.orderId ? (
-                <View style={styles.onboardDetailRow}>
-                  <Text style={styles.onboardDetailLabel}>Order</Text>
-                  <Text style={styles.onboardDetailValue}>
-                    {handleData.purchase.orderId}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          </>
-        ) : (
-          <>
-            <Text style={[styles.onboardStatus, { color: colors.textMuted }]}>
-              Waiting for certificate
-            </Text>
-            <View style={styles.onboardCard}>
-              <View style={styles.onboardCardText}>
-                <Text style={styles.onboardCardBody}>
-                  The handle is registered to your key. We'll pull the
-                  certificate as soon as a relay has it.
-                </Text>
-              </View>
-            </View>
-            <View style={styles.checkedRow}>
-              <Text style={styles.checkedText}>
-                Last checked {agoText(checkedAt, now)} ·{" "}
-              </Text>
-              <TouchableOpacity
-                onPress={() => refreshResolution()}
-                disabled={resolving}
-                hitSlop={6}
-              >
-                <Text style={styles.refreshText}>
-                  {resolving ? "…" : "Check now"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )
-      ) : onboardStage === "ready" ? (
-        <>
-          <Text style={[styles.onboardStatus, { color: colors.statusGreenFg }]}>
-            Yours — ready to use
-          </Text>
-          <View style={styles.onboardCard}>
-            <Anchor size={18} color={colors.text} />
-            <View style={styles.onboardCardText}>
-              <Text style={styles.onboardCardTitle}>Anchoring to Bitcoin</Text>
-              <Text style={styles.onboardCardBody}>
-                Usually within a day. Nothing to do — you can use the handle now.
-              </Text>
-            </View>
-          </View>
-        </>
-      ) : (
-        <>
-          <Text style={[styles.onboardStatus, { color: colors.statusBlueFg }]}>
-            Sovereign
-          </Text>
-          <View style={styles.onboardCard}>
-            <View style={styles.onboardCardText}>
-              <Text style={styles.onboardCardBody}>
-                Ownership is proven on-chain and can't be revoked. Back up your
-                certificate.
-              </Text>
-              <TouchableOpacity onPress={handleExportCertificate} hitSlop={6}>
-                <Text style={styles.viewProof}>View proof</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </>
-      )}
-    </View>
-  );
-
   const renderPurchase = () => (
     <View style={styles.purchase}>
       <Avatar handle={handle} size={64} />
@@ -1046,66 +1004,55 @@ export default function ShowHandle() {
 
   // The ⋯ options as a NATIVE header menu (UIMenu). Only when the handle is
   // owned (not while buying).
+  // Transactions are user-initiated and collect the current outpoint via the
+  // manual-entry form (we have no chain view). Transfer with no recipient = a key
+  // rotation. Certificate + signed listings live in the manage view now; refresh
+  // is pull-to-refresh; so the menu stays tight: Sell, Transfer, Remove.
   const menuActions: NativeStackHeaderItemMenuAction[] = [
     {
       type: "action",
-      label: "Import certificate",
-      icon: { type: "sfSymbol", name: "square.and.arrow.down" },
-      onPress: handleImportCertificate,
+      label: "Sell",
+      icon: { type: "sfSymbol", name: "tag" },
+      onPress: () =>
+        router.push({ pathname: "/(main)/(tabs)/handles/handle-action", params: { handle, action: "sale" } }),
+    },
+    {
+      type: "action",
+      label: "Transfer",
+      icon: { type: "sfSymbol", name: "arrow.right" },
+      onPress: () =>
+        router.push({ pathname: "/(main)/(tabs)/handles/handle-action", params: { handle, action: "transfer" } }),
+    },
+    // Reorder is only meaningful with more than one record.
+    ...(getRecords(handle).length > 1
+      ? ([
+          {
+            type: "action",
+            label: "Reorder",
+            icon: { type: "sfSymbol", name: "arrow.up.arrow.down" },
+            onPress: () => setReordering(true),
+          },
+        ] as NativeStackHeaderItemMenuAction[])
+      : []),
+    {
+      type: "action",
+      label: "Remove",
+      icon: { type: "sfSymbol", name: "trash" },
+      destructive: true,
+      onPress: confirmRemoveHandle,
     },
   ];
-  if (handleData.certRef) {
-    menuActions.push({
-      type: "action",
-      label: "Export certificate",
-      icon: { type: "sfSymbol", name: "square.and.arrow.up" },
-      onPress: handleExportCertificate,
-    });
-  }
-  // Handle transactions (user-initiated). Each collects the current outpoint via
-  // the manual-entry form (we have no chain view); Cancel uses saved offers.
-  menuActions.push({
-    type: "action",
-    label: resolving ? "Refreshing…" : "Refresh",
-    icon: { type: "sfSymbol", name: "arrow.clockwise" },
-    onPress: () => refreshResolution(),
-  });
-  menuActions.push({
-    type: "action",
-    label: "Sell handle",
-    icon: { type: "sfSymbol", name: "tag" },
-    onPress: () =>
-      router.push({ pathname: "/(main)/(tabs)/handles/handle-action", params: { handle, action: "sale" } }),
-  });
-  menuActions.push({
-    type: "action",
-    label: "Transfer handle",
-    icon: { type: "sfSymbol", name: "arrow.right" },
-    onPress: () =>
-      router.push({ pathname: "/(main)/(tabs)/handles/handle-action", params: { handle, action: "transfer" } }),
-  });
-  menuActions.push({
-    type: "action",
-    label: "Rotate key",
-    icon: { type: "sfSymbol", name: "arrow.triangle.2.circlepath" },
-    onPress: () =>
-      router.push({ pathname: "/(main)/(tabs)/handles/handle-action", params: { handle, action: "rotate" } }),
-  });
-  menuActions.push({
-    type: "action",
-    label: "Cancel offers",
-    icon: { type: "sfSymbol", name: "xmark.circle" },
-    onPress: () =>
-      router.push({ pathname: "/(main)/(tabs)/handles/cancel-offers", params: { handle } }),
-  });
-  menuActions.push({
-    type: "action",
-    label: "Remove handle",
-    icon: { type: "sfSymbol", name: "trash" },
-    destructive: true,
-    onPress: confirmRemoveHandle,
-  });
-  const headerItems: NativeStackHeaderItem[] = buyable
+  // While reordering, the header is just a Done button.
+  const headerItems: NativeStackHeaderItem[] = reordering
+    ? [
+        {
+          type: "button",
+          label: "Done",
+          tintColor: colors.text,
+          onPress: () => setReordering(false),
+        },
+      ]
+    : buyable
     ? []
     : [
         // Add is a persistent header action (mocks2 §04), not a link that moves
@@ -1154,26 +1101,78 @@ export default function ShowHandle() {
     },
   ];
 
+  // For the request / unsupported state: import a certificate the operator issued,
+  // or remove the handle from this device.
+  const requestHeaderItems: NativeStackHeaderItem[] = [
+    {
+      type: "menu",
+      label: "Options",
+      icon: { type: "sfSymbol", name: "ellipsis" },
+      menu: {
+        items: [
+          {
+            type: "action",
+            label: "Import certificate",
+            icon: { type: "sfSymbol", name: "square.and.arrow.down" },
+            onPress: handleImportCertificate,
+          },
+          {
+            type: "action",
+            label: "Remove handle",
+            icon: { type: "sfSymbol", name: "trash" },
+            destructive: true,
+            onPress: confirmRemoveHandle,
+          },
+        ],
+      },
+    },
+  ];
+
+  // Some terminal states can be reached via a replace / cross-stack navigate with
+  // nothing beneath them, so the native back button can't appear. Fall back to an
+  // explicit "Handles" left item whenever we can't pop, so there's always a way out.
+  const backFallbackLeft: NativeStackHeaderItem[] | undefined = router.canGoBack()
+    ? undefined
+    : [
+        {
+          type: "button",
+          label: "Handles",
+          icon: { type: "sfSymbol", name: "chevron.backward" },
+          tintColor: colors.text,
+          onPress: goToHandlesList,
+        },
+      ];
+  const leftFallbackOption = backFallbackLeft
+    ? { unstable_headerLeftItems: () => backFallbackLeft }
+    : {};
+
   const shortPk = `${pubkey.slice(0, 8)}…${pubkey.slice(-8)}`;
 
-  // ── Native onboarding (issuing → ready → sovereign) ─────────────────────────
+  // ── Native onboarding (issuing → sovereign) ─────────────────────────────────
   if (showOnboarding) {
     let sIcon: Parameters<typeof HandleStatusNative>[0]["icon"] = "clock";
     let iconColor = colors.textMuted;
     let statusLabel = "Waiting for certificate";
     let statusColor = colors.textMuted;
     let message = "";
+    let messageIcon: Parameters<typeof HandleStatusNative>[0]["messageIcon"];
+    let messageIconColor: string | undefined;
     let details: StatusDetail[] | undefined;
     let primary: { label: string; onPress: () => void } | undefined;
     let secondary: { label: string; onPress: () => void } | undefined;
 
     if (onboardStage === "issuing" && boughtViaNacho) {
-      sIcon = "checkmark.seal.fill";
+      // The handle is theirs (paid, bound to their key) — a plain green dot, NOT
+      // the seal/shield, which is reserved for actual sovereignty. The clock
+      // belongs to the "Issuing your certificate…" message, where the waiting is.
+      sIcon = "circle.fill";
       iconColor = colors.statusGreenFg;
       statusLabel = "is yours";
       statusColor = colors.statusGreenFg;
       message =
         "Issuing your certificate — usually a few minutes. You’ll be able to publish records as soon as it lands.";
+      messageIcon = "clock";
+      messageIconColor = colors.textMuted;
       details = [
         ...(handleData.purchase?.amountCents != null
           ? [{ label: "Paid", value: formatPrice(handleData.purchase.amountCents) }]
@@ -1191,12 +1190,17 @@ export default function ShowHandle() {
         onPress: () => refreshResolution(),
       };
     } else if (onboardStage === "ready") {
-      sIcon = "checkmark.seal.fill";
+      // Cert landed — hand off into the handle. A plain green dot (not the seal,
+      // which is for sovereignty). No "anchoring…" copy: the Certificate view
+      // now carries Provisional/Confirming.
+      sIcon = "circle.fill";
       iconColor = colors.statusGreenFg;
-      statusLabel = "Yours — ready to use";
+      statusLabel = "is yours";
       statusColor = colors.statusGreenFg;
       message =
-        "Anchoring to Bitcoin — usually within a day. Nothing to do; you can use the handle now.";
+        "Your certificate is ready. You can now use your handle!";
+      messageIcon = "checkmark.circle.fill";
+      messageIconColor = colors.statusGreenFg;
       primary = { label: "Set up records", onPress: dismissOnboarding };
     } else {
       sIcon = "checkmark.shield.fill";
@@ -1236,6 +1240,8 @@ export default function ShowHandle() {
           statusLabel={statusLabel}
           statusColor={statusColor}
           message={message}
+          messageIcon={messageIcon}
+          messageIconColor={messageIconColor}
           details={details}
           primary={primary}
           secondary={secondary}
@@ -1274,14 +1280,20 @@ export default function ShowHandle() {
   // "Sign and publish" action sits in a pinned RN footer over the native content
   // (only when there are unsaved edits).
   if (!buyable && manageable) {
+    const unverifiedResolution = !!(resolution?.found && resolution.unverified);
     const banner: { text: string; tone: "error" | "success" | "muted" } | null =
-      error
-        ? { text: error, tone: "error" }
-        : published
-          ? { text: "Records published to certrelay.", tone: "success" }
-          : notice
-            ? { text: notice, tone: "muted" }
-            : null;
+      unverifiedResolution
+        ? {
+            text: "No configured anchor could verify the latest response — it may be forged. Showing your last verified data.",
+            tone: "error",
+          }
+        : error
+          ? { text: error, tone: "error" }
+          : published
+            ? { text: "Records published to certrelay.", tone: "success" }
+            : notice
+              ? { text: notice, tone: "muted" }
+              : null;
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Stack.Screen
@@ -1296,8 +1308,14 @@ export default function ShowHandle() {
           seq={seq}
           pill={pill}
           sovereign={isSovereign}
+          unverified={unverifiedResolution}
+          reordering={reordering}
+          onMoveUp={(i) => moveRecord(handle, i, i - 1)}
+          onMoveDown={(i) => moveRecord(handle, i, i + 1)}
           banner={banner}
           copied={copiedId}
+          certState={certState}
+          listings={liveListings.map((o) => ({ id: o.id, kind: o.kind, price: o.price }))}
           onEditRecord={(i) =>
             router.push({
               pathname: "/(main)/(tabs)/handles/edit-record",
@@ -1308,23 +1326,22 @@ export default function ShowHandle() {
             router.push({ pathname: "/(main)/(tabs)/handles/add-record", params: { handle } })
           }
           onCopy={copyWithFeedback}
+          onOpenCert={() =>
+            router.push({ pathname: "/(main)/(tabs)/handles/certificate", params: { handle } })
+          }
+          onCancelListings={() =>
+            router.push({ pathname: "/(main)/(tabs)/handles/cancel-offers", params: { handle } })
+          }
+          onRefresh={onManageRefresh}
         />
         {isDirty(handle) && (
-          <View
-            style={{
-              paddingHorizontal: 20,
-              paddingTop: 10,
-              paddingBottom: insets.bottom + 10,
-              backgroundColor: colors.background,
+          <ActionFooter
+            primary={{
+              label: publishing ? "Publishing…" : "Sign and publish",
+              onPress: signAndPublish,
+              disabled: publishing,
             }}
-          >
-            <Button
-              text={publishing ? "Publishing…" : "Sign and publish"}
-              onPress={signAndPublish}
-              type="main"
-              disabled={publishing}
-            />
-          </View>
+          />
         )}
       </View>
     );
@@ -1353,7 +1370,12 @@ export default function ShowHandle() {
     return (
       <>
         <Stack.Screen
-          options={{ title: "", unstable_headerRightItems: () => removeHeaderItems }}
+          options={{
+            title: "",
+            headerBackVisible: true,
+            unstable_headerRightItems: () => removeHeaderItems,
+            ...leftFallbackOption,
+          }}
         />
         <HandleStatusNative
           handle={handle}
@@ -1371,7 +1393,14 @@ export default function ShowHandle() {
   if (ownedByOther) {
     return (
       <>
-        <Stack.Screen options={{ title: "" }} />
+        <Stack.Screen
+          options={{
+            title: "",
+            headerBackVisible: true,
+            unstable_headerRightItems: () => removeHeaderItems,
+            ...leftFallbackOption,
+          }}
+        />
         <HandleStatusNative
           handle={handle}
           icon="exclamationmark.triangle.fill"
@@ -1391,7 +1420,14 @@ export default function ShowHandle() {
   // Not owned and not purchasable here → request / unsupported / processing.
   return (
     <>
-      <Stack.Screen options={{ title: headerTitle }} />
+      <Stack.Screen
+        options={{
+          title: headerTitle,
+          headerBackVisible: true,
+          unstable_headerRightItems: () => requestHeaderItems,
+          ...leftFallbackOption,
+        }}
+      />
       <HandleStatusNative
         handle={handle}
         icon={isProcessingPurchase ? "clock" : "paperplane"}

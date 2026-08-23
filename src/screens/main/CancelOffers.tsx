@@ -73,24 +73,24 @@ export default function CancelOffers() {
   if (psbt) {
     return (
       <>
-        <Stack.Screen options={{ title: "Cancel offers" }} />
+        <Stack.Screen options={{ title: "Cancel listings" }} />
         <Host style={{ flex: 1 }} colorScheme={scheme}>
           <FieldGroup>
             <FieldGroup.Section>
               <FieldGroup.SectionHeader>
                 <Row alignment="center">
-                  <Spacer />
+                  <Spacer flexible />
                   <Column alignment="center" spacing={8}>
                     <Icon name="checkmark.circle.fill" size={46} color={colors.statusGreenFg} />
                     <Text textStyle={{ fontSize: 20, fontWeight: "700" }}>
                       Cancellation signed
                     </Text>
                     <Text textStyle={{ fontSize: 14, color: colors.textSecondary }}>
-                      Copy this to your wallet and broadcast it. Offers stay valid
+                      Copy this to your wallet and broadcast it. Listings stay valid
                       until it confirms — up to a day to clear here.
                     </Text>
                   </Column>
-                  <Spacer />
+                  <Spacer flexible />
                 </Row>
               </FieldGroup.SectionHeader>
             </FieldGroup.Section>
@@ -107,8 +107,8 @@ export default function CancelOffers() {
   if (offers === null) {
     return (
       <>
-        <Stack.Screen options={{ title: "Cancel offers" }} />
-        <NativeEmpty sf="clock" title="Loading offers…" />
+        <Stack.Screen options={{ title: "Cancel listings" }} />
+        <NativeEmpty sf="clock" title="Loading listings…" />
       </>
     );
   }
@@ -116,10 +116,10 @@ export default function CancelOffers() {
   if (offers.length === 0) {
     return (
       <>
-        <Stack.Screen options={{ title: "Cancel offers" }} />
+        <Stack.Screen options={{ title: "Cancel listings" }} />
         <NativeEmpty
           sf="checkmark.circle"
-          title="No live offers"
+          title="No live listings"
           message="There’s nothing to cancel for this handle."
         />
       </>
@@ -128,11 +128,11 @@ export default function CancelOffers() {
 
   return (
     <>
-      <Stack.Screen options={{ title: "Cancel offers" }} />
+      <Stack.Screen options={{ title: "Cancel listings" }} />
       <Host style={{ flex: 1 }} colorScheme={scheme}>
         <FieldGroup>
           <FieldGroup.Section
-            title={`Invalidate ${offers.length} live offer${offers.length === 1 ? "" : "s"}`}
+            title={`Invalidate ${offers.length} live listing${offers.length === 1 ? "" : "s"}`}
           >
             {offers.map((o) => (
               <ListItem
@@ -146,7 +146,7 @@ export default function CancelOffers() {
             ))}
             <FieldGroup.SectionFooter>
               <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
-                {`${handle} stays on the same key. Spending the UTXO is the only way to invalidate a signed offer — copy the transaction to your wallet and broadcast it.`}
+                {`${handle} stays on the same key. Spending the UTXO is the only way to invalidate a signed listing — copy the transaction to your wallet and broadcast it.`}
               </Text>
             </FieldGroup.SectionFooter>
           </FieldGroup.Section>

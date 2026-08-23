@@ -33,6 +33,10 @@ interface LayoutProps {
 // Bottom padding for tab screens on platforms without automatic content-inset
 // adjustment (Android/web). iOS handles it natively → 0.
 const TAB_BAR_PAD = 64;
+// Inline nav-bar height (excludes the status bar / safe-area top). Detail headers
+// are transparent glass now, so content scrolls UNDER them — an underHeader
+// screen must pad down by the status bar + this bar to clear it.
+const NAV_BAR = Platform.OS === "android" ? 56 : 44;
 
 export function Layout({
   children,
@@ -46,8 +50,13 @@ export function Layout({
 }: LayoutProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  // underHeader with a transparent detail header (the default now): content sits
+  // under the glass bar, so pad down by the full header height. When tabBarInset
+  // is set the native auto content-inset handles the top instead → no manual pad.
   const topInset = underHeader
-    ? 0
+    ? tabBarInset
+      ? 0
+      : insets.top + NAV_BAR + 12
     : padTop
       ? Math.max(insets.top, 20)
       : insets.top;

@@ -15,8 +15,7 @@ export default function OnboardingLayout() {
     <PendingKeystoreProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
-        {/* show-mnemonic + enter-mnemonic set their (dynamic) titles in-component. */}
-        <Stack.Screen name="show-mnemonic" options={detail} />
+        {/* enter-mnemonic (restore verify) sets its title in-component. */}
         <Stack.Screen
           name="import-keystore"
           options={{ ...detail, title: "Restore from backup" }}

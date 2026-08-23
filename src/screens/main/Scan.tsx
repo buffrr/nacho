@@ -44,11 +44,14 @@ export default function Scan() {
   const [result, setResult] = useState<ScanInput | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Only prompt for camera access once the Scan tab is actually opened — native
+  // tabs instantiate this screen in the background, so requesting on mount would
+  // pop the permission dialog while the user is still on Handles.
   useEffect(() => {
-    if (permission && !permission.granted && permission.canAskAgain) {
+    if (isFocused && permission && !permission.granted && permission.canAskAgain) {
       requestPermission();
     }
-  }, [permission]);
+  }, [isFocused, permission]);
 
   // Re-arm both detectors whenever the tab regains focus (fresh scan).
   useEffect(() => {

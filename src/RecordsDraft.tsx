@@ -28,6 +28,9 @@ type RecordsDraftValue = {
     record: EditableRecord,
   ) => void;
   deleteRecord: (handle: string, index: number) => void;
+  // Reorder a record within the draft array (SIP-7 record order is meaningful
+  // and part of the signed set, so a move is a dirtying edit that publishes).
+  moveRecord: (handle: string, from: number, to: number) => void;
   // Update the draft's sequence number (published seq = unix seconds) without
   // dropping the loaded records.
   setSeq: (handle: string, seq: number) => void;
@@ -113,6 +116,19 @@ export function RecordsDraftProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const moveRecord = useCallback((handle: string, from: number, to: number) => {
+    setDrafts((prev) => {
+      const draft = prev[handle];
+      if (!draft) return prev;
+      const n = draft.records.length;
+      if (from < 0 || from >= n || to < 0 || to >= n || from === to) return prev;
+      const records = [...draft.records];
+      const [item] = records.splice(from, 1);
+      records.splice(to, 0, item);
+      return { ...prev, [handle]: { ...draft, records, dirty: true } };
+    });
+  }, []);
+
   const setSeq = useCallback((handle: string, seq: number) => {
     setDrafts((prev) => {
       const draft = prev[handle] ?? EMPTY;
@@ -145,6 +161,7 @@ export function RecordsDraftProvider({ children }: { children: ReactNode }) {
         isDirty,
         setRecord,
         deleteRecord,
+        moveRecord,
         setSeq,
         markClean,
         clear,

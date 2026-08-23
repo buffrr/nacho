@@ -9,7 +9,8 @@ import React, {
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
-import { kvGet, kvSet, certDelete, recordsDelete } from "@/db";
+import { kvGet, kvSet, kvRemove, certDelete, recordsDelete } from "@/db";
+import { clearHistory } from "@/resolveHistory";
 import { migrateLegacyStore } from "@/migrateLegacy";
 import { loadNetConfig } from "@/config";
 import { CertData, isCertData, areCertDataEqual } from "@/cert";
@@ -48,6 +49,9 @@ const getSecureStorage = () => {
       },
       async setMnemonic(value: string): Promise<void> {
         await AsyncStorage.setItem("mnemonic", value);
+      },
+      async removeMnemonic(): Promise<void> {
+        await AsyncStorage.removeItem("mnemonic");
       },
       async getHandlePrivkey(handle: string): Promise<string | null> {
         return await AsyncStorage.getItem(handlePrvStoreKey(handle));
@@ -134,6 +138,9 @@ const getSecureStorage = () => {
     async removeHandlePrivkey(handle: string): Promise<void> {
       await SecureStore.deleteItemAsync(handlePrvStoreKey(handle));
     },
+    async removeMnemonic(): Promise<void> {
+      await SecureStore.deleteItemAsync("mnemonic");
+    },
   };
 };
 
@@ -160,6 +167,9 @@ export type HandleResolution =
       found: true;
       sovereignty: string;
       scriptPubkey?: string;
+      // True when the resolve returned but could NOT be verified against any
+      // trust anchor — the data may be forged, so we don't act on it silently.
+      unverified?: boolean;
       updatedAt: number;
     };
 
@@ -417,6 +427,12 @@ type StoreContextType = {
   setCertRef: (handle: string, certRef: CertRef | null) => Promise<void>;
   setHandleOnboarded: (handle: string, value: boolean) => Promise<void>;
   setHandlePurchase: (handle: string, purchase: PurchaseInfo) => Promise<void>;
+  // Whether the user has confirmed backing up their seed phrase. Drives the
+  // backup nudge (shown once they own a cert-backed handle). Sticky once true.
+  seedBackedUp: boolean;
+  markSeedBackedUp: () => Promise<void>;
+  // Dev/testing: reset the app to fresh onboarding (keeps network config).
+  wipeEverything: () => Promise<void>;
 };
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -425,6 +441,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   const [xpub, setXpub] = useState<string | null>(null);
   const [handles, setHandles] = useState<HandlesMap | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [seedBackedUp, setSeedBackedUp] = useState(false);
   // Always-latest handles, updated synchronously in saveKeystore, so the
   // per-handle setters merge into the current map instead of a stale render
   // closure (which caused resolution/certRef writes to clobber each other and
@@ -452,6 +469,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           handlesRef.current = keystore.handles;
         }
       }
+      if ((await kvGet("seedBackedUp")) === "1") setSeedBackedUp(true);
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {
@@ -489,6 +507,49 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
 
   const getMnemonic = async (): Promise<string | null> => {
     return await secureStorage.getMnemonic();
+  };
+
+  const markSeedBackedUp = async (): Promise<void> => {
+    setSeedBackedUp(true);
+    await kvSet("seedBackedUp", "1");
+  };
+
+  // Dev/testing: wipe the keystore, every handle's secrets/cert/records, the
+  // backup flag and the resolve history — resetting the app to fresh onboarding.
+  // Network config (relays/API) is intentionally kept. Best-effort: individual
+  // failures don't abort the wipe.
+  const wipeEverything = async (): Promise<void> => {
+    const base = currentHandles() ?? {};
+    for (const handle of Object.keys(base)) {
+      try {
+        await secureStorage.removeHandlePrivkey(handle);
+      } catch {
+        // no imported key for this handle — fine
+      }
+      await certDelete(handle);
+      await recordsDelete(handle);
+    }
+    try {
+      await secureStorage.removeXprv();
+    } catch {
+      // ignore
+    }
+    try {
+      await secureStorage.removeMnemonic();
+    } catch {
+      // ignore
+    }
+    await kvRemove("keystore");
+    await kvRemove("seedBackedUp");
+    try {
+      await clearHistory();
+    } catch {
+      // ignore
+    }
+    handlesRef.current = null;
+    setHandles(null);
+    setXpub(null);
+    setSeedBackedUp(false);
   };
 
   const setupKeystore = async (
@@ -761,6 +822,9 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         setCertRef,
         setHandleOnboarded,
         setHandlePurchase,
+        seedBackedUp,
+        markSeedBackedUp,
+        wipeEverything,
       }}
     >
       {children}

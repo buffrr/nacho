@@ -23,7 +23,7 @@ export default function () {
   const isNew = handles === undefined;
   type ValidationError = "invalid" | "mismatch" | null;
 
-  const { setupKeystore } = useStore();
+  const { setupKeystore, markSeedBackedUp } = useStore();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [inputWords, setInputWords] = useState<string[]>(Array(12).fill(""));
@@ -56,6 +56,8 @@ export default function () {
     }
 
     setupKeystore(xprv, handles || {}, mnemonic);
+    // Restoring from a backup means they already hold the seed — no need to nudge.
+    void markSeedBackedUp();
   };
 
   const getMessage = (error: ValidationError): string => {

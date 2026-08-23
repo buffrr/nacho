@@ -36,7 +36,10 @@ export default function ImportKeypair() {
     setIsLoading(true);
     try {
       await importKeypair(h, pk);
-      router.replace({ pathname: "/(main)/(tabs)/handles/show-handle", params: { handle: h } });
+      // Re-root onto the Handles tab so Back returns to the list, not to this form.
+      if (router.canDismiss()) router.dismissAll();
+      router.navigate("/(main)/(tabs)/handles");
+      router.push({ pathname: "/(main)/(tabs)/handles/show-handle", params: { handle: h } });
     } catch (err) {
       setIsLoading(false);
       setError(err instanceof Error ? err.message : "Failed to import keypair");

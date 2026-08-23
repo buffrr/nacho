@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Linking } from "react-native";
+import { WEB_TOP_INSET } from "@/ui/webInset";
+import { Linking, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import {
   Host,
@@ -13,10 +14,12 @@ import {
   RNHostView,
 } from "@expo/ui";
 import type { SFSymbol } from "sf-symbols-typescript";
+import { useRouter } from "expo-router";
 import { useTheme } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
+import { NativeEmpty } from "@/ui/nativeEmpty";
 import { ResolvedHandle } from "@/fabricResolver";
-import { lookupRecord, paymentUri } from "@/recordRegistry";
+import { lookupRecord, paymentUri, recordLink, RecordDef } from "@/recordRegistry";
 
 // The handle view rendered with @expo/ui's cross-platform native widgets
 // (FieldGroup / ListItem / Icon). Renders real SwiftUI on iOS, Compose on
@@ -42,8 +45,41 @@ const SF: Record<string, SFSymbol> = {
   tor: "globe",
   hyper: "number",
   bep44: "number",
+  email: "envelope.fill",
 };
 export const sfFor = (key: string): SFSymbol => SF[key] ?? "doc.text";
+
+// The record glyph, iOS-Settings style (img_27): a WHITE glyph centered in a
+// filled rounded-square tinted with the record's color — not a bare tinted
+// glyph. Uses the registry's own SVG icon (rendered white) so it's identical
+// cross-platform; `size` is the square's edge. One helper so every record-icon
+// site (picker, editor, profile, sign-request) stays in sync.
+export function RecordGlyph({
+  def,
+  size,
+  color,
+}: {
+  def: RecordDef;
+  size: number;
+  color?: string;
+}) {
+  const Glyph = def.Icon;
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: Math.round(size * 0.28),
+        borderCurve: "continuous",
+        backgroundColor: color ?? def.color,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Glyph size={Math.round(size * 0.62)} color="#FFFFFF" />
+    </View>
+  );
+}
 
 export function shorten(v: string): string {
   return v.length <= 22 ? v : `${v.slice(0, 9)}…${v.slice(-7)}`;
@@ -70,7 +106,13 @@ function pubkeyFromZone(zone: ResolvedHandle["zone"]): string | null {
 
 export function ResolvedProfileNative({ result }: { result: ResolvedHandle }) {
   const { scheme, colors } = useTheme();
+  const router = useRouter();
   const [copied, setCopied] = useState<string | null>(null);
+  // A resolve that couldn't be verified against ANY anchor is a security
+  // warning, not a normal state — never a seal. Hide the records behind an
+  // SSL-style interstitial until the user explicitly chooses to proceed.
+  const unverified = result.badge === "unverified";
+  const [revealed, setRevealed] = useState(false);
 
   const copy = useCallback((id: string, text: string) => {
     Clipboard.setStringAsync(text);
@@ -87,11 +129,11 @@ export function ResolvedProfileNative({ result }: { result: ResolvedHandle }) {
     const out: {
       id: string;
       label: string;
-      sf: SFSymbol;
+      def: RecordDef;
       color: string;
       primary: string;
       known: boolean;
-      canOpen: boolean;
+      openUrl: string | null;
     }[] = [];
     let i = 0;
     for (const rec of result.zone.records ?? []) {
@@ -100,14 +142,18 @@ export function ResolvedProfileNative({ result }: { result: ResolvedHandle }) {
       const values = (rec.value ?? []).map(String).filter(Boolean);
       if (!values.length) continue;
       const { def, known } = lookupRecord(rec.type, rec.key);
+      // Build the openable URL for "open" records (socials → profile URL,
+      // website/tor → the URL itself); null falls back to copy.
+      const openUrl =
+        def.action === "open" && known ? recordLink(def, values[0]) : null;
       out.push({
         id: `${rec.key}:${i++}`,
         label: def.label,
-        sf: sfFor(def.key),
+        def,
         color: def.color,
         primary: values[0],
         known,
-        canOpen: def.action === "open" && known,
+        openUrl,
       });
     }
     return out;
@@ -167,7 +213,7 @@ export function ResolvedProfileNative({ result }: { result: ResolvedHandle }) {
       {/* Spacers force the column to the horizontal center — a section header
           left-aligns and the column shrink-wraps, so alignment alone won't. */}
       <Row alignment="center">
-        <Spacer />
+        <Spacer flexible />
         <Column alignment="center" spacing={8} style={{ paddingTop: 10, paddingBottom: 14 }}>
           <RNHostView matchContents style={{ width: 76, height: 76 }}>
             <Avatar handle={result.handle} size={76} />
@@ -176,28 +222,55 @@ export function ResolvedProfileNative({ result }: { result: ResolvedHandle }) {
             {result.handle}
           </Text>
           <Row alignment="center" spacing={5}>
+            {/* Unverified overrides everything — no seal for an unverified
+                handle even if its zone claims sovereignty. */}
             <Icon
-              name={sovereign ? "checkmark.seal.fill" : "clock"}
+              name={
+                unverified
+                  ? "exclamationmark.triangle.fill"
+                  : sovereign
+                    ? "checkmark.seal.fill"
+                    : "clock"
+              }
               size={14}
-              color={sovereign ? colors.statusGreenFg : colors.textMuted}
+              color={
+                unverified
+                  ? colors.dangerText
+                  : sovereign
+                    ? colors.statusGreenFg
+                    : colors.textMuted
+              }
             />
             <Text
               textStyle={{
                 fontSize: 13,
-                color: sovereign ? colors.statusGreenFg : colors.textMuted,
+                color: unverified
+                  ? colors.dangerText
+                  : sovereign
+                    ? colors.statusGreenFg
+                    : colors.textMuted,
               }}
             >
-              {sovereign ? "Sovereign" : "Registered"}
+              {unverified ? "Unverified" : sovereign ? "Sovereign" : "Registered"}
             </Text>
           </Row>
           <Row alignment="center" spacing={6}>
-            <Icon name="checkmark.shield" size={12} color={colors.textSecondary} />
-            <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+            <Icon
+              name={unverified ? "xmark.shield.fill" : "checkmark.shield"}
+              size={12}
+              color={unverified ? colors.dangerText : colors.textSecondary}
+            />
+            <Text
+              textStyle={{
+                fontSize: 12,
+                color: unverified ? colors.dangerText : colors.textSecondary,
+              }}
+            >
               {trustText}
             </Text>
           </Row>
         </Column>
-        <Spacer />
+        <Spacer flexible />
       </Row>
     </FieldGroup.SectionHeader>
   );
@@ -205,8 +278,23 @@ export function ResolvedProfileNative({ result }: { result: ResolvedHandle }) {
   // Which section renders first (gets the profile header).
   const first = payUri ? "pay" : rows.length > 0 ? "records" : "details";
 
+  // Protective interstitial — records stay hidden until "Show anyway". The safe
+  // path (Trust settings) is the prominent button; proceeding is the muted one.
+  if (unverified && !revealed) {
+    return (
+      <NativeEmpty
+        sf="exclamationmark.shield.fill"
+        iconColor={colors.dangerText}
+        title={result.handle}
+        message="No configured anchor could verify this response — records may be forged."
+        primary={{ label: "Trust settings", onPress: () => router.push("/(main)/trust") }}
+        secondary={{ label: "Show anyway", onPress: () => setRevealed(true) }}
+      />
+    );
+  }
+
   return (
-    <Host style={{ flex: 1 }} colorScheme={scheme} matchContents={false}>
+    <Host style={{ flex: 1, paddingTop: WEB_TOP_INSET }} colorScheme={scheme} matchContents={false}>
       <FieldGroup>
         {payUri ? (
           <FieldGroup.Section>
@@ -230,15 +318,24 @@ export function ResolvedProfileNative({ result }: { result: ResolvedHandle }) {
             {rows.map((row) => (
               <ListItem
                 key={row.id}
-                leading={<Icon name={row.sf} size={22} color={row.color} />}
+                leading={<RecordGlyph def={row.def} size={28} color={row.color} />}
                 trailing={
-                  <Text textStyle={{ color: colors.textSecondary }}>
-                    {copied === row.id ? "Copied ✓" : shorten(row.primary)}
-                  </Text>
+                  row.openUrl ? (
+                    <Row alignment="center" spacing={5}>
+                      <Text textStyle={{ color: colors.textSecondary }}>
+                        {copied === row.id ? "Copied ✓" : shorten(row.primary)}
+                      </Text>
+                      <Icon name="arrow.up.right" size={13} color={colors.chevron} />
+                    </Row>
+                  ) : (
+                    <Text textStyle={{ color: colors.textSecondary }}>
+                      {copied === row.id ? "Copied ✓" : shorten(row.primary)}
+                    </Text>
+                  )
                 }
                 onPress={() =>
-                  row.canOpen
-                    ? openUri(row.primary, row.primary, row.id)
+                  row.openUrl
+                    ? openUri(row.openUrl, row.primary, row.id)
                     : copy(row.id, row.primary)
                 }
               >

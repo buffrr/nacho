@@ -52,8 +52,13 @@ export default function MainLayout() {
         <Stack.Screen name="preferences" options={{ ...detail, title: "Settings" }} />
         <Stack.Screen name="verify-anchor" options={{ ...detail, title: "Verify anchor" }} />
         <Stack.Screen name="trust-approve" options={{ ...detail, title: "Trust ID" }} />
-        <Stack.Screen name="native-demo" options={{ ...detail, title: "Native preview" }} />
         <Stack.Screen name="reveal-seed" options={{ ...detail, title: "Seed phrase" }} />
+        {/* Onboarding design preview (from Settings) — headerless so it looks
+            exactly like the real first screen; swipe or its buttons dismiss it. */}
+        <Stack.Screen
+          name="onboarding-preview"
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
       </Stack>
     </RecordsDraftProvider>
   );

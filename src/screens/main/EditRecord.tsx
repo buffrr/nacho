@@ -15,7 +15,7 @@ import {
 import { useTheme } from "@/theme";
 import { useRecordsDraft } from "@/RecordsDraft";
 import { lookupRecord } from "@/recordRegistry";
-import { sfFor } from "@/ui/handleProfileNative";
+import { RecordGlyph } from "@/ui/handleProfileNative";
 
 // One editable field, extracted so useNativeState is called once per component
 // (a hook can't run in a loop). It owns its native text state and reports each
@@ -219,7 +219,7 @@ export default function EditRecord() {
             <>
               {/* Type header */}
               <FieldGroup.Section>
-                <ListItem leading={<Icon name={sfFor(def.key)} size={24} color={def.color} />}>
+                <ListItem leading={<RecordGlyph def={def} size={28} color={def.color} />}>
                   <Text>{def.label}</Text>
                 </ListItem>
               </FieldGroup.Section>

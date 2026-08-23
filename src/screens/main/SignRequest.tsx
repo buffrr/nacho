@@ -54,7 +54,7 @@ import { loadCert, saveCert } from "@/certStore";
 import { recordsGet } from "@/db";
 import { tierFor, warningLine, needsAck } from "@/recordTiers";
 import { lookupRecord } from "@/recordRegistry";
-import { sfFor } from "@/ui/handleProfileNative";
+import { RecordGlyph } from "@/ui/handleProfileNative";
 import { remainingValidity, formatBtc } from "@/format";
 import { signMessage } from "@/messageSign";
 import { scriptForHandle } from "@/keys";
@@ -190,7 +190,7 @@ function ResultView({
           <NFieldGroup.Section>
             <NFieldGroup.SectionHeader>
               <NRow alignment="center">
-                <NSpacer />
+                <NSpacer flexible />
                 <NColumn alignment="center" spacing={8}>
                   <NIcon name="checkmark.circle.fill" size={46} color={colors.statusGreenFg} />
                   <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
@@ -200,7 +200,7 @@ function ResultView({
                     {sent ? `Sent to ${host}` : sub}
                   </NText>
                 </NColumn>
-                <NSpacer />
+                <NSpacer flexible />
               </NRow>
             </NFieldGroup.SectionHeader>
             <NListItem>
@@ -321,7 +321,7 @@ function MessageConfirm({
           <NFieldGroup.Section>
             <NFieldGroup.SectionHeader>
               <NRow alignment="center">
-                <NSpacer />
+                <NSpacer flexible />
                 <NColumn alignment="center" spacing={8}>
                   <NIcon name="at" size={40} color={colors.accent} />
                   <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
@@ -329,7 +329,7 @@ function MessageConfirm({
                   </NText>
                   <NText textStyle={{ fontSize: 20, fontWeight: "700", color: colors.text }}>{handle}</NText>
                 </NColumn>
-                <NSpacer />
+                <NSpacer flexible />
               </NRow>
             </NFieldGroup.SectionHeader>
             <NListItem
@@ -562,7 +562,7 @@ function RecordsConfirm({
             <NFieldGroup.Section>
               <NFieldGroup.SectionHeader>
                 <NRow alignment="center">
-                  <NSpacer />
+                  <NSpacer flexible />
                   <NColumn alignment="center" spacing={8}>
                     <NIcon name="checkmark.circle.fill" size={46} color={colors.statusGreenFg} />
                     <NText textStyle={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
@@ -572,7 +572,7 @@ function RecordsConfirm({
                       {`${handle} was updated.`}
                     </NText>
                   </NColumn>
-                  <NSpacer />
+                  <NSpacer flexible />
                 </NRow>
               </NFieldGroup.SectionHeader>
             </NFieldGroup.Section>
@@ -696,7 +696,7 @@ function RecordDiffView({
         return (
           <NFieldGroup.Section key={`a${i}`} title={`Add · ${r.type} · ${r.key}`}>
             <NListItem
-              leading={<NIcon name={sfFor(def.key)} size={22} color={def.color} />}
+              leading={<RecordGlyph def={def} size={28} color={def.color} />}
               trailing={
                 <NText textStyle={{ color: colors.statusGreenFg, fontWeight: "700" }}>
                   ADD
@@ -734,7 +734,7 @@ function RecordDiffView({
             title={`Replace · ${r.after.type} · ${r.after.key}`}
           >
             <NListItem
-              leading={<NIcon name={sfFor(def.key)} size={22} color={def.color} />}
+              leading={<RecordGlyph def={def} size={28} color={def.color} />}
               trailing={<NText textStyle={{ color: colors.textSecondary }}>was</NText>}
             >
               <NText textStyle={{ color: colors.textSecondary }}>
@@ -759,7 +759,7 @@ function RecordDiffView({
         return (
           <NFieldGroup.Section key={`d${i}`} title={`Remove · ${r.type} · ${r.key}`}>
             <NListItem
-              leading={<NIcon name={sfFor(def.key)} size={22} color={def.color} />}
+              leading={<RecordGlyph def={def} size={28} color={def.color} />}
               trailing={
                 <NText textStyle={{ color: colors.dangerText, fontWeight: "700" }}>
                   REMOVE
@@ -867,7 +867,7 @@ function TransferConfirm({
           <NFieldGroup.Section>
             <NFieldGroup.SectionHeader>
               <NRow alignment="center">
-                <NSpacer />
+                <NSpacer flexible />
                 <NColumn alignment="center" spacing={8}>
                   <NIcon name="arrow.right.circle.fill" size={40} color={colors.dangerText} />
                   <NText textStyle={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
@@ -877,7 +877,7 @@ function TransferConfirm({
                     You will no longer control this handle
                   </NText>
                 </NColumn>
-                <NSpacer />
+                <NSpacer flexible />
               </NRow>
             </NFieldGroup.SectionHeader>
           </NFieldGroup.Section>
@@ -940,8 +940,13 @@ function SaleConfirm({
   const router = useRouter();
   const { scheme } = useTheme();
   const { handles, xpub, getSigningKey } = useStore();
-  const payout = useNativeState(""); // native input; .value is the payout address
-  const [payoutSource, setPayoutSource] = useState<string | null>(null);
+  // When the seller starts the sale from Options → Sell handle, they already
+  // entered the payout address there — it arrives as a param and seeds the field.
+  const { payout: payoutParam } = useLocalSearchParams<{ payout?: string }>();
+  const payout = useNativeState(payoutParam ?? ""); // .value is the payout address
+  const [payoutSource, setPayoutSource] = useState<string | null>(
+    payoutParam ? "you entered" : null,
+  );
   const [signing, setSigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<string | null>(null);
@@ -949,8 +954,10 @@ function SaleConfirm({
   const data = handles?.[request.handle];
   const inputScript = data && xpub ? scriptForHandle(xpub, data) : null;
 
-  // Prefill the payout from the user's own addr:btc record (re-read live at sign).
+  // If no payout was supplied, prefill from the user's own addr:btc record
+  // (re-read live at sign).
   useEffect(() => {
+    if (payoutParam) return; // already seeded from the Sell handle page
     let cancelled = false;
     (async () => {
       try {
@@ -971,7 +978,7 @@ function SaleConfirm({
     return () => {
       cancelled = true;
     };
-  }, [request.handle]);
+  }, [request.handle, payoutParam]);
 
   const sign = useCallback(async () => {
     if (!data || !xpub || !inputScript) {
@@ -1050,7 +1057,7 @@ function SaleConfirm({
           <NFieldGroup.Section>
             <NFieldGroup.SectionHeader>
               <NRow alignment="center">
-                <NSpacer />
+                <NSpacer flexible />
                 <NColumn alignment="center" spacing={4}>
                   <NText textStyle={{ fontSize: 13, color: colors.textSecondary }}>
                     Asking price
@@ -1062,7 +1069,7 @@ function SaleConfirm({
                     {`for ${request.handle}`}
                   </NText>
                 </NColumn>
-                <NSpacer />
+                <NSpacer flexible />
               </NRow>
             </NFieldGroup.SectionHeader>
           </NFieldGroup.Section>
@@ -1201,7 +1208,7 @@ function RotateConfirm({
           <NFieldGroup.Section>
             <NFieldGroup.SectionHeader>
               <NRow alignment="center">
-                <NSpacer />
+                <NSpacer flexible />
                 <NColumn alignment="center" spacing={8}>
                   <NIcon name="arrow.triangle.2.circlepath" size={40} color={colors.accent} />
                   <NText textStyle={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
@@ -1211,7 +1218,7 @@ function RotateConfirm({
                     {`${request.handle} stays yours`}
                   </NText>
                 </NColumn>
-                <NSpacer />
+                <NSpacer flexible />
               </NRow>
             </NFieldGroup.SectionHeader>
           </NFieldGroup.Section>

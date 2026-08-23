@@ -81,8 +81,10 @@ export default function HandlesTabLayout() {
       <Stack.Screen name="show-handle" options={detail} />
       <Stack.Screen name="add-record" options={largeTitle} />
       <Stack.Screen name="edit-record" options={detail} />
+      <Stack.Screen name="certificate" options={{ ...detail, title: "Certificate" }} />
+      <Stack.Screen name="certificate-chain" options={{ ...detail, title: "Certificate chain" }} />
       <Stack.Screen name="handle-action" options={{ ...detail, title: "Handle" }} />
-      <Stack.Screen name="cancel-offers" options={{ ...detail, title: "Cancel offers" }} />
+      <Stack.Screen name="cancel-offers" options={{ ...detail, title: "Cancel listings" }} />
       <Stack.Screen name="import-certificate" options={{ ...detail, title: "Import certificate" }} />
       <Stack.Screen name="import-keypair" options={{ ...detail, title: "Import keypair" }} />
     </Stack>

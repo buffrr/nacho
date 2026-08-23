@@ -1,4 +1,5 @@
 import React from "react";
+import { WEB_TOP_INSET } from "@/ui/webInset";
 import type { SFSymbol } from "sf-symbols-typescript";
 import {
   Host,
@@ -29,6 +30,8 @@ export function HandleStatusNative({
   statusLabel,
   statusColor,
   message,
+  messageIcon,
+  messageIconColor,
   details,
   primary,
   secondary,
@@ -39,6 +42,10 @@ export function HandleStatusNative({
   statusLabel: string;
   statusColor: string;
   message: string;
+  // Optional leading glyph for the message row (e.g. a clock on "Issuing your
+  // certificate…") — distinct from the status-line icon next to statusLabel.
+  messageIcon?: SFSymbol;
+  messageIconColor?: string;
   details?: StatusDetail[];
   primary?: StatusAction;
   secondary?: StatusAction;
@@ -46,28 +53,40 @@ export function HandleStatusNative({
   const { scheme, colors } = useTheme();
   return (
     <>
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={{ flex: 1, paddingTop: WEB_TOP_INSET }} colorScheme={scheme}>
       <FieldGroup>
         <FieldGroup.Section>
           <FieldGroup.SectionHeader>
             <Row alignment="center">
-              <Spacer />
+              <Spacer flexible />
               <Column alignment="center" spacing={8} style={{ paddingTop: 10, paddingBottom: 14 }}>
                 <RNHostView matchContents style={{ width: 72, height: 72 }}>
                   <Avatar handle={handle} size={72} />
                 </RNHostView>
                 <Text textStyle={{ fontSize: 22, fontWeight: "700", color: colors.text }}>{handle}</Text>
                 <Row alignment="center" spacing={5}>
-                  <Icon name={icon} size={14} color={iconColor} />
+                  {/* A bare status dot is small; a seal/shield reads as a badge
+                      and gets more presence — matching the profile header. */}
+                  <Icon name={icon} size={icon === "circle.fill" ? 9 : 14} color={iconColor} />
                   <Text textStyle={{ fontSize: 14, fontWeight: "600", color: statusColor }}>
                     {statusLabel}
                   </Text>
                 </Row>
               </Column>
-              <Spacer />
+              <Spacer flexible />
             </Row>
           </FieldGroup.SectionHeader>
-          <ListItem>
+          <ListItem
+            leading={
+              messageIcon ? (
+                <Icon
+                  name={messageIcon}
+                  size={20}
+                  color={messageIconColor ?? colors.textSecondary}
+                />
+              ) : undefined
+            }
+          >
             <Text textStyle={{ color: colors.textSecondary }}>{message}</Text>
           </ListItem>
         </FieldGroup.Section>

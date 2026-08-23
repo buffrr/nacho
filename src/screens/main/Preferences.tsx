@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
-import { Stack } from "expo-router";
+import { Alert } from "react-native";
+import { Stack, useRouter } from "expo-router";
 import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
 import {
   Host,
@@ -11,6 +12,9 @@ import {
   Picker,
   useNativeState,
 } from "@expo/ui";
+import { useStore } from "@/Store";
+import { saveBinary } from "@/file";
+import { exportDbBytes } from "@/db";
 import { ThemeMode, useTheme } from "@/theme";
 import {
   getNetConfig,
@@ -60,16 +64,47 @@ function Field({
 }
 
 export default function Preferences() {
+  const router = useRouter();
   const { scheme, colors, mode, setMode } = useTheme();
+  const { wipeEverything } = useStore();
   const conf = useMemo(() => getNetConfig(), []);
+
+  const backupKeystore = async () => {
+    try {
+      const bytes = await exportDbBytes();
+      await saveBinary(
+        `nacho-backup-${Date.now()}.sqlite`,
+        bytes,
+        "application/x-sqlite3",
+      );
+    } catch {
+      Alert.alert("Backup failed", "Couldn't export the backup file.");
+    }
+  };
+
+  // Dev/testing: wipe the keystore + all handles and reset to onboarding. The
+  // root gate swaps to the onboarding stack automatically once xpub is cleared.
+  const confirmWipe = () => {
+    Alert.alert(
+      "Delete everything?",
+      "Erases this keystore, all handles, records and the backup reminder from this device, resetting the app to onboarding. Back up your seed phrase first if you want to restore it.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete everything",
+          style: "destructive",
+          onPress: () => {
+            void wipeEverything();
+          },
+        },
+      ],
+    );
+  };
 
   const values = useRef<Map<string, string>>(new Map());
   const idc = useRef(0);
   const mk = () => `f${idc.current++}`;
 
-  const [relayIds, setRelayIds] = useState<string[]>(() =>
-    (conf.anchorRelays.length ? conf.anchorRelays : [""]).map(() => mk()),
-  );
   const [seedIds, setSeedIds] = useState<string[]>(() =>
     (conf.seeds.length ? conf.seeds : [""]).map(() => mk()),
   );
@@ -79,7 +114,6 @@ export default function Preferences() {
   // Seed the values map once (and re-seed on reset via the ver bump path).
   useMemo(() => {
     values.current.set("api", conf.apiUrl);
-    relayIds.forEach((id, i) => values.current.set(id, conf.anchorRelays[i] ?? ""));
     seedIds.forEach((id, i) => values.current.set(id, conf.seeds[i] ?? ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -89,8 +123,10 @@ export default function Preferences() {
     ids.map((id) => (values.current.get(id) ?? "").trim()).filter(Boolean);
 
   const onSave = async () => {
+    // Anchor relays are edited on the Trust page now — preserve whatever is
+    // currently configured so saving here doesn't wipe them.
     await saveNetConfig({
-      anchorRelays: clean(relayIds),
+      anchorRelays: getNetConfig().anchorRelays,
       seeds: clean(seedIds),
       apiUrl: (values.current.get("api") ?? "").trim(),
     });
@@ -101,25 +137,14 @@ export default function Preferences() {
   const onReset = () => {
     values.current.clear();
     values.current.set("api", DEFAULT_NET_CONFIG.apiUrl);
-    const rids = (DEFAULT_NET_CONFIG.anchorRelays.length
-      ? DEFAULT_NET_CONFIG.anchorRelays
-      : [""]
-    ).map(() => mk());
     const sids = (DEFAULT_NET_CONFIG.seeds.length ? DEFAULT_NET_CONFIG.seeds : [""]).map(
       () => mk(),
     );
-    rids.forEach((id, i) => values.current.set(id, DEFAULT_NET_CONFIG.anchorRelays[i] ?? ""));
     sids.forEach((id, i) => values.current.set(id, DEFAULT_NET_CONFIG.seeds[i] ?? ""));
-    setRelayIds(rids);
     setSeedIds(sids);
     setVer((v) => v + 1);
   };
 
-  const addRelay = () => {
-    const id = mk();
-    values.current.set(id, "");
-    setRelayIds((ids) => [...ids, id]);
-  };
   const addSeed = () => {
     const id = mk();
     values.current.set(id, "");
@@ -159,23 +184,27 @@ export default function Preferences() {
             </Picker>
           </FieldGroup.Section>
 
-          <FieldGroup.Section title="Anchor relays">
-            {relayIds.map((id, i) => (
-              <Field
-                key={`${ver}:${id}`}
-                initial={values.current.get(id) ?? ""}
-                placeholder="https://…"
-                onChangeText={set(id)}
-                onRemove={relayIds.length > 1 ? () => removeId(id, setRelayIds) : undefined}
-                removeColor={colors.danger}
-              />
-            ))}
+          <FieldGroup.Section title="Keystore">
             <ListItem
-              leading={<Icon name="plus.circle.fill" size={20} color={colors.textSecondary} />}
-              onPress={addRelay}
+              leading={<Icon name="square.and.arrow.down" size={22} color={colors.textSecondary} />}
+              trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
+              onPress={backupKeystore}
             >
-              <Text textStyle={{ color: colors.text }}>Add relay</Text>
+              <Text>Backup keystore</Text>
             </ListItem>
+            <ListItem
+              leading={<Icon name="eye" size={22} color={colors.textSecondary} />}
+              trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
+              onPress={() => router.push("/(main)/reveal-seed")}
+            >
+              <Text>Reveal seed phrase</Text>
+            </ListItem>
+            <FieldGroup.SectionFooter>
+              <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                Your keystore holds your public key and handles — never your private
+                key, which stays in secure storage.
+              </Text>
+            </FieldGroup.SectionFooter>
           </FieldGroup.Section>
 
           <FieldGroup.Section title="Certrelay seeds">
@@ -219,6 +248,36 @@ export default function Preferences() {
             >
               <Text textStyle={{ color: colors.danger }}>Reset to defaults</Text>
             </ListItem>
+          </FieldGroup.Section>
+
+          <FieldGroup.Section title="Developer">
+            <ListItem
+              leading={<Icon name="sparkles" size={22} color={colors.textSecondary} />}
+              trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
+              onPress={() => router.push("/(main)/onboarding-preview")}
+            >
+              <Text>Show onboarding</Text>
+            </ListItem>
+            <FieldGroup.SectionFooter>
+              <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                Previews the first-run screen without resetting the app.
+              </Text>
+            </FieldGroup.SectionFooter>
+          </FieldGroup.Section>
+
+          <FieldGroup.Section title="Danger zone">
+            <ListItem
+              leading={<Icon name="trash.fill" size={22} color={colors.danger} />}
+              onPress={confirmWipe}
+            >
+              <Text textStyle={{ color: colors.danger }}>Delete everything</Text>
+            </ListItem>
+            <FieldGroup.SectionFooter>
+              <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                Erases this keystore and all handles from this device, resetting the
+                app to onboarding. For testing.
+              </Text>
+            </FieldGroup.SectionFooter>
           </FieldGroup.Section>
         </FieldGroup>
       </Host>

@@ -10,7 +10,7 @@ import {
   Row,
   RNHostView,
 } from "@expo/ui";
-import { listRowBackground, listRowSeparator } from "@expo/ui/swift-ui/modifiers";
+import { listRowBackground, listRowSeparator } from "@/ui/rowModifiers";
 import { PlainList } from "@/ui/PlainList";
 import type { SFSymbol } from "sf-symbols-typescript";
 import { Colors, useTheme } from "@/theme";

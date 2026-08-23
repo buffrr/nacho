@@ -125,9 +125,12 @@ export default function ImportCertificate() {
       setError("invalidHandle");
       return;
     }
-    setHandleCertData(handle, certData).then(() =>
-      router.replace({ pathname: "/(main)/(tabs)/handles/show-handle", params: { handle } }),
-    );
+    setHandleCertData(handle, certData).then(() => {
+      // Re-root onto the Handles tab so Back returns to the list, not to this form.
+      if (router.canDismiss()) router.dismissAll();
+      router.navigate("/(main)/(tabs)/handles");
+      router.push({ pathname: "/(main)/(tabs)/handles/show-handle", params: { handle } });
+    });
   };
 
   return (

@@ -3,16 +3,26 @@
 // Fabric verifies handles against pinned anchors on a three-tier model:
 //   trusted      — pinned from a QR scanned off a *local* Veritas client (Safety
 //                  ID); yields the "orange" verified badge for sovereign handles.
-//   semi-trusted — an anchor fetched over HTTPS from public relays; avoids the
-//                  "unverified" classification without claiming full trust.
+//   semi-trusted — an anchor agreed by a pinned pool of relays that each SIGN
+//                  their (root, height). Fabric's loader fetches every relay,
+//                  verifies the signature against its pinned key, and pins only a
+//                  root that meets quorum; a transient miss keeps the good anchor.
 //   observed     — best-effort latest network state; "unverified".
 //
-// By default we pin a semi-trusted anchor from the same two relays the
-// spacesprotocol.org site uses, so resolution is meaningfully verified out of
-// the box without the user having to scan anything.
+// The default pool (DEFAULT_SEMI_TRUSTED) is a 3-of-4 majority of the production
+// relays, so resolution is signature-verified out of the box without the user
+// scanning anything. Power users can edit the pool + quorum from the Trust page.
 // Docs: https://spacesprotocol.org/docs/developers/sdk/
+import type {
+  SemiTrustedRelay,
+  Quorum,
+  SemiTrustConfig,
+  SemiTrustResult,
+} from "@spacesprotocol/fabric-core";
 import { kvGet, kvSet } from "@/db";
-import { activeAnchorRelays, networkTag } from "@/config";
+import { networkTag } from "@/config";
+
+export type { SemiTrustedRelay, Quorum, SemiTrustConfig, SemiTrustResult };
 
 export type TrustAnchor = { trustId: string; height: number | null };
 
@@ -22,7 +32,8 @@ export type TrustState = {
   observed: string | null;
 };
 
-// The subset of the Fabric client the trust helpers depend on.
+// The subset of the Fabric client the trust helpers depend on. The semi-trusted
+// tier is now driven entirely by the SDK's signed-pool loader.
 export interface TrustClient {
   semiTrust(trustId: string): Promise<void>;
   trust(trustId: string): Promise<void>;
@@ -32,6 +43,10 @@ export interface TrustClient {
   semiTrusted(): string | null;
   observed(): string | null;
   clearTrusted(): void;
+  // Signed semi-trusted pool loader (fabric ≥ 0.2.8).
+  refreshSemiTrusted(): Promise<SemiTrustResult>;
+  semiTrustedPool(): SemiTrustConfig;
+  setSemiTrustedPool(relays: SemiTrustedRelay[], quorum: Quorum): void;
 }
 
 // Adds Fabric's own state persistence (anchors + zone cache) on top.
@@ -88,36 +103,85 @@ export function parseTrustInput(
   return null;
 }
 
-// Fetch the current anchor (root hash + block height) from the relay pool,
-// trying each relay until one answers. Header names match the site's client.
-// The /anchors response is sent with `cache-control: max-age=300`, so we bypass
-// the HTTP cache (no-store + a cache-busting param) — otherwise "Refresh" keeps
-// returning the same stale anchor for up to 5 minutes.
-export async function fetchSemiTrustAnchor(): Promise<TrustAnchor | null> {
-  for (const url of activeAnchorRelays()) {
-    try {
-      const bust = `${url}${url.includes("?") ? "&" : "?"}_=${Date.now()}`;
-      const res = await fetch(bust, { method: "HEAD", cache: "no-store" });
-      const root = res.headers.get("x-anchor-root");
-      if (root) {
-        const h = res.headers.get("x-anchor-height");
-        return { trustId: root, height: h ? Number(h) : null };
-      }
-    } catch {
-      // try the next relay
+// ── Semi-trusted pool persistence (§4 of semi-trust.md) ──────────────────────
+// fabric.saveState() persists anchors + zone cache but NOT the pool config, so a
+// custom pool would revert to DEFAULT_SEMI_TRUSTED on reconstruction. We persist
+// it ourselves, namespaced by network like the rest of the trust state, and
+// re-apply it on startup BEFORE the first refresh.
+function poolKey(): string {
+  return `semi_trust_pool:${networkTag()}`;
+}
+
+export async function loadSemiTrustPool(client: TrustClient): Promise<void> {
+  try {
+    const raw = await kvGet(poolKey());
+    if (raw) {
+      const { relays, quorum } = JSON.parse(raw) as SemiTrustConfig;
+      client.setSemiTrustedPool(relays, quorum);
     }
+  } catch {
+    // keep the SDK default pool
   }
-  return null;
+}
+
+export async function saveSemiTrustPool(client: TrustClient): Promise<void> {
+  try {
+    await kvSet(poolKey(), JSON.stringify(client.semiTrustedPool()));
+  } catch {
+    // best-effort; the pool stays for the session either way
+  }
+}
+
+// Agreeing relays required for a quorum over a pool of size `n` — mirrors the
+// SDK so the settings UI can show "needs 3 of 4" before saving.
+export function quorumRequired(quorum: Quorum, n: number): number {
+  if (quorum === "all") return n;
+  if (quorum === "majority") return Math.floor(n / 2) + 1;
+  return Math.max(1, Math.min(n, quorum.atLeast));
+}
+
+// Trust-on-first-use pubkey discovery for an "Add source" flow: the anchors
+// endpoint advertises its signing key in the `X-Anchor-Pubkey` header (the same
+// header fabric reads when verifying), so we HEAD it directly. We do NOT hit
+// `/stats` — that's a full-certrelay endpoint an anchors-only server may not
+// serve. This is NOT out-of-band pinning; the UI shows the key to verify.
+export async function fetchRelayPubkey(url: string): Promise<string | null> {
+  try {
+    const base = url.replace(/\/+$/, "").replace(/\/anchors$/, "");
+    const res = await fetch(`${base}/anchors`, { method: "HEAD", cache: "no-store" });
+    const pk = (res.headers.get("x-anchor-pubkey") ?? "").toLowerCase();
+    return /^[0-9a-f]{64}$/.test(pk) ? pk : null;
+  } catch {
+    return null;
+  }
 }
 
 let cachedAnchor: TrustAnchor | null = null;
 let semiTrustPromise: Promise<TrustAnchor | null> | null = null;
 
-// Refresh the semi-trusted anchor to the current relay tip once per session.
-// This runs even when a trusted (Safety ID) anchor was restored — semiTrust()
-// only touches the semi tier, so the trusted anchor is left intact while the
-// semi one tracks the latest tip. `onPinned` (optional) fires after a re-pin so
-// callers can persist the updated state.
+// Run the SDK's signed-pool loader: fetch every relay, verify signatures, and
+// pin the quorum root. Updates our display cache and (only on a re-pin) fires
+// `onPinned` to persist. Returns the vote breakdown for UI feedback. On a
+// quorum-miss the SDK keeps the existing anchor, so we never clear a good one.
+export async function refreshSemiTrustNow(
+  client: TrustClient,
+  onPinned?: () => Promise<void>,
+): Promise<SemiTrustResult> {
+  const r = await client.refreshSemiTrusted();
+  if (r.quorumMet && r.trustId) {
+    cachedAnchor = { trustId: r.trustId, height: r.height };
+    await onPinned?.();
+  } else if (!cachedAnchor) {
+    // Nothing repinned this run — fall back to whatever is already pinned.
+    const id = client.semiTrusted() ?? client.trusted() ?? client.observed();
+    if (id) cachedAnchor = { trustId: id, height: null };
+  }
+  return r;
+}
+
+// Refresh the semi-trusted anchor once per session (memoized). Runs even when a
+// trusted Safety ID was restored — the semi tier is independent, so the trusted
+// anchor is left intact while the semi one tracks the tip.
 export function applyDefaultSemiTrust(
   client: TrustClient,
   onPinned?: () => Promise<void>,
@@ -125,26 +189,59 @@ export function applyDefaultSemiTrust(
   if (!semiTrustPromise) {
     semiTrustPromise = (async () => {
       try {
-        const anchor = await fetchSemiTrustAnchor();
-        if (anchor) {
-          // Only re-pin (and persist) when the tip actually moved.
-          if (client.semiTrusted() !== anchor.trustId) {
-            await client.semiTrust(anchor.trustId);
-            await onPinned?.();
-          }
-          cachedAnchor = anchor;
-        }
+        await refreshSemiTrustNow(client, onPinned);
       } catch {
         // leave semi as-is; resolution still works with whatever is pinned
-      }
-      if (!cachedAnchor) {
-        const id = client.semiTrusted() ?? client.trusted() ?? client.observed();
-        if (id) cachedAnchor = { trustId: id, height: null };
+        if (!cachedAnchor) {
+          const id = client.semiTrusted() ?? client.trusted() ?? client.observed();
+          if (id) cachedAnchor = { trustId: id, height: null };
+        }
       }
       return cachedAnchor;
     })();
   }
   return semiTrustPromise;
+}
+
+// ── Disabling the fallback tier ──────────────────────────────────────────────
+// fabric ≤ 0.2.8 has no clearSemiTrusted(), and the semi anchor is persisted
+// under anchors.semi_trusted, so a plain rebuild would restore it. To truly turn
+// the fallback off we (a) record a flag that makes init skip the loader, and
+// (b) strip the pinned semi anchor out of the saved state. The caller rebuilds
+// the client afterwards so the in-memory anchor is dropped too.
+function semiDisabledKey(): string {
+  return `semi_trust_disabled:${networkTag()}`;
+}
+
+export async function isSemiTrustDisabled(): Promise<boolean> {
+  try {
+    return (await kvGet(semiDisabledKey())) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export async function setSemiTrustDisabled(
+  client: PersistableTrustClient,
+  disabled: boolean,
+): Promise<void> {
+  try {
+    await kvSet(semiDisabledKey(), disabled ? "1" : "0");
+  } catch {
+    // flag is best-effort
+  }
+  if (disabled) {
+    try {
+      const obj = JSON.parse(client.saveState()) as {
+        anchors?: { semi_trusted?: unknown[] };
+      };
+      if (obj.anchors) obj.anchors.semi_trusted = [];
+      await kvSet(stateKey(), JSON.stringify(obj));
+    } catch {
+      // if we can't strip it, the flag still prevents re-pinning on refresh
+    }
+    cachedAnchor = null;
+  }
 }
 
 export function trustStateOf(client: TrustClient): TrustState {

@@ -1,10 +1,12 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { View, StyleSheet, Text } from "react-native";
 import { useRouter } from "expo-router";
 import { Button } from "@/ui/Button";
 import { Layout } from "@/ui/Layout";
-import { AtbitcoinLogo } from "@/ui/AtbitcoinLogo";
-import { SvgXml } from "react-native-svg";
+import Svg, { SvgXml, Defs, RadialGradient, Stop, Rect } from "react-native-svg";
+import { Link, KeyRound } from "@/ui/icons";
+import { useStore } from "@/Store";
+import { generateMnemonic, xprvFromMnemonic } from "@/keys";
 import { Colors, useTheme } from "@/theme";
 
 
@@ -41,37 +43,100 @@ const LIGHT_LOGO = `<svg width="245" height="140" viewBox="0 0 245 140" fill="no
 </defs>
 </svg>`;
 
-export default function () {
+// A single warm radial wash from the top, behind everything (onboard.html "The
+// glow"): brand orange at 10% fading to transparent by ~68% of the radius. A
+// gradient, not glass — glass has nothing to sample on a near-black screen and
+// degrades badly below iOS 26 / on Android. Non-interactive, doesn't scroll.
+function Glow() {
+  return (
+    <Svg pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <RadialGradient id="onboardGlow" cx="50%" cy="4%" rx="78%" ry="52%">
+          <Stop offset="0" stopColor="#FF7B00" stopOpacity={0.1} />
+          <Stop offset="0.68" stopColor="#FF7B00" stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill="url(#onboardGlow)" />
+    </Svg>
+  );
+}
+
+// `preview` renders the exact screen for design review (from Settings) without
+// side effects — the buttons just dismiss instead of creating/restoring a
+// keystore, so it's safe to open while already configured.
+export default function Home({ preview = false }: { preview?: boolean }) {
   const router = useRouter();
   const { colors, scheme } = useTheme();
+  const { setupKeystore } = useStore();
+  const [creating, setCreating] = useState(false);
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const logoXml = scheme === "light" ? LIGHT_LOGO : DARK_LOGO;
+
+  // "Get started" creates the keystore silently — no seed-phrase reveal/confirm
+  // step. The seed is generated and stored securely (revealable + backup-able
+  // later from Settings); we nudge the user to back it up after the fact to keep
+  // onboarding frictionless. The root gate flips to the main app once
+  // isConfigured is true.
+  const createKeystore = async () => {
+    setCreating(true);
+    await new Promise((r) => setTimeout(r, 5));
+    const phrase = generateMnemonic();
+    await setupKeystore(xprvFromMnemonic(phrase), {}, phrase);
+  };
+
+  const bullet = (icon: React.ReactNode, text: string) => (
+    <View style={styles.bullet}>
+      <View style={styles.bulletIcon}>{icon}</View>
+      <Text style={styles.bulletText}>{text}</Text>
+    </View>
+  );
+
   return (
     <Layout
       scrollable={false}
       footer={
         <>
           <Button
-            text="Create a new keystore"
-            onPress={() => router.push("/(onboarding)/show-mnemonic")}
+            text={creating ? "Creating…" : "Get started"}
+            onPress={preview ? () => router.back() : createKeystore}
             type="main"
+            disabled={creating}
           />
           <Button
             text="Restore from backup"
-            onPress={() => router.push("/(onboarding)/import-keystore")}
+            onPress={
+              preview
+                ? () => router.back()
+                : () => router.push("/(onboarding)/import-keystore")
+            }
             type="secondary"
+            disabled={creating}
           />
         </>
       }
     >
-      <View style={styles.content}>
-        <SvgXml xml={logoXml} width={280} height={160} />
-        <View style={styles.headerContainer}>
-          <View style={styles.ownRow}>
-            <Text style={styles.ownText}>Own </Text>
-            <AtbitcoinLogo height={20} />
-          </View>
-          <Text style={styles.tagline}>Self-custodial handles for Bitcoin.</Text>
+      <Glow />
+      {/* Logo centred in its own half — equal flexible space above and below so
+          the gap to the top edge matches the gap down to the headline. */}
+      <View style={styles.spacer} />
+      <SvgXml xml={logoXml} width={152} height={87} style={styles.logo} />
+      <View style={styles.spacer} />
+
+
+      {/* Bottom-weighted, left-aligned copy: three tiers (headline / lede /
+          bullets), sat near the thumb where the buttons are. */}
+      <View style={styles.block}>
+        <Text style={styles.headline}>One handle for{"\n"}the whole internet</Text>
+        <Text style={styles.lede}>Yours to keep, forever.</Text>
+        <View style={styles.bullets}>
+          {bullet(
+            <Link size={18} color={colors.textMuted} />,
+            "For your socials, your keys and getting paid.",
+          )}
+          {bullet(
+            <KeyRound size={18} color={colors.textMuted} />,
+            "Can't be suspended or closed. Not even by us.",
+          )}
         </View>
       </View>
     </Layout>
@@ -80,29 +145,48 @@ export default function () {
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    content: {
+    spacer: {
       flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
     },
-    headerContainer: {
-      alignItems: "center",
-      marginBottom: 48,
+    logo: {
+      alignSelf: "center",
     },
-    ownRow: {
-      flexDirection: "row",
-      justifyContent: "center",
-      alignItems: "center",
+    block: {
+      alignItems: "flex-start",
+      paddingBottom: 4,
     },
-    ownText: {
-      fontSize: 20,
-      fontWeight: "400",
+    headline: {
+      fontSize: 30,
+      fontWeight: "700",
       color: c.text,
+      letterSpacing: -0.8,
+      lineHeight: 34,
     },
-    tagline: {
-      fontSize: 15,
+    lede: {
+      fontSize: 16,
       color: c.textSecondary,
-      marginTop: 14,
-      textAlign: "center",
+      marginTop: 12,
+      lineHeight: 22,
+    },
+    bullets: {
+      marginTop: 28,
+      alignSelf: "stretch",
+    },
+    bullet: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 11,
+      paddingVertical: 5,
+    },
+    bulletIcon: {
+      width: 20,
+      alignItems: "center",
+      marginTop: 2,
+    },
+    bulletText: {
+      flex: 1,
+      fontSize: 14,
+      color: c.textMuted,
+      lineHeight: 20,
     },
   });

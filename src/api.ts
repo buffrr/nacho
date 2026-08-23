@@ -238,7 +238,9 @@ export async function reserveHandle(
       handle_status: HandleStatus;
       product_id: string;
     }
-  | { error: string }
+  // errorKind: "network" (fetch threw or 5xx — retryable) vs "server" (the
+  // server durably rejected the request). See claimHandleIAP for the rationale.
+  | { error: string; errorKind: "network" | "server" }
 > {
   try {
     const response = await fetch(`${activeApiUrl()}/reserve`, {
@@ -253,23 +255,31 @@ export async function reserveHandle(
       }),
     });
 
+    // 5xx = server didn't durably process it; retryable, treat as a transport miss.
+    if (response.status >= 500) {
+      return { error: `Server error (${response.status})`, errorKind: "network" };
+    }
     if (!response.ok) {
-      const text = await response.text();
-      return { error: text.trim() };
+      const text = await response.text().catch(() => "");
+      return {
+        error: text.trim() || `Request failed (${response.status})`,
+        errorKind: "server",
+      };
     }
 
-    const data = await response.json();
+    const data = await response.json().catch(() => null);
     if (
+      !data ||
       typeof data.deadline !== "number" ||
       !isHandleStatus(data.handle_status) ||
       typeof data.product_id !== "string"
     ) {
-      throw new Error("Invalid API response");
+      return { error: "Invalid response from server", errorKind: "server" };
     }
     return data;
   } catch (error) {
     console.error("Failed to reserve handle:", error);
-    return { error: "Network error" };
+    return { error: "Network error", errorKind: "network" };
   }
 }
 
@@ -281,6 +291,12 @@ export async function claimHandleIAP(
 ): Promise<{
   handle_status: HandleStatus;
   error?: string;
+  // Distinguishes a server that DURABLY saw the receipt ("server" — even if it
+  // rejected the claim) from a transport failure ("network" — request may not
+  // have landed). The caller finishes the StoreKit transaction on success or a
+  // "server" error, and ONLY leaves it queued to retry on a "network" error.
+  // Undefined on success.
+  errorKind?: "network" | "server";
 }> {
   try {
     const response = await fetch(`${activeApiUrl()}/claim`, {
@@ -296,27 +312,49 @@ export async function claimHandleIAP(
       }),
     });
 
-    const data = await response.json();
-    if (
-      !isHandleStatus(data.handle_status) ||
-      (data.error !== undefined && typeof data.error !== "string")
-    ) {
-      throw new Error("Invalid API response");
+    // 5xx = the server didn't durably process this; safe to retry, so treat it
+    // like a transport failure and DON'T finish the transaction.
+    if (response.status >= 500) {
+      return {
+        handle_status: { handle, status: "unknown" },
+        error: `Server error (${response.status})`,
+        errorKind: "network",
+      };
     }
 
-    return data;
+    const data = await response.json().catch(() => null);
+    if (
+      data &&
+      isHandleStatus(data.handle_status) &&
+      (data.error === undefined || typeof data.error === "string")
+    ) {
+      // Well-formed response: success, or a terminal server rejection (error set).
+      return { ...data, errorKind: data.error ? "server" : undefined };
+    }
+
+    // The server responded (non-5xx) but with an unusable body — it still saw the
+    // receipt, so this is a durable "server" outcome, not a retryable one.
+    return {
+      handle_status: { handle, status: "unknown" },
+      error: "Invalid response from server",
+      errorKind: "server",
+    };
   } catch (error) {
+    // fetch itself threw — the request may never have reached the server.
     console.error("Failed to claim handle:", error);
     return {
       handle_status: { handle, status: "unknown" },
       error: "Network error",
+      errorKind: "network",
     };
   }
 }
 
 export type ClaimCodeResult =
   | { ok: true; handle: string; status: string }
-  | { ok: false; error: string; httpStatus: number };
+  // errorKind: "network" (fetch threw or 5xx — retryable) vs "server" (durable
+  // rejection). httpStatus is 0 when the request never got a response.
+  | { ok: false; error: string; httpStatus: number; errorKind: "network" | "server" };
 
 // Web-purchase redemption: bind our key to a handle the buyer already paid for
 // on the web, using a claim code (URL token or short code). Returns the handle
@@ -343,9 +381,11 @@ export async function claimCode(
       ok: false,
       error: typeof data.error === "string" ? data.error : "Failed to redeem code",
       httpStatus: response.status,
+      // 5xx is retryable; a 4xx (e.g. 402/409) is a durable server rejection.
+      errorKind: response.status >= 500 ? "network" : "server",
     };
   } catch (error) {
     console.error("Failed to redeem claim code:", error);
-    return { ok: false, error: "Network error", httpStatus: 0 };
+    return { ok: false, error: "Network error", httpStatus: 0, errorKind: "network" };
   }
 }

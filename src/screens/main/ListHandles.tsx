@@ -8,7 +8,7 @@ import {
   Row,
   RNHostView,
 } from "@expo/ui";
-import { listRowBackground, listRowSeparator } from "@expo/ui/swift-ui/modifiers";
+import { listRowBackground, listRowSeparator } from "@/ui/rowModifiers";
 import { PlainList } from "@/ui/PlainList";
 import { HandleData, useStore } from "@/Store";
 import { useTheme } from "@/theme";
@@ -26,7 +26,7 @@ import type { SFSymbol } from "sf-symbols-typescript";
 // into the centred nav-bar title as the list scrolls (Messages/Settings style).
 export default function ListHandles() {
   const router = useRouter();
-  const { handles, xpub, setHandleResolution } = useStore();
+  const { handles, xpub, setHandleResolution, seedBackedUp } = useStore();
   const { colors, scheme } = useTheme();
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [, setRefreshing] = useState(false);
@@ -37,6 +37,14 @@ export default function ListHandles() {
   const handlesList = q
     ? allHandles.filter(([name]) => name.toLowerCase().includes(q))
     : allHandles;
+
+  // Nudge the user to back up their seed once they own a handle they can actually
+  // control (has a certificate) — not before, to keep onboarding frictionless.
+  // Dismissed for good once they confirm on the reveal screen. Hidden while filtering.
+  const needsBackup =
+    !seedBackedUp &&
+    !q &&
+    allHandles.some(([, d]) => !!(d.certRef || d.cert));
 
   // Pull-to-refresh: EXPLICITLY refresh the semi-trusted anchor (the only place we
   // re-fetch it — never automatically), then re-resolve each handle so the tiles'
@@ -166,11 +174,12 @@ export default function ListHandles() {
   // The first row also hides its TOP separator — a plain-style List draws a
   // hairline above the first cell, which reads as a stray divider under the header.
   const rowBg = [listRowBackground(colors.background)];
-  // First row hides its top separator; while filtering (no Shop row) the last
-  // handle hides its bottom separator so the list doesn't trail off with a divider.
+  // First row hides its top separator (unless the backup banner is that first
+  // row); while filtering (no Shop row) the last handle hides its bottom separator
+  // so the list doesn't trail off with a divider.
   const rowMods = (i: number) => {
     const m = [...rowBg];
-    if (i === 0) m.push(listRowSeparator("hidden", "top"));
+    if (i === 0 && !needsBackup) m.push(listRowSeparator("hidden", "top"));
     if (q && i === handlesList.length - 1) m.push(listRowSeparator("hidden", "bottom"));
     return m;
   };
@@ -180,6 +189,21 @@ export default function ListHandles() {
       {searchScreen}
       <Host style={{ flex: 1 }} colorScheme={scheme}>
       <PlainList onRefresh={onRefresh}>
+        {needsBackup ? (
+          <ListItem
+            modifiers={[...rowBg, listRowSeparator("hidden", "top")]}
+            leading={
+              <Icon name="exclamationmark.shield.fill" size={26} color={colors.statusAmberFg} />
+            }
+            supportingText="Save your recovery phrase so you can't lose your handles."
+            trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
+            onPress={() => router.push("/(main)/reveal-seed")}
+          >
+            <UIText textStyle={{ fontSize: 17, fontWeight: "600" }}>
+              Back up your seed phrase
+            </UIText>
+          </ListItem>
+        ) : null}
         {handlesList.map(([name, handleData], i) => {
           const info = infoFor(name, handleData);
           const glyph = glyphFor(info);

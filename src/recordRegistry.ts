@@ -23,13 +23,20 @@ import {
   Globe,
   FileText,
   Hash,
+  XTwitter,
+  Instagram,
+  Mastodon,
+  Telegram,
+  Discord,
+  Github,
+  Mail,
   IconProps,
 } from "@/ui/icons";
 import { RecordTier } from "@/recordTiers";
 
 export type { RecordTier };
 export type RecordAction = "copy" | "open";
-export type RecordGroup = "payments" | "identity" | "general";
+export type RecordGroup = "payments" | "identity" | "socials" | "general";
 
 // One slot in a key's value list. SIP-7 stores an ordered, unlabelled string
 // list per key; the registry names the slots so the editor can build the right
@@ -88,6 +95,15 @@ const REGISTRY: RecordDef[] = [
   { rtype: "addr", key: "age", label: "age key", Icon: Lock, color: GREY, tier: "identity", action: "copy", group: "identity", slots: ONE("Recipient", "age1…") },
   { rtype: "addr", key: "did", label: "DID", Icon: Key, color: GREY, tier: "identity", action: "copy", group: "identity", slots: ONE("DID", "did:…") },
 
+  // ── Socials — profiles on other services (a wrong one is impersonation) ────
+  { rtype: "txt", key: "x", label: "X", Icon: XTwitter, color: GREY, tier: "identity", action: "open", group: "socials", slots: ONE("Username or URL", "@handle") },
+  { rtype: "txt", key: "instagram", label: "Instagram", Icon: Instagram, color: "#E1306C", tier: "identity", action: "open", group: "socials", slots: ONE("Username", "@handle") },
+  { rtype: "txt", key: "mastodon", label: "Mastodon", Icon: Mastodon, color: "#6364FF", tier: "identity", action: "open", group: "socials", slots: ONE("Address", "@user@server") },
+  { rtype: "txt", key: "telegram", label: "Telegram", Icon: Telegram, color: "#229ED9", tier: "identity", action: "open", group: "socials", slots: ONE("Username", "@handle") },
+  { rtype: "txt", key: "discord", label: "Discord", Icon: Discord, color: "#5865F2", tier: "identity", action: "copy", group: "socials", slots: ONE("Username") },
+  { rtype: "txt", key: "github", label: "GitHub", Icon: Github, color: GREY, tier: "identity", action: "open", group: "socials", slots: ONE("Username") },
+  { rtype: "txt", key: "email", label: "Email", Icon: Mail, color: BLUE, tier: "identity", action: "copy", group: "socials", slots: ONE("Address", "you@example.com") },
+
   // ── General — pointers and free text ──────────────────────────────────────
   { rtype: "txt", key: "website", label: "Website", Icon: Globe, color: BLUE, tier: "generic", action: "open", group: "general", slots: ONE("URL", "https://…") },
   { rtype: "txt", key: "note", label: "Note", Icon: FileText, color: GREY, tier: "generic", action: "copy", group: "general", slots: [{ label: "Text", multi: true }] },
@@ -109,6 +125,11 @@ const ALIASES: Record<string, string> = {
   npub: "nostr",
   url: "website",
   web: "website",
+  twitter: "x",
+  ig: "instagram",
+  tg: "telegram",
+  gh: "github",
+  mail: "email",
 };
 
 const byKey = new Map<string, RecordDef>();
@@ -151,6 +172,7 @@ export function registryGroups(): Record<RecordGroup, RecordDef[]> {
   const out: Record<RecordGroup, RecordDef[]> = {
     payments: [],
     identity: [],
+    socials: [],
     general: [],
   };
   for (const def of REGISTRY) out[def.group].push(def);
@@ -159,6 +181,42 @@ export function registryGroups(): Record<RecordGroup, RecordDef[]> {
 
 export function allRecordDefs(): RecordDef[] {
   return REGISTRY;
+}
+
+// The openable URL for a record whose primary action is "open". Social handles
+// are stored bare (e.g. `@alice`), so we build the profile URL per service;
+// website/tor values are already URLs (we just ensure a scheme). Returns null
+// when there's nothing sensible to open (e.g. a Nostr npub, a Discord username),
+// in which case the caller falls back to copy.
+export function recordLink(def: RecordDef, raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return null;
+  const isUrl = /^[a-z][a-z0-9+.-]*:\/\//i.test(v);
+  const handle = v.replace(/^@+/, "");
+  switch (def.key) {
+    case "x":
+      return isUrl ? v : `https://x.com/${handle}`;
+    case "instagram":
+      return isUrl ? v : `https://instagram.com/${handle}`;
+    case "telegram":
+      return isUrl ? v : `https://t.me/${handle}`;
+    case "github":
+      return isUrl ? v : `https://github.com/${handle}`;
+    case "mastodon": {
+      // `@user@server` (or `user@server`) → https://server/@user
+      if (isUrl) return v;
+      const parts = v.replace(/^@/, "").split("@");
+      return parts.length === 2 && parts[0] && parts[1]
+        ? `https://${parts[1]}/@${parts[0]}`
+        : null;
+    }
+    case "website":
+    case "tor":
+      return isUrl ? v : `https://${v}`;
+    default:
+      // Unknown "open" record: open it only if it's already a URL.
+      return isUrl ? v : null;
+  }
 }
 
 // ── Derived `bitcoin:` URI (mocks2 §01 "handoff, not copy") ─────────────────

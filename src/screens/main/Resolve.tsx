@@ -6,8 +6,12 @@ import {
   useFocusEffect,
 } from "expo-router";
 import { useTheme } from "@/theme";
-import { resolveHandle } from "@/fabric";
-import { ResolvedHandle } from "@/fabricResolver";
+import { resolveHandle, refreshSemiTrust } from "@/fabric";
+import {
+  ResolvedHandle,
+  verifyErrorMessage,
+  isStaleAnchorError,
+} from "@/fabricResolver";
 import { recordResolve } from "@/resolveHistory";
 import { ResolvedProfileNative, recordCountOf } from "@/ui/handleProfileNative";
 import { NativeEmpty } from "@/ui/nativeEmpty";
@@ -22,6 +26,8 @@ export default function Resolve() {
   const [result, setResult] = useState<ResolvedHandle | null>(null);
   const [notFound, setNotFound] = useState<string | null>(null);
   const [error, setError] = useState<"network" | "verify" | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [staleAnchor, setStaleAnchor] = useState(false);
 
   const phase: "idle" | "loading" | "result" | "notfound" | "error" = pending
     ? "loading"
@@ -59,13 +65,22 @@ export default function Resolve() {
       // Distinguish "no relay answered" from "answered but failed to verify" by
       // the error text; a non-existent space stays in the verify bucket rather
       // than being mislabelled not-found (which would hide real tampering).
-      const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+      const raw = e instanceof Error ? e.message : String(e);
       const network =
-        /no peers|http error|relay error|network|timed out|fetch|econn/.test(msg);
+        /no peers|http error|relay error|network|timed out|fetch|econn/.test(raw.toLowerCase());
       setError(network ? "network" : "verify");
+      setErrorMsg(verifyErrorMessage(e));
+      setStaleAnchor(isStaleAnchorError(e));
     } finally {
       setPending(null);
     }
+  };
+
+  // Stale-anchor recovery: re-pin the semi-trusted anchor to the current tip,
+  // then resolve again.
+  const refreshAndRetry = async () => {
+    await refreshSemiTrust().catch(() => {});
+    onResolve(handle);
   };
 
   const { prefill } = useLocalSearchParams<{ prefill?: string }>();
@@ -201,8 +216,12 @@ export default function Resolve() {
           sf="exclamationmark.shield.fill"
           iconColor={colors.accent}
           title={handle || "This handle"}
-          message="Couldn’t verify against a trust anchor, so records are hidden."
-          primary={{ label: "Try again", onPress: () => onResolve(handle) }}
+          message={errorMsg ?? "Couldn’t verify against a trust anchor, so records are hidden."}
+          primary={
+            staleAnchor
+              ? { label: "Refresh & try again", onPress: refreshAndRetry }
+              : { label: "Try again", onPress: () => onResolve(handle) }
+          }
           secondary={{ label: "Trust settings", onPress: () => router.push("/(main)/trust") }}
         />
       )}

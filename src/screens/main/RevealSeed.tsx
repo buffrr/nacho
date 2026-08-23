@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useRouter } from "expo-router";
 import { Host, FieldGroup, ListItem, Icon, Text } from "@expo/ui";
 import { useStore } from "@/Store";
 import { useTheme } from "@/theme";
@@ -6,7 +7,8 @@ import { NativeEmpty } from "@/ui/nativeEmpty";
 import { ActionFooter } from "@/ui/actionFooter";
 
 export default function RevealSeed() {
-  const { getMnemonic } = useStore();
+  const router = useRouter();
+  const { getMnemonic, seedBackedUp, markSeedBackedUp } = useStore();
   const { scheme, colors } = useTheme();
   const [words, setWords] = useState<string[] | null>(null);
   const [revealed, setRevealed] = useState(false);
@@ -79,6 +81,18 @@ export default function RevealSeed() {
             label: "Reveal seed phrase",
             onPress: () => setRevealed(true),
             disabled: words === null,
+          }}
+        />
+      ) : !seedBackedUp && words && words.length > 0 ? (
+        // Once revealed, let them confirm they've backed it up — this dismisses
+        // the backup nudge for good.
+        <ActionFooter
+          primary={{
+            label: "I’ve backed it up",
+            onPress: async () => {
+              await markSeedBackedUp();
+              router.back();
+            },
           }}
         />
       ) : null}

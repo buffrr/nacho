@@ -5,7 +5,7 @@ import {
   listRowSeparator,
   controlSize,
   tint,
-} from "@expo/ui/swift-ui/modifiers";
+} from "@/ui/rowModifiers";
 import { PlainList } from "@/ui/PlainList";
 import { useStore } from "@/Store";
 import { useTheme } from "@/theme";

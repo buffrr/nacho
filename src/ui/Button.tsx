@@ -95,10 +95,12 @@ const makeStyles = (c: Colors) =>
       backgroundColor: "transparent",
     },
     secondaryButtonText: {
-      color: c.accent,
+      // Muted, not accent — reserves orange for the primary CTA so a screen has
+      // one clear main action.
+      color: c.textSecondary,
     },
     secondaryButtonTextDisabled: {
-      color: c.accentMuted,
+      color: c.textMuted,
     },
     dangerButton: {
       backgroundColor: c.dangerBg,

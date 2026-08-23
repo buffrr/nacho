@@ -107,7 +107,11 @@ export default function CreateRequest() {
     }
     try {
       await createHandle(handle);
-      router.replace({ pathname: "/(main)/(tabs)/handles/show-handle", params: { handle } });
+      // Re-root onto the Handles tab so the handle sits on the list (Back → Handles),
+      // not stranded on top of the register-hub modal with nothing beneath it.
+      if (router.canDismiss()) router.dismissAll();
+      router.navigate("/(main)/(tabs)/handles");
+      router.push({ pathname: "/(main)/(tabs)/handles/show-handle", params: { handle } });
     } catch (err) {
       setIsLoading(false);
       throw err;

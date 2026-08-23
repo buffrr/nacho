@@ -3,7 +3,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Host, FieldGroup, ListItem, Icon, Text } from "@expo/ui";
 import { useTheme } from "@/theme";
 import { registryGroups, RecordDef, RecordGroup } from "@/recordRegistry";
-import { sfFor } from "@/ui/handleProfileNative";
+import { RecordGlyph } from "@/ui/handleProfileNative";
 
 // Add a record — pick what it's FOR, not a key string (the registry supplies
 // rtype + key). Native @expo/ui grouped sections, plus a native search bar to
@@ -12,9 +12,10 @@ import { sfFor } from "@/ui/handleProfileNative";
 const GROUP_TITLES: Record<RecordGroup, string> = {
   payments: "Payments",
   identity: "Identity",
+  socials: "Socials",
   general: "General",
 };
-const GROUP_ORDER: RecordGroup[] = ["payments", "identity", "general"];
+const GROUP_ORDER: RecordGroup[] = ["payments", "identity", "socials", "general"];
 
 export default function AddRecord() {
   const router = useRouter();
@@ -47,8 +48,9 @@ export default function AddRecord() {
   const row = (d: RecordDef) => (
     <ListItem
       key={`${d.rtype}:${d.key}`}
-      leading={<Icon name={sfFor(d.key)} size={22} color={d.color} />}
-      supportingText={`${d.rtype} · ${d.key}`}
+      leading={<RecordGlyph def={d} size={28} color={d.color} />}
+      // Label only — "Bitcoin address" says it all. Any qualifier ("BOLT 12")
+      // is visible on the record's own screen once picked.
       trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
       onPress={() => pick(d)}
     >

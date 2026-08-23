@@ -27,14 +27,6 @@ export function appMenuLeftItems(tint: string): NativeStackHeaderItem[] {
             icon: { type: "sfSymbol", name: "gearshape" },
             onPress: () => router.push("/(main)/preferences"),
           },
-          {
-            // TEMP: preview of the handle view built with native SwiftUI forms
-            // (@expo/ui) — remove once we've decided on the approach.
-            type: "action",
-            label: "Native preview (demo)",
-            icon: { type: "sfSymbol", name: "square.stack.3d.up" },
-            onPress: () => router.push("/(main)/native-demo"),
-          },
         ],
       },
     },

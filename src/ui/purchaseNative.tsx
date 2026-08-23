@@ -1,4 +1,5 @@
 import React from "react";
+import { WEB_TOP_INSET } from "@/ui/webInset";
 import {
   Host,
   FieldGroup,
@@ -39,12 +40,12 @@ export function PurchaseNative({
   const priceText = price !== null ? formatPrice(price) : "—";
   return (
     <>
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={{ flex: 1, paddingTop: WEB_TOP_INSET }} colorScheme={scheme}>
       <FieldGroup>
         <FieldGroup.Section>
           <FieldGroup.SectionHeader>
             <Row alignment="center">
-              <Spacer />
+              <Spacer flexible />
               <Column alignment="center" spacing={8} style={{ paddingTop: 10, paddingBottom: 14 }}>
                 <RNHostView matchContents style={{ width: 72, height: 72 }}>
                   <Avatar handle={handle} size={72} />
@@ -57,7 +58,7 @@ export function PurchaseNative({
                   </Text>
                 </Row>
               </Column>
-              <Spacer />
+              <Spacer flexible />
             </Row>
           </FieldGroup.SectionHeader>
           <ListItem leading={<Icon name="infinity" size={22} color={colors.text} />}>

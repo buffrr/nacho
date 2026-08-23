@@ -1,8 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useTheme } from "@/theme";
-import { resolveHandle } from "@/fabric";
-import { ResolvedHandle } from "@/fabricResolver";
+import { resolveHandle, refreshSemiTrust } from "@/fabric";
+import {
+  ResolvedHandle,
+  verifyErrorMessage,
+  isStaleAnchorError,
+} from "@/fabricResolver";
 import { recordResolve } from "@/resolveHistory";
 import { ResolvedProfileNative, recordCountOf } from "@/ui/handleProfileNative";
 import { NativeEmpty } from "@/ui/nativeEmpty";
@@ -21,6 +25,8 @@ export default function HandleView() {
   const [result, setResult] = useState<ResolvedHandle | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<"network" | "verify" | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [staleAnchor, setStaleAnchor] = useState(false);
 
   const run = useCallback(async () => {
     if (!name) return;
@@ -42,10 +48,12 @@ export default function HandleView() {
         setNotFound(true);
       }
     } catch (e) {
-      const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+      const raw = e instanceof Error ? e.message : String(e);
       const network =
-        /no peers|http error|relay error|network|timed out|fetch|econn/.test(msg);
+        /no peers|http error|relay error|network|timed out|fetch|econn/.test(raw.toLowerCase());
       setError(network ? "network" : "verify");
+      setErrorMsg(verifyErrorMessage(e));
+      setStaleAnchor(isStaleAnchorError(e));
     } finally {
       setPending(false);
     }
@@ -54,6 +62,12 @@ export default function HandleView() {
   useEffect(() => {
     void run();
   }, [run]);
+
+  // Stale-anchor recovery: re-pin the semi-trusted anchor to the tip, then retry.
+  const refreshAndRetry = async () => {
+    await refreshSemiTrust().catch(() => {});
+    void run();
+  };
 
   // Handle shown big under the avatar, so the bar carries no title.
   const screen = <Stack.Screen options={{ title: "" }} />;
@@ -102,8 +116,12 @@ export default function HandleView() {
           sf="exclamationmark.shield.fill"
           iconColor={colors.accent}
           title={name || "This handle"}
-          message="Couldn’t verify against a trust anchor, so records are hidden."
-          primary={{ label: "Try again", onPress: run }}
+          message={errorMsg ?? "Couldn’t verify against a trust anchor, so records are hidden."}
+          primary={
+            staleAnchor
+              ? { label: "Refresh & try again", onPress: refreshAndRetry }
+              : { label: "Try again", onPress: run }
+          }
           secondary={{ label: "Trust settings", onPress: () => router.push("/(main)/trust") }}
         />
       )}

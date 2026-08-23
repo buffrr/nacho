@@ -5,7 +5,7 @@ import React, {
   useState,
   ReactNode,
 } from "react";
-import { useColorScheme, Appearance } from "react-native";
+import { useColorScheme, Appearance, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Semantic color tokens mirroring the Nacho v2 Figma variable system.
@@ -82,7 +82,7 @@ export const darkColors: Colors = {
   placeholder: "#80808A",
   iconDefault: "#B2B2BD",
   chevron: "#5E5E68",
-  accentText: "#FFFFFF",
+  accentText: "#000000",
   border: "#303037",
   // Formerly a warm amber divider; neutralised to the standard border so cards
   // and forms read native rather than "highlighted". Kept as an alias so callers
@@ -135,7 +135,7 @@ export const lightColors: Colors = {
   placeholder: "#B8B8BF",
   iconDefault: "#B8B8BF",
   chevron: "#C4C4CC",
-  accentText: "#FFFFFF",
+  accentText: "#000000",
   border: "#E5E7EA",
   borderWarm: "#E5E7EA",
   accent: "#FF7B00",
@@ -200,12 +200,40 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // sheets, headers, blur, tab bar — follow OUR theme rather than the system
   // appearance. `"unspecified"` = follow the system (RN 0.86 reset value).
   useEffect(() => {
-    Appearance.setColorScheme(mode === "system" ? "unspecified" : mode);
+    // Native-only: RN web has no Appearance.setColorScheme.
+    Appearance.setColorScheme?.(mode === "system" ? "unspecified" : mode);
   }, [mode]);
 
   const scheme: "light" | "dark" =
     mode === "system" ? (system === "light" ? "light" : "dark") : mode;
   const colors = scheme === "light" ? lightColors : darkColors;
+
+  // Web: @expo/ui's web components read their palette from `--expo-ui-*` CSS vars
+  // gated on `[data-theme]`. Their defaults don't match ours (their dark bg is
+  // #0b0f14 / gray-50 #111418, ours is pure #000000), so FieldGroup/sections look
+  // like a mismatched grey. Pin `data-theme` to our scheme and remap the vars to
+  // our exact tokens so the native grouped look matches the rest of the app.
+  // No-op on native.
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    document.documentElement.setAttribute("data-theme", scheme);
+    const ID = "nacho-expo-ui-theme";
+    if (document.getElementById(ID)) return;
+    const style = document.createElement("style");
+    style.id = ID;
+    const vars = (c: Colors) => `
+      --expo-ui-background: ${c.card};
+      --expo-ui-foreground: ${c.text};
+      --expo-ui-gray-50: ${c.background};
+      --expo-ui-gray-100: ${c.border};
+      --expo-ui-gray-150: ${c.border};
+      --expo-ui-gray-200: ${c.surfaceSunken};
+      --expo-ui-gray-500: ${c.textMuted};
+      --expo-ui-gray-600: ${c.textSecondary};
+      --expo-ui-gray-900: ${c.textSecondary};`;
+    style.textContent = `:root[data-theme="light"]{${vars(lightColors)}}:root[data-theme="dark"]{${vars(darkColors)}}`;
+    document.head.appendChild(style);
+  }, [scheme]);
 
   return React.createElement(
     ThemeContext.Provider,

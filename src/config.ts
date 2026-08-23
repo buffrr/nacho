@@ -9,7 +9,10 @@
 import { kvGet, kvSet } from "@/db";
 
 export type NetConfig = {
-  // Semi-trusted anchor sources — HEAD'd for x-anchor-root/height.
+  // Legacy field. The semi-trusted anchor is now managed by Fabric's signed
+  // pool loader (see trust.ts / semi-trust.md), NOT this list. Kept only so
+  // networkTag() stays stable — dropping it would rename the persisted trust
+  // keys and orphan pinned anchors. The editable pool lives in the Fabric client.
   anchorRelays: string[];
   // Certrelay bootstrap seeds (peer discovery + resolve/publish). Empty → the
   // SDK's built-in DEFAULT_SEEDS.
@@ -80,12 +83,6 @@ export async function saveNetConfig(next: NetConfig): Promise<void> {
     // keep the in-memory value even if persistence fails
   }
   listeners.forEach((fn) => fn());
-}
-
-export function activeAnchorRelays(): string[] {
-  return current.anchorRelays.length
-    ? current.anchorRelays
-    : DEFAULT_NET_CONFIG.anchorRelays;
 }
 
 // undefined → the SDK's built-in DEFAULT_SEEDS.

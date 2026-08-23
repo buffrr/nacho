@@ -1,11 +1,19 @@
 // Native (iOS/Android) Fabric client — backed by the native libveritas module.
 // The web build resolves src/fabric.web.ts instead.
-import { Fabric } from "@spacesprotocol/fabric-react-native";
+import { Fabric, DEFAULT_SEMI_TRUSTED } from "@spacesprotocol/fabric-react-native";
+import type {
+  SemiTrustConfig,
+  SemiTrustResult,
+  SemiTrustedRelay,
+  Quorum,
+} from "@spacesprotocol/fabric-react-native";
 import { signSchnorr } from "@spacesprotocol/fabric-react-native/signing";
 import { Record, RecordSet } from "@spacesprotocol/react-native-libveritas";
 import {
   resolveWith,
+  resolveWithCertsWith,
   ResolvedHandle,
+  ResolvedWithCerts,
   EditableRecord,
   isNotFoundResolveError,
 } from "@/fabricResolver";
@@ -17,6 +25,13 @@ import { activeSeeds, loadNetConfig, onNetConfigChange } from "@/config";
 Fabric.registerSigner(signSchnorr);
 import {
   applyDefaultSemiTrust,
+  refreshSemiTrustNow,
+  loadSemiTrustPool,
+  saveSemiTrustPool,
+  isSemiTrustDisabled,
+  setSemiTrustDisabled,
+  fetchRelayPubkey,
+  quorumRequired,
   loadTrustState,
   saveTrustState,
   trustStateOf,
@@ -52,7 +67,13 @@ function ensureInit(): Promise<void> {
       await loadNetConfig();
       const c = getClient();
       await loadTrustState(c);
-      await applyDefaultSemiTrust(c, () => saveTrustState(c));
+      // Re-apply the persisted pool config BEFORE the first refresh (saveState
+      // doesn't carry it — see semi-trust.md §4).
+      await loadSemiTrustPool(c);
+      // Skip the fallback loader entirely if the user disabled it.
+      if (!(await isSemiTrustDisabled())) {
+        await applyDefaultSemiTrust(c, () => saveTrustState(c));
+      }
     })();
   }
   return initPromise;
@@ -77,13 +98,6 @@ export async function resolveHandle(
   } catch (e) {
     // A name that's provably absent from the proof → not found (see helper).
     // A real verification failure on an existing name still throws.
-    if (__DEV__) {
-      console.log("[nacho/resolve-error]", handle, {
-        tag: (e as { tag?: unknown })?.tag,
-        message: (e as { message?: unknown })?.message,
-        notFound: isNotFoundResolveError(e),
-      });
-    }
     if (isNotFoundResolveError(e)) return null;
     throw e;
   }
@@ -104,6 +118,31 @@ export async function resolveHandle(
     );
   }
   return resolved;
+}
+
+// Resolution + full certificate chain in one round trip (fabric 0.2.8). More
+// expensive than resolve() — call it for the certificate view when we don't yet
+// hold a final cert, and via pull-to-refresh; don't poll it once a handle is
+// final. `fresh` uses a throwaway client to bypass the SDK's zone cache.
+export async function resolveHandleWithCerts(
+  handle: string,
+  fresh = false,
+): Promise<ResolvedWithCerts | null> {
+  await ensureInit();
+  const client = fresh
+    ? await (async () => {
+        const seeds = activeSeeds();
+        const c = new Fabric(seeds ? { seeds } : undefined);
+        await loadTrustState(c);
+        return c;
+      })()
+    : getClient();
+  try {
+    return await resolveWithCertsWith(client, handle);
+  } catch (e) {
+    if (isNotFoundResolveError(e)) return null;
+    throw e;
+  }
 }
 
 // Resolve with a throwaway client so the SDK's in-memory zone cache can't return
@@ -144,12 +183,53 @@ export function getTipHeight(): number | null {
   return tipHeightOf(getClient());
 }
 
-export async function refreshSemiTrust(): Promise<TrustAnchor | null> {
+// Re-run the signed-pool loader against the CURRENT pool and report the vote
+// breakdown (agreed/total). The pinned anchor is updated as a side effect —
+// read it with getTrustAnchor() after this resolves.
+export async function refreshSemiTrust(): Promise<SemiTrustResult> {
   await ensureInit();
   resetTrustCache();
   const c = getClient();
-  return applyDefaultSemiTrust(c, () => saveTrustState(c));
+  return refreshSemiTrustNow(c, () => saveTrustState(c));
 }
+
+// ── Semi-trusted pool editing (Trust page) ──────────────────────────────────
+export function getSemiTrustPool(): SemiTrustConfig {
+  return getClient().semiTrustedPool();
+}
+
+// Swap the pool + quorum, persist the config, then re-verify. Returns the vote
+// result so the UI can show "3/4 agreed"; the anchor cache is updated on quorum.
+export async function applySemiTrustPool(
+  relays: SemiTrustedRelay[],
+  quorum: Quorum,
+): Promise<SemiTrustResult> {
+  await ensureInit();
+  const c = getClient();
+  c.setSemiTrustedPool(relays, quorum);
+  await saveSemiTrustPool(c);
+  resetTrustCache();
+  return refreshSemiTrustNow(c, () => saveTrustState(c));
+}
+
+// Whether the fallback (semi-trusted) tier is on. Off → no anchor is pinned and
+// responses rely solely on a scanned Trust ID (else unverified).
+export function isFallbackEnabled(): Promise<boolean> {
+  return isSemiTrustDisabled().then((d) => !d);
+}
+
+// Toggle the fallback tier. Persists the flag (stripping any pinned anchor when
+// disabling), rebuilds the client, and re-pins when re-enabling.
+export async function setFallbackEnabled(enabled: boolean): Promise<void> {
+  await ensureInit();
+  await setSemiTrustDisabled(getClient(), !enabled);
+  resetFabric(); // drop the in-memory client (and its pinned semi anchor)
+  await ensureInit(); // rebuild; the loader runs only when enabled
+}
+
+// Re-exports so the Trust page needs only one import surface.
+export { DEFAULT_SEMI_TRUSTED, fetchRelayPubkey, quorumRequired };
+export type { SemiTrustConfig, SemiTrustResult, SemiTrustedRelay, Quorum };
 
 // Pin a fully-trusted Safety ID from either a `veritas://scan?id=…` QR/link or
 // a bare hex Trust ID, then persist so it survives restarts. Throws if the
@@ -205,4 +285,4 @@ export async function publishRecords(
   });
 }
 
-export type { ResolvedHandle };
+export type { ResolvedHandle, ResolvedWithCerts };

@@ -21,7 +21,7 @@ export default function HandleAction() {
   const router = useRouter();
   const { handle, action } = useLocalSearchParams<{
     handle: string;
-    action: "sale" | "transfer" | "rotate";
+    action: "sale" | "transfer";
   }>();
 
   const txid = useNativeState("");
@@ -29,11 +29,11 @@ export default function HandleAction() {
   const amount = useNativeState("");
   const to = useNativeState(""); // transfer
   const price = useNativeState(""); // sale
+  const payout = useNativeState(""); // sale: where the seller gets paid
   const [error, setError] = React.useState<string | null>(null);
 
   const isSale = action === "sale";
-  const isRotate = action === "rotate";
-  const title = isSale ? "Sell handle" : isRotate ? "Rotate key" : "Transfer handle";
+  const title = isSale ? "Sell handle" : "Transfer handle";
 
   const proceed = () => {
     setError(null);
@@ -47,26 +47,38 @@ export default function HandleAction() {
 
     const outpoint = { txid: txid.value.trim().toLowerCase(), vout: voutN, amount: amountN };
     let req: SignRequest;
+    let payoutParam: string | undefined;
     if (isSale) {
       const priceN = Number(price.value);
       if (!Number.isInteger(priceN) || priceN <= 0)
         return setError("Enter a price in ₿ base units.");
+      if (!payout.value.trim())
+        return setError("Enter the bitcoin address where you’ll be paid.");
+      payoutParam = payout.value.trim();
       req = { v: 1, type: "sale", handle: handle!, price: priceN, outpoint };
-    } else if (isRotate) {
-      req = { v: 1, type: "rotate", handle: handle!, outpoint };
     } else {
-      if (!/^[0-9a-fA-F]+$/.test(to.value.trim()))
-        return setError("Enter the recipient's script (hex).");
-      req = {
-        v: 1,
-        type: "transfer",
-        handle: handle!,
-        to: to.value.trim().toLowerCase(),
-        outpoint,
-      };
+      const recipient = to.value.trim();
+      if (recipient) {
+        // A recipient → transfer to them.
+        if (!/^[0-9a-fA-F]+$/.test(recipient))
+          return setError("Enter the recipient's script (hex), or leave it empty to rotate.");
+        req = {
+          v: 1,
+          type: "transfer",
+          handle: handle!,
+          to: recipient.toLowerCase(),
+          outpoint,
+        };
+      } else {
+        // No recipient → just rotate the key to a fresh one (same owner).
+        req = { v: 1, type: "rotate", handle: handle!, outpoint };
+      }
     }
     const param = extractReqParam(encodeSignRequest(req));
-    router.replace({ pathname: "/(main)/sign", params: { req: param ?? "" } });
+    router.replace({
+      pathname: "/(main)/sign",
+      params: { req: param ?? "", ...(payoutParam ? { payout: payoutParam } : {}) },
+    });
   };
 
   return (
@@ -92,18 +104,42 @@ export default function HandleAction() {
           </FieldGroup.Section>
 
           {isSale ? (
-            <FieldGroup.Section title="Price (₿ base units)">
-              <ListItem>
-                <TextInput value={price} placeholder="500000" keyboardType="number-pad" />
-              </ListItem>
-            </FieldGroup.Section>
+            <>
+              <FieldGroup.Section title="Price (₿ base units)">
+                <ListItem>
+                  <TextInput value={price} placeholder="500000" keyboardType="number-pad" />
+                </ListItem>
+              </FieldGroup.Section>
+              <FieldGroup.Section title="You get paid to">
+                <ListItem>
+                  <TextInput
+                    value={payout}
+                    placeholder="bc1… (your bitcoin address)"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </ListItem>
+                <FieldGroup.SectionFooter>
+                  <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                    Where the sale proceeds are sent when a buyer takes the handle —
+                    not the handle’s own address.
+                  </Text>
+                </FieldGroup.SectionFooter>
+              </FieldGroup.Section>
+            </>
           ) : null}
 
-          {!isSale && !isRotate ? (
-            <FieldGroup.Section title="Recipient script (hex)">
+          {!isSale ? (
+            <FieldGroup.Section title="Recipient (optional)">
               <ListItem>
-                <TextInput value={to} placeholder="5120…" autoCapitalize="none" autoCorrect={false} />
+                <TextInput value={to} placeholder="5120… recipient script (hex)" autoCapitalize="none" autoCorrect={false} />
               </ListItem>
+              <FieldGroup.SectionFooter>
+                <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                  Leave empty to just rotate this handle to a fresh key (you keep
+                  ownership). Enter a recipient’s script to transfer it to them.
+                </Text>
+              </FieldGroup.SectionFooter>
             </FieldGroup.Section>
           ) : null}
 

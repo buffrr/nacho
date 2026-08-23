@@ -83,6 +83,60 @@ export function isNotFoundResolveError(e: unknown): boolean {
   return /not found in proof|not found for /i.test(msg);
 }
 
+// Pull a human-meaningful reason out of a resolve/verify error for display.
+//
+// libveritas' VeritasError carries the real detail in `.inner.msg` (e.g. "root
+// mismatch", "name not found in proof", "incomplete proof"). But fabric-core
+// wraps verify failures as `verification error: ${e}` (FabricError with no
+// `cause`), which flattens the object to just its enum name —
+// "verification error: Error: VeritasError.VerificationFailed" — so the inner
+// detail is usually gone by the time we catch it. We therefore: (1) defensively
+// look for a surviving `inner.msg`/`cause` in case some path preserves it, then
+// (2) unwrap the redundant "verification error: Error:" noise, and (3) map the
+// bare variant to a readable sentence when that's all we have.
+export function verifyErrorDetail(e: unknown): string {
+  const err = e as
+    | { inner?: { msg?: unknown }; cause?: any; message?: unknown }
+    | null
+    | undefined;
+  const innerMsg =
+    (typeof err?.inner?.msg === "string" && err.inner.msg) ||
+    (typeof err?.cause?.inner?.msg === "string" && err.cause.inner.msg) ||
+    (typeof err?.cause?.message === "string" && err.cause.message) ||
+    "";
+  let msg = innerMsg || (typeof err?.message === "string" ? err.message : String(e));
+  msg = msg
+    .replace(/verification error:\s*/gi, "")
+    .replace(/\b(?:Fabric)?Error:\s*/g, "")
+    .trim();
+  if (!innerMsg) {
+    if (/VeritasError\.VerificationFailed/i.test(msg))
+      return "Proof failed to verify against the trust anchor — it may be stale, incomplete, or tampered.";
+    if (/VeritasError\.InvalidInput/i.test(msg))
+      return "Malformed response — the proof couldn’t be parsed.";
+  }
+  return msg || "Verification failed.";
+}
+
+// The message to SHOW for a resolve/verify failure. libveritas' reasons (now
+// surfaced verbatim via fabric ≥ 0.2.9) carry the specifics worth seeing — e.g.
+// "anchor <root> is stale, oldest is <height>" tells you exactly which block
+// heights disagree — so we show them as-is (sentence-cased), NOT a lossy
+// generic sentence. Only the fallback (pre-0.2.9 / no detail) gets a canned
+// line, handled inside verifyErrorDetail.
+export function verifyErrorMessage(e: unknown): string {
+  const detail = verifyErrorDetail(e);
+  return detail
+    ? detail.charAt(0).toUpperCase() + detail.slice(1)
+    : "Couldn’t verify against a trust anchor.";
+}
+
+// A stale trust anchor is fixable by refreshing to the current tip — the UI uses
+// this to offer "Refresh & try again" instead of a plain retry.
+export function isStaleAnchorError(e: unknown): boolean {
+  return /\bstale\b/i.test(verifyErrorDetail(e));
+}
+
 interface FabricZoneLike {
   handle: string;
   toJson(): any;
@@ -104,4 +158,40 @@ export async function resolveWith(
   const badge = fabric.badge(zone);
   const json = (zone.toJson() ?? {}) as ZoneJson;
   return { handle: zone.handle, badge, zone: json };
+}
+
+// Resolution + the full certificate chain in one round trip (fabric 0.2.8).
+// `parents` are the parent-space zones ordered [parent, grandparent, …, TLD],
+// each with its own commitment/sovereignty (read from its ZoneJson). `certs` is
+// the exportable `.spacecert` chain. Use this when we don't yet hold a final
+// cert; once final, stop calling it (it's an expensive multi-zone fetch).
+export type ResolvedWithCerts = {
+  handle: string;
+  badge: VerificationBadge;
+  zone: ZoneJson;
+  parents: ZoneJson[];
+  certs: Uint8Array;
+};
+
+export interface FabricWithCertsLike extends FabricLike {
+  resolveWithCerts(handle: string): Promise<{
+    zone: FabricZoneLike;
+    parents: FabricZoneLike[];
+    certs: Uint8Array;
+  } | null>;
+}
+
+export async function resolveWithCertsWith(
+  fabric: FabricWithCertsLike,
+  handle: string,
+): Promise<ResolvedWithCerts | null> {
+  const res = await fabric.resolveWithCerts(handle);
+  if (!res) return null;
+  return {
+    handle: res.zone.handle,
+    badge: fabric.badge(res.zone),
+    zone: (res.zone.toJson() ?? {}) as ZoneJson,
+    parents: (res.parents ?? []).map((p) => (p.toJson() ?? {}) as ZoneJson),
+    certs: res.certs,
+  };
 }

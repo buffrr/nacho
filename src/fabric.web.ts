@@ -5,19 +5,39 @@
 // Metro can't resolve. We instead bundle the .wasm as an asset and initialize
 // libveritas explicitly here; once initialized, Fabric's own no-arg init early
 // returns and never touches the import.meta path.
-import { Fabric, Record, RecordSet } from "@spacesprotocol/fabric-web";
+import {
+  Fabric,
+  Record,
+  RecordSet,
+  DEFAULT_SEMI_TRUSTED,
+} from "@spacesprotocol/fabric-web";
+import type {
+  SemiTrustConfig,
+  SemiTrustResult,
+  SemiTrustedRelay,
+  Quorum,
+} from "@spacesprotocol/fabric-web";
 import "@spacesprotocol/fabric-web/signing";
 import initLibveritas from "@spacesprotocol/libveritas";
 import wasmUrl from "@spacesprotocol/libveritas/libveritas_bg.wasm";
 import {
   resolveWith,
+  resolveWithCertsWith,
   ResolvedHandle,
+  ResolvedWithCerts,
   EditableRecord,
   isNotFoundResolveError,
 } from "@/fabricResolver";
 import { activeSeeds, loadNetConfig, onNetConfigChange } from "@/config";
 import {
   applyDefaultSemiTrust,
+  refreshSemiTrustNow,
+  loadSemiTrustPool,
+  saveSemiTrustPool,
+  isSemiTrustDisabled,
+  setSemiTrustDisabled,
+  fetchRelayPubkey,
+  quorumRequired,
   loadTrustState,
   saveTrustState,
   trustStateOf,
@@ -75,7 +95,13 @@ function ensureInit(): Promise<void> {
       await loadNetConfig();
       const c = getClient();
       await loadTrustState(c);
-      await applyDefaultSemiTrust(c, () => saveTrustState(c));
+      // Re-apply the persisted pool config before the first refresh (saveState
+      // doesn't carry it — see semi-trust.md §4).
+      await loadSemiTrustPool(c);
+      // Skip the fallback loader entirely if the user disabled it.
+      if (!(await isSemiTrustDisabled())) {
+        await applyDefaultSemiTrust(c, () => saveTrustState(c));
+      }
     })();
   }
   return initPromise;
@@ -97,6 +123,29 @@ export async function resolveHandle(
     return await resolveWith(getClient(), handle);
   } catch (e) {
     // A non-existent space can't be proven → treat as not found (see fabric.ts).
+    if (isNotFoundResolveError(e)) return null;
+    throw e;
+  }
+}
+
+// Resolution + full certificate chain in one round trip (fabric 0.2.8). See the
+// native wrapper for usage notes (expensive; skip once a handle is final).
+export async function resolveHandleWithCerts(
+  handle: string,
+  fresh = false,
+): Promise<ResolvedWithCerts | null> {
+  await ensureInit();
+  const client = fresh
+    ? await (async () => {
+        const seeds = activeSeeds();
+        const c = new Fabric(seeds ? { seeds } : undefined);
+        await loadTrustState(c);
+        return c;
+      })()
+    : getClient();
+  try {
+    return await resolveWithCertsWith(client, handle);
+  } catch (e) {
     if (isNotFoundResolveError(e)) return null;
     throw e;
   }
@@ -140,12 +189,46 @@ export function getTipHeight(): number | null {
   return tipHeightOf(getClient());
 }
 
-export async function refreshSemiTrust(): Promise<TrustAnchor | null> {
+// Re-run the signed-pool loader against the current pool and report the vote
+// breakdown; the pinned anchor is updated as a side effect (read via
+// getTrustAnchor()).
+export async function refreshSemiTrust(): Promise<SemiTrustResult> {
   await ensureInit();
   resetTrustCache();
   const c = getClient();
-  return applyDefaultSemiTrust(c, () => saveTrustState(c));
+  return refreshSemiTrustNow(c, () => saveTrustState(c));
 }
+
+// ── Semi-trusted pool editing (Trust page) ──────────────────────────────────
+export function getSemiTrustPool(): SemiTrustConfig {
+  return getClient().semiTrustedPool();
+}
+
+export async function applySemiTrustPool(
+  relays: SemiTrustedRelay[],
+  quorum: Quorum,
+): Promise<SemiTrustResult> {
+  await ensureInit();
+  const c = getClient();
+  c.setSemiTrustedPool(relays, quorum);
+  await saveSemiTrustPool(c);
+  resetTrustCache();
+  return refreshSemiTrustNow(c, () => saveTrustState(c));
+}
+
+export function isFallbackEnabled(): Promise<boolean> {
+  return isSemiTrustDisabled().then((d) => !d);
+}
+
+export async function setFallbackEnabled(enabled: boolean): Promise<void> {
+  await ensureInit();
+  await setSemiTrustDisabled(getClient(), !enabled);
+  resetFabric();
+  await ensureInit();
+}
+
+export { DEFAULT_SEMI_TRUSTED, fetchRelayPubkey, quorumRequired };
+export type { SemiTrustConfig, SemiTrustResult, SemiTrustedRelay, Quorum };
 
 // Pin a fully-trusted Safety ID from either a `veritas://scan?id=…` QR/link or
 // a bare hex Trust ID, then persist so it survives restarts. Throws if the
@@ -202,4 +285,4 @@ export async function publishRecords(
   });
 }
 
-export type { ResolvedHandle };
+export type { ResolvedHandle, ResolvedWithCerts };
