@@ -11,6 +11,7 @@ import {
   Spacer,
   RNHostView,
 } from "@expo/ui";
+import type { SFSymbol } from "sf-symbols-typescript";
 import { refreshable } from "@/ui/rowModifiers";
 import { useTheme } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
@@ -56,6 +57,8 @@ export function OwnerProfileNative({
   pill,
   sovereign,
   unverified,
+  dirty,
+  changed,
   reordering,
   onMoveUp,
   onMoveDown,
@@ -79,10 +82,14 @@ export function OwnerProfileNative({
   pill: Pill;
   sovereign: boolean;
   unverified?: boolean;
+  // Unpublished-changes affordances: `dirty` drives the section caption, and
+  // `changed[i]` flags a leading dot on the i-th record row (new/edited).
+  dirty?: boolean;
+  changed?: boolean[];
   reordering?: boolean;
   onMoveUp?: (index: number) => void;
   onMoveDown?: (index: number) => void;
-  banner?: { text: string; tone: "error" | "success" | "muted" } | null;
+  banner?: { text: string; tone: "error" | "success" | "muted" | "pending" } | null;
   copied: string | null;
   certState: CertState;
   listings: ListingSummary[];
@@ -103,38 +110,92 @@ export function OwnerProfileNative({
   if (alias) details.push({ id: "alias", label: "Alias", value: alias, display: alias });
   const published = lastPublished(seq);
 
+  // Surface unpublished edits (and other statuses) at the TOP — a Form section
+  // can't be sticky and a footer scrolls off on long lists. A real banner
+  // (error/success) takes priority over the pending-edits hint.
+  const effBanner: {
+    text: string;
+    tone: "error" | "success" | "muted" | "pending";
+  } | null =
+    banner ?? (dirty ? { text: "Unpublished changes", tone: "pending" } : null);
+  const bannerIcon = (t: NonNullable<typeof effBanner>["tone"]): SFSymbol =>
+    t === "error"
+      ? "exclamationmark.triangle.fill"
+      : t === "success"
+        ? "checkmark.circle.fill"
+        : t === "pending"
+          ? "circle.fill"
+          : "info.circle";
+  const bannerColor = (t: NonNullable<typeof effBanner>["tone"]) =>
+    t === "error"
+      ? colors.dangerText
+      : t === "pending"
+        ? colors.accent
+        : colors.textSecondary;
+  // The dot/icon carries the colour; keep the text neutral (a coloured sentence
+  // would read as a link/action).
+  const bannerTextColor = (t: NonNullable<typeof effBanner>["tone"]) =>
+    t === "error" ? colors.dangerText : colors.textSecondary;
+  // Count of changed rows, shown inside the pending badge as an SF number-circle
+  // ("5.circle.fill"). Those symbols exist for 0–50; fall back above that.
+  const changeCount = (changed ?? []).filter(Boolean).length;
+  const countSymbol: SFSymbol =
+    changeCount >= 1 && changeCount <= 50
+      ? (`${changeCount}.circle.fill` as SFSymbol)
+      : "exclamationmark.circle.fill";
+
   const profileHeader = (
     <FieldGroup.SectionHeader>
-      <Row alignment="center">
-        <Spacer flexible />
-        <Column alignment="center" spacing={8} style={{ paddingTop: 10, paddingBottom: 14 }}>
-          <RNHostView matchContents style={{ width: 76, height: 76 }}>
-            <Avatar handle={handle} size={76} />
-          </RNHostView>
-          <Text textStyle={{ fontSize: 22, fontWeight: "700", color: colors.text }}>{handle}</Text>
+      <Column spacing={12}>
+        <Row alignment="center">
+          <Spacer flexible />
+          <Column alignment="center" spacing={8} style={{ paddingTop: 10, paddingBottom: 14 }}>
+            <RNHostView matchContents style={{ width: 76, height: 76 }}>
+              <Avatar handle={handle} size={76} />
+            </RNHostView>
+            <Text textStyle={{ fontSize: 22, fontWeight: "700", color: colors.text }}>{handle}</Text>
+            {/* Only the noteworthy trust states get a status line: the Sovereign
+                seal and the Unverified warning. A plain "Registered" is redundant
+                on your own handle — the name alone says it's yours. */}
+            {unverified || sovereign ? (
+              <Row alignment="center" spacing={5}>
+                <Icon
+                  name={
+                    unverified ? "exclamationmark.triangle.fill" : "checkmark.seal.fill"
+                  }
+                  size={14}
+                  color={unverified ? colors.dangerText : pill.fg}
+                />
+                <Text
+                  textStyle={{ fontSize: 13, color: unverified ? colors.dangerText : pill.fg }}
+                >
+                  {unverified ? "Unverified" : pill.label}
+                </Text>
+              </Row>
+            ) : null}
+          </Column>
+          <Spacer flexible />
+        </Row>
+        {/* Status caption — left-aligned at the bottom of the header, right above
+            the record rows (bare, no card). */}
+        {effBanner ? (
+          // Trailing flexible Spacer forces the caption to hug the left edge
+          // (Column alignment alone didn't left-align it reliably).
           <Row alignment="center" spacing={5}>
-            {/* Unverified overrides the seal — a handle we couldn't verify never
-                shows a trust badge, even if its zone claims sovereignty. */}
             <Icon
               name={
-                unverified
-                  ? "exclamationmark.triangle.fill"
-                  : sovereign
-                    ? "checkmark.seal.fill"
-                    : "circle.fill"
+                effBanner.tone === "pending" ? countSymbol : bannerIcon(effBanner.tone)
               }
-              size={unverified || sovereign ? 14 : 9}
-              color={unverified ? colors.dangerText : pill.fg}
+              size={effBanner.tone === "pending" ? 16 : 13}
+              color={bannerColor(effBanner.tone)}
             />
-            <Text
-              textStyle={{ fontSize: 13, color: unverified ? colors.dangerText : pill.fg }}
-            >
-              {unverified ? "Unverified" : pill.label}
+            <Text textStyle={{ fontSize: 13, color: bannerTextColor(effBanner.tone) }}>
+              {effBanner.text}
             </Text>
+            <Spacer flexible />
           </Row>
-        </Column>
-        <Spacer flexible />
-      </Row>
+        ) : null}
+      </Column>
     </FieldGroup.SectionHeader>
   );
 
@@ -143,41 +204,11 @@ export function OwnerProfileNative({
   return (
     <Host style={{ flex: 1, paddingTop: WEB_TOP_INSET }} colorScheme={scheme} matchContents={false}>
       <FieldGroup modifiers={[refreshable(onRefresh)]}>
-        {/* Optional status banner (published / key mismatch / etc.) */}
-        {banner ? (
-          <FieldGroup.Section>
-            {profileHeader}
-            <ListItem
-              leading={
-                <Icon
-                  name={
-                    banner.tone === "error"
-                      ? "exclamationmark.triangle.fill"
-                      : banner.tone === "success"
-                        ? "checkmark.circle.fill"
-                        : "info.circle"
-                  }
-                  size={20}
-                  color={
-                    banner.tone === "error"
-                      ? colors.dangerText
-                      : banner.tone === "success"
-                        ? colors.statusGreenFg
-                        : colors.textSecondary
-                  }
-                />
-              }
-            >
-              <Text textStyle={{ color: colors.textSecondary }}>{banner.text}</Text>
-            </ListItem>
-          </FieldGroup.Section>
-        ) : null}
-
-        {/* Records */}
-        <FieldGroup.Section
-          title={banner ? "Records" : hasRecords ? undefined : undefined}
-        >
-          {!banner ? profileHeader : null}
+        {/* Profile header + records in ONE section so the list sits close under
+            the handle (a separate section adds a big inter-group gap). The status
+            caption lives at the bottom-left of the header, just above the rows. */}
+        <FieldGroup.Section title={undefined}>
+          {profileHeader}
           {hasRecords ? (
             records.map((r, i) => {
               const { def, known } = lookupRecord(r.type, r.key);
@@ -187,7 +218,17 @@ export function OwnerProfileNative({
                 <ListItem
                   key={`${r.key}:${i}`}
                   leading={<RecordGlyph def={def} size={28} color={def.color} />}
-                  supportingText={r.value.join(", ")}
+                  supportingText={
+                    // Changed-since-publish rows tint their value in the accent
+                    // (matching the Publish CTA) instead of carrying a dot.
+                    <Text
+                      textStyle={{
+                        color: changed?.[i] ? colors.accent : colors.textSecondary,
+                      }}
+                    >
+                      {r.value.join(", ")}
+                    </Text>
+                  }
                   trailing={
                     reordering ? (
                       // Up/down in filled-circle chevrons (row isn't tappable in
@@ -223,7 +264,7 @@ export function OwnerProfileNative({
             })
           ) : (
             <ListItem
-              leading={<Icon name="plus.circle.fill" size={22} color={colors.textSecondary} />}
+              leading={<Icon name="plus.circle.fill" size={22} color={colors.accent} />}
               trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
               onPress={onAddRecord}
             >

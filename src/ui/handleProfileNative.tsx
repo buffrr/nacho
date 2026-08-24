@@ -20,6 +20,7 @@ import { Avatar } from "@/ui/Avatar";
 import { NativeEmpty } from "@/ui/nativeEmpty";
 import { ResolvedHandle } from "@/fabricResolver";
 import { lookupRecord, paymentUri, recordLink, RecordDef } from "@/recordRegistry";
+import { refreshable } from "@/ui/rowModifiers";
 
 // The handle view rendered with @expo/ui's cross-platform native widgets
 // (FieldGroup / ListItem / Icon). Renders real SwiftUI on iOS, Compose on
@@ -104,7 +105,13 @@ function pubkeyFromZone(zone: ResolvedHandle["zone"]): string | null {
   return m ? m[1] : spk;
 }
 
-export function ResolvedProfileNative({ result }: { result: ResolvedHandle }) {
+export function ResolvedProfileNative({
+  result,
+  onRefresh,
+}: {
+  result: ResolvedHandle;
+  onRefresh?: () => Promise<void>;
+}) {
   const { scheme, colors } = useTheme();
   const router = useRouter();
   const [copied, setCopied] = useState<string | null>(null);
@@ -202,7 +209,7 @@ export function ResolvedProfileNative({ result }: { result: ResolvedHandle }) {
       ? "Verified with your trust anchor"
       : result.badge === "unverified"
         ? "Not verified against any anchor"
-        : "Verified with Nacho’s default anchor";
+        : "Verified with fallback trust sources";
 
   // The profile (avatar + name + status + trust) lives in a SECTION HEADER, so
   // it sits on the plain grouped background (centered, full-width) like the
@@ -295,7 +302,7 @@ export function ResolvedProfileNative({ result }: { result: ResolvedHandle }) {
 
   return (
     <Host style={{ flex: 1, paddingTop: WEB_TOP_INSET }} colorScheme={scheme} matchContents={false}>
-      <FieldGroup>
+      <FieldGroup modifiers={onRefresh ? [refreshable(onRefresh)] : undefined}>
         {payUri ? (
           <FieldGroup.Section>
             {first === "pay" ? profileHeader : null}

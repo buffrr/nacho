@@ -1,10 +1,20 @@
-import React, { useMemo, useState } from "react";
-import { View, StyleSheet, Text } from "react-native";
+import React, { useMemo, useRef, useState } from "react";
+import {
+  View,
+  StyleSheet,
+  Text,
+  ScrollView,
+  useWindowDimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+} from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/ui/Button";
-import { Layout } from "@/ui/Layout";
 import Svg, { SvgXml, Defs, RadialGradient, Stop, Rect } from "react-native-svg";
 import { Link, KeyRound } from "@/ui/icons";
+import { AtbitcoinLogo } from "@/ui/AtbitcoinLogo";
+import { SampleProfileCard } from "@/ui/SampleProfileCard";
 import { useStore } from "@/Store";
 import { generateMnemonic, xprvFromMnemonic } from "@/keys";
 import { Colors, useTheme } from "@/theme";
@@ -91,60 +101,168 @@ export default function Home({ preview = false }: { preview?: boolean }) {
     </View>
   );
 
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const scrollRef = useRef<ScrollView>(null);
+  const [page, setPage] = useState(0);
+  const [pagerH, setPagerH] = useState(0);
+
+  const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+    setPage(Math.round(e.nativeEvent.contentOffset.x / width));
+  const goToProfile = () => scrollRef.current?.scrollTo({ x: width, animated: true });
+
+  const dots = (
+    <View style={styles.dots}>
+      <View style={[styles.dot, page === 0 && styles.dotOn]} />
+      <View style={[styles.dot, page === 1 && styles.dotOn]} />
+    </View>
+  );
+
+  const pageStyle = [styles.page, { width, height: pagerH || undefined }];
+  const pad = { paddingTop: insets.top, paddingBottom: insets.bottom + 12 };
+  // Equal vertical rhythm between logo → field → title → bullets → button.
+  const GAP = 28;
+
   return (
-    <Layout
-      scrollable={false}
-      footer={
-        <>
-          <Button
-            text={creating ? "Creating…" : "Get started"}
-            onPress={preview ? () => router.back() : createKeystore}
-            type="main"
-            disabled={creating}
-          />
-          <Button
-            text="Restore from backup"
-            onPress={
-              preview
-                ? () => router.back()
-                : () => router.push("/(onboarding)/import-keystore")
-            }
-            type="secondary"
-            disabled={creating}
-          />
-        </>
-      }
-    >
-      <Glow />
-      {/* Logo centred in its own half — equal flexible space above and below so
-          the gap to the top edge matches the gap down to the headline. */}
-      <View style={styles.spacer} />
-      <SvgXml xml={logoXml} width={152} height={87} style={styles.logo} />
-      <View style={styles.spacer} />
+    <View style={styles.root}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={onScrollEnd}
+        onLayout={(e) => setPagerH(e.nativeEvent.layout.height)}
+        style={styles.pager}
+      >
+        {/* ── Screen 1: what it is. One even rhythm — equal GAP between logo →
+            field → title/desc → bullets → button. A top spacer keeps the logo at
+            its height while the stack is bottom-anchored. ──────────────────── */}
+        <View style={[pageStyle, pad]}>
+          {/* Warm glow behind screen 1 only — screen 2's card carries its own
+              gradient, so a page-level wash there would double up. */}
+          <Glow />
+          {/* Two equal spacers center the logo between the top and the field;
+              the field-through-button stack below keeps the even GAP rhythm and
+              is bottom-anchored. */}
+          <View style={styles.spacer} />
+          <SvgXml xml={logoXml} width={152} height={87} style={styles.logo} />
+          <View style={styles.spacer} />
 
+          {/* Address field — "your | @bitcoin". Not a real input: the static
+              caret after "your" invites the reader to imagine typing their own
+              name, and teaches the @bitcoin syntax before the headline. */}
+          <View style={styles.field}>
+            <Text style={styles.fieldYour}>your</Text>
+            <View style={styles.caret} />
+            <View style={styles.fieldMark}>
+              <AtbitcoinLogo height={20} color={colors.accent} />
+            </View>
+          </View>
 
-      {/* Bottom-weighted, left-aligned copy: three tiers (headline / lede /
-          bullets), sat near the thumb where the buttons are. */}
-      <View style={styles.block}>
-        <Text style={styles.headline}>One handle for{"\n"}the whole internet</Text>
-        <Text style={styles.lede}>Yours to keep, forever.</Text>
-        <View style={styles.bullets}>
-          {bullet(
-            <Link size={18} color={colors.textMuted} />,
-            "For your socials, your keys and getting paid.",
-          )}
-          {bullet(
-            <KeyRound size={18} color={colors.textMuted} />,
-            "Can't be suspended or closed. Not even by us.",
-          )}
+          <View style={[styles.copy, { marginTop: GAP }]}>
+            <Text style={styles.headline}>One handle for{"\n"}the whole internet</Text>
+            <Text style={styles.lede}>Yours to keep, forever.</Text>
+          </View>
+
+          <View style={[styles.bullets, { marginTop: GAP }]}>
+            {bullet(
+              <Link size={18} color={colors.textMuted} />,
+              "For your socials, your keys and getting paid.",
+            )}
+            {bullet(
+              <KeyRound size={18} color={colors.textMuted} />,
+              "Can't be closed or taken down. Not even by us.",
+            )}
+          </View>
+
+          <View style={[styles.actions, { marginTop: GAP }]}>
+            <Button text="Continue" onPress={goToProfile} type="main" />
+            <Button
+              text="Restore from backup"
+              onPress={
+                preview
+                  ? () => router.back()
+                  : () => router.push("/(onboarding)/import-keystore")
+              }
+              type="secondary"
+            />
+          </View>
+          {dots}
         </View>
-      </View>
-    </Layout>
+
+        {/* ── Screen 2: what it does — a native, self-verified profile. Mirrors
+            screen 1: the figure (card) up top, the copy bottom-weighted by the
+            button. ─────────────────────────────────────────────────────────── */}
+        <View style={[pageStyle, pad]}>
+          <View style={styles.spacer} />
+          <View style={styles.cardWrap}>
+            <SampleProfileCard />
+          </View>
+          {/* Copy sits just under the preview (modest gap); the spacer below it
+              keeps the button at the bottom. */}
+          <View style={[styles.page2Head, { marginTop: GAP }]}>
+            <Text style={styles.headline2}>
+                Look up anyone.{"\n"}Verified on your phone.
+            </Text>
+            <Text style={styles.lede}>No company decides who's real — your phone checks the proof itself.</Text>
+          </View>
+          <View style={[styles.spacer, { flex: 2 }]} />
+          <View style={styles.actions}>
+            <Button
+              text={creating ? "Creating…" : "Get started"}
+              onPress={preview ? () => router.back() : createKeystore}
+              type="main"
+              disabled={creating}
+            />
+          </View>
+          {dots}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: c.background,
+    },
+    pager: {
+      flex: 1,
+    },
+    page: {
+      flexDirection: "column",
+    },
+    actions: {
+      paddingHorizontal: 20,
+    },
+    copy: {
+      paddingHorizontal: 20,
+    },
+    page2Head: {
+      paddingHorizontal: 20,
+    },
+    cardWrap: {
+      paddingHorizontal: 20,
+    },
+    dots: {
+      flexDirection: "row",
+      gap: 6,
+      justifyContent: "center",
+      paddingTop: 14,
+    },
+    dot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: c.textMuted,
+      opacity: 0.4,
+    },
+    dotOn: {
+      backgroundColor: c.text,
+      opacity: 1,
+    },
     spacer: {
       flex: 1,
     },
@@ -153,7 +271,36 @@ const makeStyles = (c: Colors) =>
     },
     block: {
       alignItems: "flex-start",
+      paddingHorizontal: 20,
       paddingBottom: 4,
+    },
+    field: {
+      marginHorizontal: 20,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      borderWidth: 0.5,
+      borderColor: c.border,
+      borderRadius: 14,
+      borderCurve: "continuous",
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+    },
+    fieldYour: {
+      fontSize: 21,
+      fontWeight: "600",
+      color: c.textMuted,
+      letterSpacing: -0.4,
+    },
+    caret: {
+      width: 2,
+      height: 22,
+      borderRadius: 1,
+      backgroundColor: c.accent,
+      marginLeft: 1,
+    },
+    fieldMark: {
+      marginLeft: "auto",
     },
     headline: {
       fontSize: 30,
@@ -162,6 +309,13 @@ const makeStyles = (c: Colors) =>
       letterSpacing: -0.8,
       lineHeight: 34,
     },
+    headline2: {
+      fontSize: 28,
+      fontWeight: "700",
+      color: c.text,
+      letterSpacing: -0.7,
+      lineHeight: 32,
+    },
     lede: {
       fontSize: 16,
       color: c.textSecondary,
@@ -169,8 +323,7 @@ const makeStyles = (c: Colors) =>
       lineHeight: 22,
     },
     bullets: {
-      marginTop: 28,
-      alignSelf: "stretch",
+      paddingHorizontal: 20,
     },
     bullet: {
       flexDirection: "row",

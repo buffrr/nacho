@@ -166,6 +166,11 @@ function ResultView({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+  // Safe dismissal: fall back to the handles tab if there's no back entry (e.g.
+  // this screen was reached via a path that left no history) so "Done" can never
+  // throw "GO_BACK was not handled by any navigator".
+  const done = () =>
+    router.canGoBack() ? router.back() : router.replace("/(main)/(tabs)/handles");
   const send = async () => {
     if (!endpoint) return;
     setSending(true);
@@ -231,7 +236,7 @@ function ResultView({
         secondary={
           host && !sent
             ? { label: copied ? "Copied ✓" : "Copy response", onPress: copy }
-            : { label: "Done", onPress: () => router.back() }
+            : { label: "Done", onPress: done }
         }
       />
     </>

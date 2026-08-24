@@ -110,26 +110,40 @@ export default function Preferences() {
   );
   const [ver, setVer] = useState(0); // bump to remount fields (reset)
   const [savedTick, setSavedTick] = useState(false);
+  const [, bump] = useState(0); // force a re-render so "Save" can react to edits
+  // Signature of the last-saved config, so "Save" only shows when the editor
+  // has unsaved changes (the fields are uncontrolled, hence the manual compare).
+  const savedSig = useRef<string>("");
+
+  const clean = (ids: string[]) =>
+    ids.map((id) => (values.current.get(id) ?? "").trim()).filter(Boolean);
+  const cfgSig = (seeds: string[], api: string) =>
+    JSON.stringify({ seeds, api: api.trim() });
 
   // Seed the values map once (and re-seed on reset via the ver bump path).
   useMemo(() => {
     values.current.set("api", conf.apiUrl);
     seedIds.forEach((id, i) => values.current.set(id, conf.seeds[i] ?? ""));
+    savedSig.current = cfgSig(conf.seeds.map((s) => s.trim()).filter(Boolean), conf.apiUrl);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const set = (id: string) => (t: string) => values.current.set(id, t);
-  const clean = (ids: string[]) =>
-    ids.map((id) => (values.current.get(id) ?? "").trim()).filter(Boolean);
+  const set = (id: string) => (t: string) => {
+    values.current.set(id, t);
+    bump((x) => x + 1);
+  };
 
   const onSave = async () => {
     // Anchor relays are edited on the Trust page now — preserve whatever is
     // currently configured so saving here doesn't wipe them.
+    const seeds = clean(seedIds);
+    const apiUrl = (values.current.get("api") ?? "").trim();
     await saveNetConfig({
       anchorRelays: getNetConfig().anchorRelays,
-      seeds: clean(seedIds),
-      apiUrl: (values.current.get("api") ?? "").trim(),
+      seeds,
+      apiUrl,
     });
+    savedSig.current = cfgSig(seeds, apiUrl);
     setSavedTick(true);
     setTimeout(() => setSavedTick(false), 1600);
   };
@@ -158,14 +172,22 @@ export default function Preferences() {
     setIds((ids) => ids.filter((x) => x !== id));
   };
 
-  const headerItems: NativeStackHeaderItem[] = [
-    {
-      type: "button",
-      label: savedTick ? "Saved ✓" : "Save",
-      tintColor: colors.text,
-      onPress: onSave,
-    },
-  ];
+  const dirty =
+    cfgSig(clean(seedIds), values.current.get("api") ?? "") !== savedSig.current;
+
+  // Only surface "Save" when there are unsaved edits (or a save just landed, so
+  // "Saved ✓" still flashes). Theme changes save immediately and don't count.
+  const headerItems: NativeStackHeaderItem[] =
+    dirty || savedTick
+      ? [
+          {
+            type: "button",
+            label: savedTick ? "Saved ✓" : "Save",
+            tintColor: colors.text,
+            onPress: onSave,
+          },
+        ]
+      : [];
 
   return (
     <>

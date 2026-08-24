@@ -46,6 +46,21 @@ function toQuorum(policy: Policy, n: number, size: number): Quorum {
   return { atLeast: Math.min(Math.max(1, n), Math.max(1, size)) };
 }
 
+// A stable string signature of a pool (urls + quorum) so the Trust page can tell
+// whether the editor differs from what's saved — the "Save" button only shows
+// when there are unsaved changes. URLs are normalised the same way onSave stores
+// them so a cosmetic "/anchors" suffix or trailing slash isn't a false edit.
+const normUrl = (u: string) =>
+  u.trim().replace(/\/anchors\/?$/, "").replace(/\/+$/, "");
+const quorumSig = (q: Quorum) =>
+  typeof q === "object" ? `atLeast:${q.atLeast}` : q;
+function poolSig(urls: string[], quorum: Quorum): string {
+  return JSON.stringify({
+    relays: urls.map(normUrl).filter(Boolean),
+    quorum: quorumSig(quorum),
+  });
+}
+
 const shortKey = (pk: string) =>
   pk.length > 12 ? `${pk.slice(0, 6)}…${pk.slice(-6)}` : pk;
 const shortHost = (url: string) =>
@@ -138,6 +153,10 @@ export default function Settings() {
   const [savedTick, setSavedTick] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fallbackOn, setFallbackOn] = useState(true);
+  // Signature of the last saved pool + whether the editor has finished loading,
+  // so "Save" only appears once there are genuine unsaved edits.
+  const savedSig = useRef<string>("");
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     isFallbackEnabled().then(setFallbackOn);
@@ -158,7 +177,12 @@ export default function Settings() {
   };
 
   // Load the current pool into local editor state (also used after reset).
-  const loadPool = useCallback(() => {
+  // Awaits init first: getSemiTrustPool() reads the live client synchronously,
+  // but on a cold start the persisted pool is only applied inside ensureInit()
+  // (loadSemiTrustPool). Reading before that returns the DEFAULT pool, which is
+  // why a saved custom pool looked like it didn't persist.
+  const loadPool = useCallback(async () => {
+    await ensureSemiTrust();
     const pool = getSemiTrustPool();
     rows.current = new Map();
     const ids = pool.relays.map((r) => {
@@ -173,11 +197,13 @@ export default function Settings() {
       setPolicy("atLeast");
       setAtLeastN(Math.max(1, pool.quorum.atLeast));
     }
+    savedSig.current = poolSig(pool.relays.map((r) => r.url), pool.quorum);
+    setLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    loadPool();
+    void loadPool();
   }, [loadPool]);
 
   const setUrl = (id: string) => (t: string) => {
@@ -208,6 +234,9 @@ export default function Settings() {
     setVote(result);
     setAnchor(getTrustAnchor());
     syncTrust();
+    // The editor now matches what's saved — clears the dirty state so "Save"
+    // hides again (the brief "Saved ✓" is driven by savedTick below).
+    savedSig.current = poolSig(relays.map((r) => r.url), q);
     setSavedTick(true);
     setTimeout(() => setSavedTick(false), 1600);
   };
@@ -265,7 +294,7 @@ export default function Settings() {
     setBusy(true);
     try {
       await apply(DEFAULT_SEMI_TRUSTED.map((r) => ({ ...r })), "majority");
-      loadPool();
+      await loadPool();
     } finally {
       setBusy(false);
     }
@@ -328,17 +357,27 @@ export default function Settings() {
       : `Quorum not met — ${vote.agreed}/${vote.total} sources agreed, kept previous anchor`
     : null;
 
-  // Nothing to save when the fallback is off.
-  const headerItems: NativeStackHeaderItem[] = fallbackOn
-    ? [
-        {
-          type: "button",
-          label: busy ? "…" : savedTick ? "Saved ✓" : "Save",
-          tintColor: colors.text,
-          onPress: onSave,
-        },
-      ]
-    : [];
+  // The editor differs from what's saved → there's something to save.
+  const dirty =
+    loaded &&
+    poolSig(
+      relayIds.map((id) => rows.current.get(id)?.url ?? ""),
+      toQuorum(policy, atLeastN, poolSize),
+    ) !== savedSig.current;
+
+  // Show "Save" only when the fallback is on AND there are unsaved edits (or a
+  // save is in flight / just landed, so "…" and "Saved ✓" still get to show).
+  const headerItems: NativeStackHeaderItem[] =
+    fallbackOn && (dirty || busy || savedTick)
+      ? [
+          {
+            type: "button",
+            label: busy ? "…" : savedTick ? "Saved ✓" : "Save",
+            tintColor: colors.text,
+            onPress: onSave,
+          },
+        ]
+      : [];
 
   return (
     <>

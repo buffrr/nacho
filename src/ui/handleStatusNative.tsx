@@ -37,8 +37,10 @@ export function HandleStatusNative({
   secondary,
 }: {
   handle: string;
-  icon: SFSymbol;
-  iconColor: string;
+  // Omit for a clean text-only status line (e.g. "is yours") — a coloured dot
+  // adds nothing there. Set it for badge states (seal/shield/clock).
+  icon?: SFSymbol;
+  iconColor?: string;
   statusLabel: string;
   statusColor: string;
   message: string;
@@ -65,9 +67,11 @@ export function HandleStatusNative({
                 </RNHostView>
                 <Text textStyle={{ fontSize: 22, fontWeight: "700", color: colors.text }}>{handle}</Text>
                 <Row alignment="center" spacing={5}>
-                  {/* A bare status dot is small; a seal/shield reads as a badge
-                      and gets more presence — matching the profile header. */}
-                  <Icon name={icon} size={icon === "circle.fill" ? 9 : 14} color={iconColor} />
+                  {/* Icon is optional: badge states (seal/shield/clock) show a
+                      glyph; plain states like "is yours" are text-only. */}
+                  {icon ? (
+                    <Icon name={icon} size={14} color={iconColor} />
+                  ) : null}
                   <Text textStyle={{ fontSize: 14, fontWeight: "600", color: statusColor }}>
                     {statusLabel}
                   </Text>

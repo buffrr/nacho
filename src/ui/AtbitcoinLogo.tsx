@@ -2,11 +2,18 @@ import React from "react";
 import { SvgXml } from "react-native-svg";
 import { useTheme } from "@/theme";
 
-// The atbitcoin wordmark, tinted to the current theme's text color.
-export function AtbitcoinLogo({ height = 22 }: { height?: number }) {
+// The atbitcoin wordmark, tinted to the current theme's text color (or an
+// explicit `color`, e.g. the accent for the onboarding address field).
+export function AtbitcoinLogo({
+  height = 22,
+  color,
+}: {
+  height?: number;
+  color?: string;
+}) {
   const { colors } = useTheme();
   const width = (96 / 22) * height;
-  const fill = colors.text;
+  const fill = color ?? colors.text;
   const xml = `<svg width="96" height="22" viewBox="0 0 96 22" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g clip-path="url(#clip0_1_952)">
 <path fill-rule="evenodd" clip-rule="evenodd" d="M14.8327 6.04492H0V9.30476H11.6822V18.1328H10.7696C9.78762 18.1328 8.99153 17.3092 8.99153 16.293V12.0889H0V21.3926H5.84113V18.1328H7.21353C8.1955 18.1328 8.99153 18.9565 8.99153 19.9726V21.3926H14.8327V6.04492ZM5.84113 18.1328H3.15042V15.3487H5.84113V18.1328Z" fill="${fill}"/>

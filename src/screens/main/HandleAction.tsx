@@ -75,7 +75,11 @@ export default function HandleAction() {
       }
     }
     const param = extractReqParam(encodeSignRequest(req));
-    router.replace({
+    // push, not replace: /sign lives in the (main) stack while this form is in
+    // the handles tab stack. Replacing across that navigator boundary corrupts
+    // the back history, so the sign screen's "Done"/"Cancel" (router.back) has
+    // nothing to return to ("GO_BACK was not handled by any navigator").
+    router.push({
       pathname: "/(main)/sign",
       params: { req: param ?? "", ...(payoutParam ? { payout: payoutParam } : {}) },
     });

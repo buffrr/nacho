@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Keyboard } from "react-native";
 import {
   Stack,
   useLocalSearchParams,
@@ -42,6 +43,12 @@ export default function Resolve() {
   const onResolve = async (nameArg?: string) => {
     const name = (nameArg ?? handle).trim().toLowerCase();
     if (!name.includes("@") || pending) return;
+    // Drop the keyboard on submit. Blurring the native search bar (not just
+    // Keyboard.dismiss, which doesn't reliably resign the search field's focus)
+    // returns it to the header, so the terminal-state ActionFooter isn't hidden
+    // behind the floating search field.
+    searchRef.current?.blur();
+    Keyboard.dismiss();
     setError(null);
     setNotFound(null);
     setResult(null);
@@ -76,6 +83,38 @@ export default function Resolve() {
     }
   };
 
+  // Pull-to-refresh on the result profile: re-resolve WITHOUT clearing the
+  // current result first, so the profile stays visible under the native refresh
+  // spinner and only swaps on completion. A failed refresh is surfaced (flips to
+  // the error/not-found state) rather than swallowed.
+  const refreshResult = async () => {
+    const name = result?.handle;
+    if (!name) return;
+    try {
+      const resolved = await resolveHandle(name);
+      if (resolved) {
+        setResult(resolved);
+        void recordResolve({
+          handle: resolved.handle,
+          badge: resolved.badge,
+          sovereignty: resolved.zone.sovereignty ?? "unknown",
+          recordCount: recordCountOf(resolved),
+        });
+      } else {
+        setResult(null);
+        setNotFound(name);
+      }
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      const network =
+        /no peers|http error|relay error|network|timed out|fetch|econn/.test(raw.toLowerCase());
+      setResult(null);
+      setError(network ? "network" : "verify");
+      setErrorMsg(verifyErrorMessage(e));
+      setStaleAnchor(isStaleAnchorError(e));
+    }
+  };
+
   // Stale-anchor recovery: re-pin the semi-trusted anchor to the current tip,
   // then resolve again.
   const refreshAndRetry = async () => {
@@ -88,6 +127,11 @@ export default function Resolve() {
     if (prefill) {
       setHandle(prefill);
       onResolve(prefill);
+      // Consume the param. Expo Router dedupes identical param values, so if we
+      // leave prefill set, scanning the SAME handle again is a no-op (the effect
+      // won't re-fire) and the page is left empty. Resetting it makes every scan
+      // a fresh undefined→value transition that re-triggers resolution.
+      router.setParams({ prefill: undefined });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
@@ -167,7 +211,7 @@ export default function Resolve() {
     return (
       <>
         {searchScreen}
-        <ResolvedProfileNative result={result} />
+        <ResolvedProfileNative result={result} onRefresh={refreshResult} />
       </>
     );
   }

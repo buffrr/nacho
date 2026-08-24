@@ -17,15 +17,14 @@ import { ActionFooter } from "@/ui/actionFooter";
 import { formatPrice } from "@/api";
 
 // Native buy view for an available handle: profile + why-own it + the key it
-// binds to + one-time price + Buy / Copy-request actions. Buy triggers the
-// existing IAP flow via onBuy.
+// binds to + one-time price + Buy action. Buy triggers the existing IAP flow via
+// onBuy. (No "copy request" here — that's for handles NOT sold through our flow.)
 export function PurchaseNative({
   handle,
   pubkey,
   price,
   purchasing,
   onBuy,
-  onCopyRequest,
   onCopyKey,
 }: {
   handle: string;
@@ -33,7 +32,6 @@ export function PurchaseNative({
   price: number | null;
   purchasing: boolean;
   onBuy: () => void;
-  onCopyRequest: () => void;
   onCopyKey: () => void;
 }) {
   const { scheme, colors } = useTheme();
@@ -85,12 +83,6 @@ export function PurchaseNative({
           </FieldGroup.SectionFooter>
         </FieldGroup.Section>
 
-        <FieldGroup.Section title="Price">
-          <ListItem trailing={<Text textStyle={{ fontWeight: "700" }}>{priceText}</Text>}>
-            <Text>One-time price</Text>
-          </ListItem>
-        </FieldGroup.Section>
-
       </FieldGroup>
       </Host>
       <ActionFooter
@@ -103,7 +95,6 @@ export function PurchaseNative({
           onPress: onBuy,
           disabled: purchasing,
         }}
-        secondary={{ label: "Copy request", onPress: onCopyRequest }}
       />
     </>
   );

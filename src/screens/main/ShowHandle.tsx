@@ -25,7 +25,7 @@ import { saveBinary } from "@/file";
 import * as Clipboard from "expo-clipboard";
 import { saveCert, loadCert, deleteCert } from "@/certStore";
 import { useRecordsDraft } from "@/RecordsDraft";
-import { editableFromZone } from "@/fabricResolver";
+import { editableFromZone, verifyErrorMessage } from "@/fabricResolver";
 import { handlePill } from "@/handleTile";
 import { Avatar } from "@/ui/Avatar";
 import { Layout } from "@/ui/Layout";
@@ -53,7 +53,6 @@ import { lookupRecord } from "@/recordRegistry";
 import type { EditableRecord } from "@/fabricResolver";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { OwnerProfileNative } from "@/ui/ownerProfileNative";
-import { ActionFooter } from "@/ui/actionFooter";
 import { liveOffers, Offer } from "@/offers";
 import { resolveHandleWithCerts } from "@/fabric";
 import {
@@ -155,6 +154,7 @@ export default function ShowHandle() {
     getSeq,
     setSeq,
     isDirty,
+    changedFlags,
     markClean,
     moveRecord,
   } = useRecordsDraft();
@@ -411,8 +411,9 @@ export default function ShowHandle() {
 
   // `fresh` uses a throwaway Fabric client so the SDK's zone cache can't return
   // stale data — used by the onboarding poll to catch the cert / sovereignty.
-  const refreshResolution = async (fresh = false) => {
+  const refreshResolution = async (fresh = false, loud = false) => {
     setResolving(true);
+    if (loud) setError(null);
     try {
       const resolved = fresh
         ? await resolveHandleFresh(handle)
@@ -479,7 +480,10 @@ export default function ShowHandle() {
         }
       }
     } catch (e) {
-      // leave the previous resolution in place on failure
+      // Leave the previous resolution in place on failure. Background polls stay
+      // silent; a user-initiated (loud) refresh surfaces the real error so
+      // pull-to-refresh doesn't fail invisibly.
+      if (loud) setError(verifyErrorMessage(e));
     } finally {
       setResolving(false);
     }
@@ -502,14 +506,21 @@ export default function ShowHandle() {
   // Pull-to-refresh for the manage view: re-resolve + reload signed listings, and
   // refresh the cert chain unless it's already final (immutable).
   const onManageRefresh = async () => {
-    await refreshResolution(true);
+    // loud = surface any resolve failure in the banner (this is user-initiated).
+    await refreshResolution(true, true);
     setLiveListings(await liveOffers(handle));
     if (!isFinalCached(handle)) {
-      const r = await resolveHandleWithCerts(handle, true).catch(() => null);
-      // Never cache a cert chain we couldn't verify against an anchor.
-      if (r && r.badge !== "unverified") {
-        setCachedCerts(handle, r);
-        setCertNonce((n) => n + 1);
+      try {
+        const r = await resolveHandleWithCerts(handle, true);
+        // Never cache a cert chain we couldn't verify against an anchor.
+        if (r && r.badge !== "unverified") {
+          setCachedCerts(handle, r);
+          setCertNonce((n) => n + 1);
+        }
+      } catch (e) {
+        // Only report the cert-chain error if the resolve above didn't already
+        // set one, so we don't clobber the more relevant message.
+        setError((prev) => prev ?? verifyErrorMessage(e));
       }
     }
   };
@@ -1008,7 +1019,19 @@ export default function ShowHandle() {
   // manual-entry form (we have no chain view). Transfer with no recipient = a key
   // rotation. Certificate + signed listings live in the manage view now; refresh
   // is pull-to-refresh; so the menu stays tight: Sell, Transfer, Remove.
+  // Unsaved record edits → the header shows a Publish CTA instead of the "+",
+  // so Add record moves into the ⋯ menu while publishing is pending.
+  const dirty = manageable && isDirty(handle);
+  const addRecordAction: NativeStackHeaderItemMenuAction = {
+    type: "action",
+    label: "Add record",
+    icon: { type: "sfSymbol", name: "plus" },
+    onPress: () =>
+      router.push({ pathname: "/(main)/(tabs)/handles/add-record", params: { handle } }),
+  };
   const menuActions: NativeStackHeaderItemMenuAction[] = [
+    // While dirty the "+" lives here (the header slot is taken by Publish).
+    ...(dirty ? [addRecordAction] : []),
     {
       type: "action",
       label: "Sell",
@@ -1055,9 +1078,23 @@ export default function ShowHandle() {
     : buyable
     ? []
     : [
-        // Add is a persistent header action (mocks2 §04), not a link that moves
-        // as the list grows — and it picks up the native iOS 26 bar-button look.
-        ...(manageable
+        // Unsaved edits → a prominent "Publish" CTA (send-arrow) takes the slot;
+        // otherwise the persistent "Add record" action (mocks2 §04), which picks
+        // up the native iOS 26 bar-button look.
+        ...(dirty
+          ? ([
+              {
+                // Spell out "Publish" (no icon — a native bar button renders the
+                // icon OR the title, not both, and the word is clearer here).
+                // Accent-tinted text, not a filled pill (prominent looked heavy).
+                type: "button",
+                label: publishing ? "Publishing…" : "Publish",
+                tintColor: colors.accent,
+                disabled: publishing,
+                onPress: signAndPublish,
+              },
+            ] as NativeStackHeaderItem[])
+          : manageable
           ? ([
               {
                 type: "button",
@@ -1162,11 +1199,11 @@ export default function ShowHandle() {
     let secondary: { label: string; onPress: () => void } | undefined;
 
     if (onboardStage === "issuing" && boughtViaNacho) {
-      // The handle is theirs (paid, bound to their key) — a plain green dot, NOT
-      // the seal/shield, which is reserved for actual sovereignty. The clock
-      // belongs to the "Issuing your certificate…" message, where the waiting is.
-      sIcon = "circle.fill";
-      iconColor = colors.statusGreenFg;
+      // The handle is theirs (paid, bound to their key) — no status glyph, just
+      // green "is yours" text. The seal/shield is reserved for actual
+      // sovereignty; the clock belongs to the "Issuing your certificate…"
+      // message, where the waiting is.
+      sIcon = undefined;
       statusLabel = "is yours";
       statusColor = colors.statusGreenFg;
       message =
@@ -1190,11 +1227,10 @@ export default function ShowHandle() {
         onPress: () => refreshResolution(),
       };
     } else if (onboardStage === "ready") {
-      // Cert landed — hand off into the handle. A plain green dot (not the seal,
-      // which is for sovereignty). No "anchoring…" copy: the Certificate view
-      // now carries Provisional/Confirming.
-      sIcon = "circle.fill";
-      iconColor = colors.statusGreenFg;
+      // Cert landed — hand off into the handle. No status glyph (the seal is for
+      // sovereignty). No "anchoring…" copy: the Certificate view now carries
+      // Provisional/Confirming.
+      sIcon = undefined;
       statusLabel = "is yours";
       statusColor = colors.statusGreenFg;
       message =
@@ -1289,7 +1325,7 @@ export default function ShowHandle() {
           }
         : error
           ? { text: error, tone: "error" }
-          : published
+          : published && !dirty
             ? { text: "Records published to certrelay.", tone: "success" }
             : notice
               ? { text: notice, tone: "muted" }
@@ -1309,6 +1345,8 @@ export default function ShowHandle() {
           pill={pill}
           sovereign={isSovereign}
           unverified={unverifiedResolution}
+          dirty={dirty}
+          changed={changedFlags(handle)}
           reordering={reordering}
           onMoveUp={(i) => moveRecord(handle, i, i - 1)}
           onMoveDown={(i) => moveRecord(handle, i, i + 1)}
@@ -1334,15 +1372,6 @@ export default function ShowHandle() {
           }
           onRefresh={onManageRefresh}
         />
-        {isDirty(handle) && (
-          <ActionFooter
-            primary={{
-              label: publishing ? "Publishing…" : "Sign and publish",
-              onPress: signAndPublish,
-              disabled: publishing,
-            }}
-          />
-        )}
       </View>
     );
   }
@@ -1358,7 +1387,6 @@ export default function ShowHandle() {
           price={price}
           purchasing={purchasing}
           onBuy={handleBuyHandle}
-          onCopyRequest={handleCopyRequest}
           onCopyKey={() => copy(pubkey)}
         />
       </>
