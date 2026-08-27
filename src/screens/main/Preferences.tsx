@@ -13,9 +13,8 @@ import {
   useNativeState,
 } from "@expo/ui";
 import { useStore } from "@/Store";
-import { saveBinary } from "@/file";
-import { exportDbBytes } from "@/db";
-import { ThemeMode, useTheme } from "@/theme";
+import { recordsSet } from "@/db";
+import { ThemeMode, useTheme, boundedHost } from "@/theme";
 import {
   getNetConfig,
   saveNetConfig,
@@ -66,21 +65,42 @@ function Field({
 export default function Preferences() {
   const router = useRouter();
   const { scheme, colors, mode, setMode } = useTheme();
-  const { wipeEverything } = useStore();
-  const conf = useMemo(() => getNetConfig(), []);
+  const { wipeEverything, createHandle, setHandlePurchase, setHandleOnboarded } =
+    useStore();
 
-  const backupKeystore = async () => {
-    try {
-      const bytes = await exportDbBytes();
-      await saveBinary(
-        `nacho-backup-${Date.now()}.sqlite`,
-        bytes,
-        "application/x-sqlite3",
-      );
-    } catch {
-      Alert.alert("Backup failed", "Couldn't export the backup file.");
+  // Seed a couple of local @example handles with rich records for screenshots.
+  // Reuses the @example demo bypass (no cert/network), so this only ever touches
+  // demo handles. Records go straight into the local cache the manage/resolve
+  // views read from.
+  const seedDemo = async () => {
+    const seq = Math.floor(Date.now() / 1000);
+    const demo: Record<string, { type: "txt" | "addr"; key: string; value: string[] }[]> = {
+      "alice@example": [
+        { type: "addr", key: "btc", value: ["bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq"] },
+        { type: "addr", key: "nostr", value: ["npub1sn0wdenkukak0d9dfczzeacvhkrgz92ak56egt7vdgzn8pv2wfqqhrjdv9"] },
+        { type: "txt", key: "x", value: ["alice"] },
+        { type: "txt", key: "instagram", value: ["alice"] },
+        { type: "txt", key: "website", value: ["alice.com"] },
+      ],
+      "satoshi@example": [
+        { type: "addr", key: "btc", value: ["bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"] },
+        { type: "addr", key: "ln", value: ["lno1pg257enxv4ezqcneype82um50ynhxgrwdajx293pqglnyxw6q0hzngfdusg8umzuxe8kquuz7pjl90ldj8wadwgs0xlmc"] },
+        { type: "txt", key: "bluesky", value: ["satoshi.bsky.social"] },
+        { type: "txt", key: "github", value: ["satoshi"] },
+      ],
+    };
+    for (const [h, records] of Object.entries(demo)) {
+      await createHandle(h);
+      await setHandlePurchase(h, { amountCents: 900 });
+      await setHandleOnboarded(h, true);
+      await recordsSet(h, JSON.stringify({ records, seq }), Date.now());
     }
+    Alert.alert(
+      "Demo data seeded",
+      "alice@example and satoshi@example added with records. Resolve either handle or open it from the list.",
+    );
   };
+  const conf = useMemo(() => getNetConfig(), []);
 
   // Dev/testing: wipe the keystore + all handles and reset to onboarding. The
   // root gate swaps to the onboarding stack automatically once xpub is cleared.
@@ -110,6 +130,7 @@ export default function Preferences() {
   );
   const [ver, setVer] = useState(0); // bump to remount fields (reset)
   const [savedTick, setSavedTick] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false); // collapse noise
   const [, bump] = useState(0); // force a re-render so "Save" can react to edits
   // Signature of the last-saved config, so "Save" only shows when the editor
   // has unsaved changes (the fields are uncontrolled, hence the manual compare).
@@ -192,7 +213,7 @@ export default function Preferences() {
   return (
     <>
       <Stack.Screen options={{ unstable_headerRightItems: () => headerItems }} />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup>
           <FieldGroup.Section title="Appearance">
             <Picker
@@ -208,99 +229,119 @@ export default function Preferences() {
 
           <FieldGroup.Section title="Keystore">
             <ListItem
-              leading={<Icon name="square.and.arrow.down" size={22} color={colors.textSecondary} />}
+              leading={<Icon name="checkmark.shield" size={22} color={colors.textSecondary} />}
               trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
-              onPress={backupKeystore}
+              onPress={() => router.push("/(main)/backup")}
             >
-              <Text>Backup keystore</Text>
-            </ListItem>
-            <ListItem
-              leading={<Icon name="eye" size={22} color={colors.textSecondary} />}
-              trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
-              onPress={() => router.push("/(main)/reveal-seed")}
-            >
-              <Text>Reveal seed phrase</Text>
+              <Text>Back up</Text>
             </ListItem>
             <FieldGroup.SectionFooter>
               <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
-                Your keystore holds your public key and handles — never your private
-                key, which stays in secure storage.
+                A complete backup is your seed phrase plus a backup file — you need
+                both to restore. Your private key never leaves secure storage.
               </Text>
             </FieldGroup.SectionFooter>
           </FieldGroup.Section>
 
-          <FieldGroup.Section title="Certrelay seeds">
-            {seedIds.map((id) => (
-              <Field
-                key={`${ver}:${id}`}
-                initial={values.current.get(id) ?? ""}
-                placeholder="https://…"
-                onChangeText={set(id)}
-                onRemove={seedIds.length > 1 ? () => removeId(id, setSeedIds) : undefined}
-                removeColor={colors.danger}
-              />
-            ))}
-            <ListItem
-              leading={<Icon name="plus.circle.fill" size={20} color={colors.textSecondary} />}
-              onPress={addSeed}
-            >
-              <Text textStyle={{ color: colors.text }}>Add seed</Text>
-            </ListItem>
-            <FieldGroup.SectionFooter>
-              <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
-                Used to bootstrap certrelays when the defaults are unreachable.
-              </Text>
-            </FieldGroup.SectionFooter>
-          </FieldGroup.Section>
-
-          <FieldGroup.Section title="API URL">
-            <Field
-              key={`${ver}:api`}
-              initial={values.current.get("api") ?? ""}
-              placeholder="https://…/api"
-              onChangeText={set("api")}
-              removeColor={colors.danger}
-            />
-          </FieldGroup.Section>
-
+          {/* Advanced — collapsed by default. Network config + dev/danger tools
+              are noise for most users, so they live behind one tap. */}
           <FieldGroup.Section>
             <ListItem
-              leading={<Icon name="arrow.counterclockwise" size={22} color={colors.danger} />}
-              onPress={onReset}
+              leading={<Icon name="slider.horizontal.3" size={22} color={colors.textSecondary} />}
+              trailing={
+                <Icon
+                  name={advancedOpen ? "chevron.down" : "chevron.forward"}
+                  size={14}
+                  color={colors.chevron}
+                />
+              }
+              onPress={() => setAdvancedOpen((o) => !o)}
             >
-              <Text textStyle={{ color: colors.danger }}>Reset to defaults</Text>
+              <Text>Advanced</Text>
             </ListItem>
           </FieldGroup.Section>
 
-          <FieldGroup.Section title="Developer">
-            <ListItem
-              leading={<Icon name="sparkles" size={22} color={colors.textSecondary} />}
-              trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
-              onPress={() => router.push("/(main)/onboarding-preview")}
-            >
-              <Text>Show onboarding</Text>
-            </ListItem>
-            <FieldGroup.SectionFooter>
-              <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
-                Previews the first-run screen without resetting the app.
-              </Text>
-            </FieldGroup.SectionFooter>
-          </FieldGroup.Section>
+          {advancedOpen ? (
+            <>
+              <FieldGroup.Section title="Certrelay seeds">
+                {seedIds.map((id) => (
+                  <Field
+                    key={`${ver}:${id}`}
+                    initial={values.current.get(id) ?? ""}
+                    placeholder="https://…"
+                    onChangeText={set(id)}
+                    onRemove={seedIds.length > 1 ? () => removeId(id, setSeedIds) : undefined}
+                    removeColor={colors.danger}
+                  />
+                ))}
+                <ListItem
+                  leading={<Icon name="plus.circle.fill" size={20} color={colors.textSecondary} />}
+                  onPress={addSeed}
+                >
+                  <Text textStyle={{ color: colors.text }}>Add seed</Text>
+                </ListItem>
+                <FieldGroup.SectionFooter>
+                  <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                    Used to bootstrap certrelays when the defaults are unreachable.
+                  </Text>
+                </FieldGroup.SectionFooter>
+              </FieldGroup.Section>
 
-          <FieldGroup.Section title="Danger zone">
-            <ListItem
-              leading={<Icon name="trash.fill" size={22} color={colors.danger} />}
-              onPress={confirmWipe}
-            >
-              <Text textStyle={{ color: colors.danger }}>Delete everything</Text>
-            </ListItem>
-            <FieldGroup.SectionFooter>
-              <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
-                Erases this keystore and all handles from this device, resetting the
-                app to onboarding. For testing.
-              </Text>
-            </FieldGroup.SectionFooter>
-          </FieldGroup.Section>
+              <FieldGroup.Section title="API URL">
+                <Field
+                  key={`${ver}:api`}
+                  initial={values.current.get("api") ?? ""}
+                  placeholder="https://…/api"
+                  onChangeText={set("api")}
+                  removeColor={colors.danger}
+                />
+              </FieldGroup.Section>
+
+              <FieldGroup.Section>
+                <ListItem
+                  leading={<Icon name="arrow.counterclockwise" size={22} color={colors.danger} />}
+                  onPress={onReset}
+                >
+                  <Text textStyle={{ color: colors.danger }}>Reset to defaults</Text>
+                </ListItem>
+              </FieldGroup.Section>
+
+              {/* Debug tools — compiled out of release builds (__DEV__ is false
+                  in production), so real users never see them. */}
+              {__DEV__ ? (
+                <FieldGroup.Section title="Debug">
+                  <ListItem
+                    leading={<Icon name="sparkles" size={22} color={colors.textSecondary} />}
+                    trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
+                    onPress={() => router.push("/(main)/onboarding-preview")}
+                  >
+                    <Text>Show onboarding</Text>
+                  </ListItem>
+                  <ListItem
+                    leading={<Icon name="wand.and.stars" size={22} color={colors.textSecondary} />}
+                    onPress={seedDemo}
+                  >
+                    <Text>Seed demo data (@example)</Text>
+                  </ListItem>
+                </FieldGroup.Section>
+              ) : null}
+
+              <FieldGroup.Section title="Danger zone">
+                <ListItem
+                  leading={<Icon name="trash.fill" size={22} color={colors.danger} />}
+                  onPress={confirmWipe}
+                >
+                  <Text textStyle={{ color: colors.danger }}>Delete everything</Text>
+                </ListItem>
+                <FieldGroup.SectionFooter>
+                  <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                    Erases this keystore and all handles from this device, resetting
+                    the app to onboarding.
+                  </Text>
+                </FieldGroup.SectionFooter>
+              </FieldGroup.Section>
+            </>
+          ) : null}
         </FieldGroup>
       </Host>
     </>

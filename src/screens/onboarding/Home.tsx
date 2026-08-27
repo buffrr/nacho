@@ -17,7 +17,7 @@ import { AtbitcoinLogo } from "@/ui/AtbitcoinLogo";
 import { SampleProfileCard } from "@/ui/SampleProfileCard";
 import { useStore } from "@/Store";
 import { generateMnemonic, xprvFromMnemonic } from "@/keys";
-import { Colors, useTheme } from "@/theme";
+import { Colors, useTheme, CONTENT_MAX_WIDTH } from "@/theme";
 
 
 const DARK_LOGO = `<svg width="245" height="140" viewBox="0 0 245 140" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -141,6 +141,10 @@ export default function Home({ preview = false }: { preview?: boolean }) {
           {/* Warm glow behind screen 1 only — screen 2's card carries its own
               gradient, so a page-level wash there would double up. */}
           <Glow />
+          {/* Cap the content column on wide screens (iPad) so it reads as an
+              intentional centered layout instead of edge-to-edge stretch. No-op
+              on phones (their width is below the cap). */}
+          <View style={styles.pageInner}>
           {/* Two equal spacers center the logo between the top and the field;
               the field-through-button stack below keeps the even GAP rhythm and
               is bottom-anchored. */}
@@ -151,7 +155,15 @@ export default function Home({ preview = false }: { preview?: boolean }) {
           {/* Address field — "your | @bitcoin". Not a real input: the static
               caret after "your" invites the reader to imagine typing their own
               name, and teaches the @bitcoin syntax before the headline. */}
-          <View style={styles.field}>
+          <View
+            style={[
+              styles.field,
+              // The default `border` token (#E5E7EA) is nearly invisible on the
+              // light grey screen (#F2F2F7). Use the slightly stronger chevron
+              // grey in light so the field reads as a bordered input; dark is fine.
+              scheme === "light" && { borderColor: colors.chevron, borderWidth: 1 },
+            ]}
+          >
             <Text style={styles.fieldYour}>your</Text>
             <View style={styles.caret} />
             <View style={styles.fieldMark}>
@@ -188,12 +200,14 @@ export default function Home({ preview = false }: { preview?: boolean }) {
             />
           </View>
           {dots}
+          </View>
         </View>
 
         {/* ── Screen 2: what it does — a native, self-verified profile. Mirrors
             screen 1: the figure (card) up top, the copy bottom-weighted by the
             button. ─────────────────────────────────────────────────────────── */}
         <View style={[pageStyle, pad]}>
+          <View style={styles.pageInner}>
           <View style={styles.spacer} />
           <View style={styles.cardWrap}>
             <SampleProfileCard />
@@ -216,6 +230,7 @@ export default function Home({ preview = false }: { preview?: boolean }) {
             />
           </View>
           {dots}
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -233,6 +248,15 @@ const makeStyles = (c: Colors) =>
     },
     page: {
       flexDirection: "column",
+    },
+    // Cap the content column so onboarding reads as an intentional centered
+    // layout on iPad rather than a stretched phone screen. On phones the window
+    // is narrower than the cap, so alignSelf:center + maxWidth is a no-op.
+    pageInner: {
+      flex: 1,
+      width: "100%",
+      maxWidth: CONTENT_MAX_WIDTH,
+      alignSelf: "center",
     },
     actions: {
       paddingHorizontal: 20,

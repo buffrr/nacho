@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/ui/Button";
-import { useTheme } from "@/theme";
+import { useTheme, CONTENT_MAX_WIDTH } from "@/theme";
 
 type Primary = {
   label: string;
@@ -58,31 +58,36 @@ export function ActionFooter({
 
   return (
     <View style={[styles.footer, { paddingBottom, backgroundColor: colors.background }]}>
-      {primary ? (
-        <Button
-          text={primary.label}
-          onPress={primary.onPress}
-          type={primary.type ?? "main"}
-          disabled={primary.disabled}
-        />
-      ) : null}
-      {secondary ? (
-        <TouchableOpacity
-          onPress={secondary.onPress}
-          disabled={secondary.disabled}
-          style={styles.secondary}
-        >
-          <Text style={[styles.secondaryText, { color: colors.textSecondary }]}>
-            {secondary.label}
-          </Text>
-        </TouchableOpacity>
-      ) : null}
+      {/* Center + cap the button column so it aligns with the capped Host content
+          on wide screens (iPad); the full-width bg still spans edge to edge. */}
+      <View style={styles.inner}>
+        {primary ? (
+          <Button
+            text={primary.label}
+            onPress={primary.onPress}
+            type={primary.type ?? "main"}
+            disabled={primary.disabled}
+          />
+        ) : null}
+        {secondary ? (
+          <TouchableOpacity
+            onPress={secondary.onPress}
+            disabled={secondary.disabled}
+            style={styles.secondary}
+          >
+            <Text style={[styles.secondaryText, { color: colors.textSecondary }]}>
+              {secondary.label}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   footer: { paddingHorizontal: 20, paddingTop: 10 },
+  inner: { width: "100%", maxWidth: CONTENT_MAX_WIDTH, alignSelf: "center" },
   secondary: { paddingVertical: 14, alignItems: "center" },
   secondaryText: { fontSize: 15, fontWeight: "500" },
 });

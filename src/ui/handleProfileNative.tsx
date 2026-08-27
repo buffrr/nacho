@@ -1,6 +1,7 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useId, useMemo, useState } from "react";
 import { WEB_TOP_INSET } from "@/ui/webInset";
-import { Linking, View } from "react-native";
+import { Linking, View, StyleSheet } from "react-native";
+import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
 import * as Clipboard from "expo-clipboard";
 import {
   Host,
@@ -15,7 +16,7 @@ import {
 } from "@expo/ui";
 import type { SFSymbol } from "sf-symbols-typescript";
 import { useRouter } from "expo-router";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
 import { NativeEmpty } from "@/ui/nativeEmpty";
 import { ResolvedHandle } from "@/fabricResolver";
@@ -55,6 +56,23 @@ export const sfFor = (key: string): SFSymbol => SF[key] ?? "doc.text";
 // glyph. Uses the registry's own SVG icon (rendered white) so it's identical
 // cross-platform; `size` is the square's edge. One helper so every record-icon
 // site (picker, editor, profile, sign-request) stays in sync.
+
+// Shift a #RRGGBB colour toward white (amt > 0) or black (amt < 0) by |amt|
+// fraction — used to derive a subtle two-stop gradient from a solid brand colour.
+function shade(hex: string, amt: number): string {
+  const m = hex.replace("#", "");
+  if (m.length < 6) return hex;
+  const target = amt < 0 ? 0 : 255;
+  const p = Math.min(1, Math.abs(amt));
+  const ch = (i: number) => {
+    const c = parseInt(m.slice(i, i + 2), 16);
+    return Math.round(c + (target - c) * p)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${ch(0)}${ch(2)}${ch(4)}`;
+}
+
 export function RecordGlyph({
   def,
   size,
@@ -65,6 +83,13 @@ export function RecordGlyph({
   color?: string;
 }) {
   const Glyph = def.Icon;
+  // Sanitise the React id — useId() contains ":" which is invalid in an SVG id.
+  const gid = `g${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  // Every glyph gets a gradient for a consistent, iOS-icon-like sheen. Brand
+  // gradients (e.g. Instagram) win; otherwise derive a subtle darker→lighter
+  // ramp from the solid colour (bottom-left → top-right).
+  const base = color ?? def.color;
+  const stops = def.gradient ?? [shade(base, -0.12), shade(base, 0.16)];
   return (
     <View
       style={{
@@ -72,11 +97,25 @@ export function RecordGlyph({
         height: size,
         borderRadius: Math.round(size * 0.28),
         borderCurve: "continuous",
-        backgroundColor: color ?? def.color,
+        overflow: "hidden",
         alignItems: "center",
         justifyContent: "center",
       }}
     >
+      <Svg pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <Defs>
+          <LinearGradient id={gid} x1="0" y1="1" x2="1" y2="0">
+            {stops.map((c, i) => (
+              <Stop
+                key={i}
+                offset={stops.length > 1 ? i / (stops.length - 1) : 0}
+                stopColor={c}
+              />
+            ))}
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${gid})`} />
+      </Svg>
       <Glyph size={Math.round(size * 0.62)} color="#FFFFFF" />
     </View>
   );
@@ -204,9 +243,12 @@ export function ResolvedProfileNative({
   }, [result]);
 
   const sovereign = result.zone.sovereignty === "sovereign";
+  // Verified against the user's OWN pinned anchor — the strongest trust state, so
+  // it gets a distinct green device-check glyph + brighter text than the fallback.
+  const verifiedOwn = result.badge === "orange";
   const trustText =
-    result.badge === "orange"
-      ? "Verified with your trust anchor"
+    verifiedOwn
+      ? "Verified on-device with your trust anchor"
       : result.badge === "unverified"
         ? "Not verified against any anchor"
         : "Verified with fallback trust sources";
@@ -228,49 +270,52 @@ export function ResolvedProfileNative({
           <Text textStyle={{ fontSize: 22, fontWeight: "700", color: colors.text }}>
             {result.handle}
           </Text>
-          <Row alignment="center" spacing={5}>
-            {/* Unverified overrides everything — no seal for an unverified
-                handle even if its zone claims sovereignty. */}
+          {/* Only the noteworthy states get a status line: the Sovereign seal and
+              the Unverified warning. A plain "Registered" (clock) is noise on a
+              resolved handle — the trust caption below already covers it. */}
+          {unverified || sovereign ? (
+            <Row alignment="center" spacing={5}>
+              <Icon
+                name={unverified ? "exclamationmark.triangle.fill" : "checkmark.seal.fill"}
+                size={14}
+                color={unverified ? colors.dangerText : colors.statusGreenFg}
+              />
+              <Text
+                textStyle={{
+                  fontSize: 13,
+                  color: unverified ? colors.dangerText : colors.statusGreenFg,
+                }}
+              >
+                {unverified ? "Unverified" : "Sovereign"}
+              </Text>
+            </Row>
+          ) : null}
+          <Row alignment="center" spacing={6}>
             <Icon
               name={
                 unverified
-                  ? "exclamationmark.triangle.fill"
-                  : sovereign
-                    ? "checkmark.seal.fill"
-                    : "clock"
+                  ? "xmark.shield.fill"
+                  : verifiedOwn
+                    ? "iphone.badge.checkmark"
+                    : "checkmark.shield"
               }
-              size={14}
+              size={13}
               color={
                 unverified
                   ? colors.dangerText
-                  : sovereign
+                  : verifiedOwn
                     ? colors.statusGreenFg
-                    : colors.textMuted
+                    : colors.textSecondary
               }
-            />
-            <Text
-              textStyle={{
-                fontSize: 13,
-                color: unverified
-                  ? colors.dangerText
-                  : sovereign
-                    ? colors.statusGreenFg
-                    : colors.textMuted,
-              }}
-            >
-              {unverified ? "Unverified" : sovereign ? "Sovereign" : "Registered"}
-            </Text>
-          </Row>
-          <Row alignment="center" spacing={6}>
-            <Icon
-              name={unverified ? "xmark.shield.fill" : "checkmark.shield"}
-              size={12}
-              color={unverified ? colors.dangerText : colors.textSecondary}
             />
             <Text
               textStyle={{
                 fontSize: 12,
-                color: unverified ? colors.dangerText : colors.textSecondary,
+                color: unverified
+                  ? colors.dangerText
+                  : verifiedOwn
+                    ? colors.text
+                    : colors.textSecondary,
               }}
             >
               {trustText}
@@ -301,7 +346,7 @@ export function ResolvedProfileNative({
   }
 
   return (
-    <Host style={{ flex: 1, paddingTop: WEB_TOP_INSET }} colorScheme={scheme} matchContents={false}>
+    <Host style={[boundedHost, { paddingTop: WEB_TOP_INSET }]} colorScheme={scheme} matchContents={false}>
       <FieldGroup modifiers={onRefresh ? [refreshable(onRefresh)] : undefined}>
         {payUri ? (
           <FieldGroup.Section>

@@ -2,7 +2,7 @@ import React, { ReactNode } from "react";
 import { View, StyleSheet, Platform, ScrollView } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme } from "@/theme";
+import { useTheme, CONTENT_MAX_WIDTH } from "@/theme";
 
 interface LayoutProps {
   children: ReactNode;
@@ -72,11 +72,18 @@ export function Layout({
     bottomPad ? { paddingBottom: bottomPad } : null,
   ];
 
+  // Cap + center the content column on wide screens (iPad); the horizontal
+  // padding lives here too so it insets within the capped column. No-op on
+  // phones (window narrower than the cap).
+  const bounded = (node: ReactNode, fill = false) => (
+    <View style={[styles.bounded, fill && styles.boundedFill]}>{node}</View>
+  );
+
   let content: ReactNode;
   if (!scrollable) {
     content = (
       <View style={[styles.content, bottomPad ? { paddingBottom: bottomPad } : null]}>
-        {children}
+        {bounded(children, true)}
       </View>
     );
   } else if (keyboardAware) {
@@ -89,7 +96,7 @@ export function Layout({
         enableOnAndroid={true}
         contentInsetAdjustmentBehavior={autoInset ? "automatic" : "never"}
       >
-        {children}
+        {bounded(children)}
       </KeyboardAwareScrollView>
     );
   } else {
@@ -105,7 +112,7 @@ export function Layout({
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior={autoInset ? "automatic" : "never"}
       >
-        {children}
+        {bounded(children)}
       </ScrollView>
     );
   }
@@ -128,7 +135,7 @@ export function Layout({
             { paddingBottom: insets.bottom, backgroundColor: colors.background },
           ]}
         >
-          {footer}
+          {bounded(footer)}
         </View>
       )}
     </View>
@@ -144,14 +151,21 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {},
+  // Content column: full width up to the cap, centered, with the horizontal
+  // inset that used to live on the containers above.
+  bounded: {
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: "center",
     paddingHorizontal: 20,
   },
-  scrollContent: {
-    paddingHorizontal: 20,
+  boundedFill: {
+    flex: 1,
   },
   footer: {
     paddingTop: 20,
-    paddingHorizontal: 20,
     zIndex: 10,
   },
   overlay: {

@@ -12,7 +12,7 @@ import {
   Picker,
   useNativeState,
 } from "@expo/ui";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import { useRecordsDraft } from "@/RecordsDraft";
 import { lookupRecord } from "@/recordRegistry";
 import { RecordGlyph } from "@/ui/handleProfileNative";
@@ -213,7 +213,7 @@ export default function EditRecord() {
       <Stack.Screen
         options={{ title, unstable_headerRightItems: () => headerItems }}
       />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup>
           {useSlots && def ? (
             <>

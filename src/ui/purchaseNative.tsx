@@ -11,7 +11,7 @@ import {
   Spacer,
   RNHostView,
 } from "@expo/ui";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
 import { ActionFooter } from "@/ui/actionFooter";
 import { formatPrice } from "@/api";
@@ -38,7 +38,7 @@ export function PurchaseNative({
   const priceText = price !== null ? formatPrice(price) : "—";
   return (
     <>
-      <Host style={{ flex: 1, paddingTop: WEB_TOP_INSET }} colorScheme={scheme}>
+      <Host style={[boundedHost, { paddingTop: WEB_TOP_INSET }]} colorScheme={scheme}>
       <FieldGroup>
         <FieldGroup.Section>
           <FieldGroup.SectionHeader>

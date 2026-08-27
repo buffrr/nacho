@@ -40,6 +40,7 @@ import {
   parseTrustInput,
   cachedTrustAnchor,
   resetTrustCache,
+  wipeTrustStorage,
   TrustAnchor,
   TrustState,
 } from "@/trust";
@@ -87,6 +88,14 @@ function resetFabric(): void {
   resetTrustCache();
 }
 onNetConfigChange(resetFabric);
+
+// "Delete everything": clear persisted trust state (pinned anchors, custom pool,
+// fallback-disabled flag) and drop the client, so the next resolve rebuilds with
+// the SDK default pool (DEFAULT_SEMI_TRUSTED).
+export async function wipeTrust(): Promise<void> {
+  await wipeTrustStorage();
+  resetFabric();
+}
 
 export async function resolveHandle(
   handle: string,

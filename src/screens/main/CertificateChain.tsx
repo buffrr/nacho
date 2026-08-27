@@ -3,7 +3,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { Host, FieldGroup, ListItem, Icon, Text, Column, Row } from "@expo/ui";
 import { refreshable } from "@/ui/rowModifiers";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import { NativeEmpty } from "@/ui/nativeEmpty";
 import { resolveHandleWithCerts } from "@/fabric";
 import { chainRows, getCachedCerts, setCachedCerts, ChainRow, CertState } from "@/certState";
@@ -97,7 +97,7 @@ export default function CertificateChain() {
   return (
     <>
       <Stack.Screen options={{ title: "Certificate chain" }} />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup modifiers={[refreshable(onRefresh)]}>
           <FieldGroup.Section title="How this handle is anchored">
             {rows.map((r, i) =>
@@ -196,7 +196,7 @@ export default function CertificateChain() {
             <FieldGroup.SectionFooter>
               <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
                 A zone is included in the commitment its parent publishes. Tap a root to
-                copy it and check it against a block explorer.
+                copy it.
               </Text>
             </FieldGroup.SectionFooter>
           </FieldGroup.Section>

@@ -10,7 +10,7 @@ import {
   useNativeState,
 } from "@expo/ui";
 import { useStore } from "@/Store";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import { ActionFooter } from "@/ui/actionFooter";
 import { claimCode } from "@/api";
 
@@ -61,7 +61,7 @@ export default function Redeem() {
 
   return (
     <>
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup>
           <FieldGroup.Section title="Claim code">
             <ListItem>
@@ -75,7 +75,7 @@ export default function Redeem() {
             </ListItem>
             <FieldGroup.SectionFooter>
               <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
-                Bought a handle on the web? Enter your claim code to bind it to a
+                Enter your claim code to bind it to a
                 new key in this keystore.
               </Text>
             </FieldGroup.SectionFooter>

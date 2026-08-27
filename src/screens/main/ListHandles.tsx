@@ -26,7 +26,8 @@ import type { SFSymbol } from "sf-symbols-typescript";
 // into the centred nav-bar title as the list scrolls (Messages/Settings style).
 export default function ListHandles() {
   const router = useRouter();
-  const { handles, xpub, setHandleResolution, seedBackedUp } = useStore();
+  const { handles, xpub, setHandleResolution, seedBackedUp, backupStale } =
+    useStore();
   const { colors, scheme } = useTheme();
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [, setRefreshing] = useState(false);
@@ -38,13 +39,15 @@ export default function ListHandles() {
     ? allHandles.filter(([name]) => name.toLowerCase().includes(q))
     : allHandles;
 
-  // Nudge the user to back up their seed once they own a handle they can actually
-  // control (has a certificate) — not before, to keep onboarding frictionless.
-  // Dismissed for good once they confirm on the reveal screen. Hidden while filtering.
+  // Nudge to back up once the user owns a handle they can actually control (has a
+  // certificate) — not before, to keep onboarding frictionless. Shown while the
+  // seed isn't saved OR the backup file is stale (a new cert-backed handle was
+  // added, or a cert finalized, since the last export), so it recurs each time
+  // there's something new to back up. Hidden while filtering.
   const needsBackup =
-    !seedBackedUp &&
     !q &&
-    allHandles.some(([, d]) => !!(d.certRef || d.cert));
+    allHandles.some(([, d]) => !!(d.certRef || d.cert)) &&
+    (!seedBackedUp || backupStale);
 
   // Pull-to-refresh: EXPLICITLY refresh the semi-trusted anchor (the only place we
   // re-fetch it — never automatically), then re-resolve each handle so the tiles'
@@ -93,7 +96,17 @@ export default function ListHandles() {
     }, []),
   );
 
-  const infoFor = (name: string, handleData: HandleData) => {
+  const infoFor = (name: string, handleData: HandleData): TileInfo => {
+    // App Review demo handle (@example): local-only, no cert — show the record
+    // count, never "Waiting for certificate". Can't match a real handle.
+    if (/@example$/i.test(name)) {
+      const n = counts[name] ?? 0;
+      return {
+        status: "none",
+        subtitle: n > 0 ? `${n} record${n === 1 ? "" : "s"}` : "No records yet",
+        attention: false,
+      };
+    }
     const ourScript = xpub ? scriptForHandle(xpub, handleData) : null;
     const resolution = handleData.resolution;
     const keyMismatch = !!(
@@ -116,12 +129,11 @@ export default function ListHandles() {
       <NativeEmpty
         sf="at"
         title="No handles yet"
-        message="Register a new handle or buy one — it lives in this keystore, yours to control."
+        message="Purchase a handle or add a new one."
         primary={{
-          label: "Register a handle",
-          onPress: () => router.push("/(main)/register-hub"),
+          label: "Shop handles",
+          onPress: () => router.push("/(main)/(tabs)/handles/shop"),
         }}
-        secondary={{ label: "Shop handles", onPress: () => router.push("/(main)/(tabs)/handles/shop") }}
       />
     );
   }
@@ -195,12 +207,12 @@ export default function ListHandles() {
             leading={
               <Icon name="exclamationmark.shield.fill" size={26} color={colors.statusAmberFg} />
             }
-            supportingText="Save your recovery phrase so you can't lose your handles."
+            supportingText="Save your seed phrase and a backup file so you can't lose your handles."
             trailing={<Icon name="chevron.forward" size={14} color={colors.chevron} />}
-            onPress={() => router.push("/(main)/reveal-seed")}
+            onPress={() => router.push("/(main)/backup")}
           >
             <UIText textStyle={{ fontSize: 17, fontWeight: "600" }}>
-              Back up your seed phrase
+              Back up your keystore
             </UIText>
           </ListItem>
         ) : null}

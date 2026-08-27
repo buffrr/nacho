@@ -155,8 +155,10 @@ export default function ShowHandle() {
     setSeq,
     isDirty,
     changedFlags,
+    changeCount,
     markClean,
     moveRecord,
+    deleteRecord,
   } = useRecordsDraft();
   const [error, setError] = useState<string | null>(null);
   // Records reorder mode: rows show up/down arrows instead of editing on tap
@@ -224,6 +226,21 @@ export default function ShowHandle() {
   const persisted = handles?.[handle];
   const handleData = persisted ?? nextHandleData();
   const isProspective = !persisted;
+
+  // App Review demo handles. The "@example" space is never a real registerable
+  // space, so this can never match a production handle — it lets a purchased
+  // example handle skip cert issuance / certrelay publishing and just edit dummy
+  // records locally, so reviewers can exercise the record UI. Gated ONLY on the
+  // handle string, so it adds no behavior to any real handle.
+  const demo = /@example$/i.test(handle);
+  // A demo handle counts as OWNED only once it's actually acquired — seeded, or a
+  // completed sandbox purchase (both set a purchase record) — NOT merely present
+  // in the keystore. During an in-flight purchase, handleBuyHandle calls
+  // createHandle BEFORE payment (to reserve), which persists the handle; gating
+  // on the purchase record (not `!isProspective`) keeps the Buy view up with the
+  // IAP sheet over it instead of flipping to the manage view mid-purchase. A
+  // prospective demo (from Shop) stays buyable so reviewers can sandbox-purchase.
+  const demoOwned = demo && !!handleData?.purchase;
 
   if (!xpub || !handleData) {
     return <Redirect href="/(main)/(tabs)/handles" />;
@@ -330,7 +347,12 @@ export default function ShowHandle() {
       // server again. This also means a server outage can't mislabel an
       // established handle as "not available to buy".
       const hasCertYet = !!handleData.certRef || !!handleData.cert;
-      if (!hasCertYet) {
+      // An OWNED demo (@example) is always "available" on the server (it's the
+      // sandbox-purchasable review handle), so probing its status would flip a
+      // seeded, locally-manageable handle into the Buy view. Skip it for owned
+      // demos only — a PROSPECTIVE demo still needs the status + price so its Buy
+      // page works (reviewers purchase it via sandbox).
+      if (!hasCertYet && !demoOwned) {
         fetchAndUpdateHandleStatus();
         checkPurchaseInfo(handle).then((info) => {
           setPurchaseSupport(info.support);
@@ -412,6 +434,9 @@ export default function ShowHandle() {
   // `fresh` uses a throwaway Fabric client so the SDK's zone cache can't return
   // stale data — used by the onboarding poll to catch the cert / sovereignty.
   const refreshResolution = async (fresh = false, loud = false) => {
+    // Demo (@example) never resolves on the network — skip so it doesn't flap to
+    // "unverified"/not-found or waste a request.
+    if (demo) return;
     setResolving(true);
     if (loud) setError(null);
     try {
@@ -506,6 +531,7 @@ export default function ShowHandle() {
   // Pull-to-refresh for the manage view: re-resolve + reload signed listings, and
   // refresh the cert chain unless it's already final (immutable).
   const onManageRefresh = async () => {
+    if (demo) return; // nothing to refresh for a local-only example handle
     // loud = surface any resolve failure in the banner (this is user-initiated).
     await refreshResolution(true, true);
     setLiveListings(await liveOffers(handle));
@@ -577,6 +603,19 @@ export default function ShowHandle() {
     setError(null);
     setPublished(false);
     setPublishing(true);
+    // Demo (@example): no cert, no certrelay — just accept the edits locally so
+    // reviewers see a working publish without any network dependency.
+    if (demo) {
+      const seq = Math.floor(Date.now() / 1000);
+      const records = getRecords(handle);
+      setSeq(handle, seq);
+      markClean(handle);
+      recordsSet(handle, JSON.stringify({ records, seq }), Date.now());
+      foundRef.current = true;
+      setPublished(true);
+      setPublishing(false);
+      return;
+    }
     try {
       const secretKey = await getSigningKey(handle);
       if (!secretKey) {
@@ -757,13 +796,17 @@ export default function ShowHandle() {
   // handles never go through the buy/request flow.
   const isImported = handleData.source === "imported";
   const resolvable = !!resolution?.found && !keyMismatch;
-  const owned = resolvable || isImported || isScriptPubkeyValid === true;
+  // A persisted demo counts as owned (it's local-only, no resolution/cert) so it
+  // manages instead of showing Buy.
+  const owned = resolvable || isImported || isScriptPubkeyValid === true || demoOwned;
   // We've already grabbed + stored this handle's certificate.
   const hasCert = !!handleData.certRef || !!cert;
   // Once we hold the cert we can show + manage records regardless of a flapping
   // live resolution (e.g. the semi-trusted anchor lagging the handle's block),
   // so the view doesn't bounce back to "waiting for certificate".
-  const manageable = !keyMismatch && (resolvable || (owned && hasCert));
+  // An OWNED demo (@example) is always manageable (local records, no cert
+  // needed). A prospective demo is NOT manageable — it shows the Buy view.
+  const manageable = demoOwned || (!keyMismatch && (resolvable || (owned && hasCert)));
   // The handle is actually PAID for (not merely reserved) once it's taken on the
   // server, resolves on certrelay, we hold its cert, or it's an imported keypair.
   // A reservation the user never paid for (status "reserved"/"processing_payment")
@@ -792,8 +835,10 @@ export default function ShowHandle() {
   // Certificate view now carries Provisional/Confirming), but keep the step
   // itself for its "Set up records" hand-off into the manage view.
   // Reserved/unpaid handles and pre-existing ones skip onboarding entirely.
+  // Demo (@example) skips the issuing/ready/sovereign onboarding entirely — it
+  // has no cert to wait for; it lands straight in the manage view.
   const showOnboarding =
-    isPaid && !keyMismatch && handleData.onboarded === false;
+    !demo && isPaid && !keyMismatch && handleData.onboarded === false;
   const onboardStage: "issuing" | "ready" | "sovereign" = !hasCert
     ? "issuing"
     : isSovereign
@@ -822,7 +867,7 @@ export default function ShowHandle() {
     : certStateFromSovereignty(isSovereign ? "sovereign" : sovereignty);
   const [, setCertNonce] = useState(0);
   useEffect(() => {
-    if (!manageable || isSovereign || isFinalCached(handle)) return;
+    if (demo || !manageable || isSovereign || isFinalCached(handle)) return;
     let active = true;
     resolveHandleWithCerts(handle)
       .then((r) => {
@@ -839,7 +884,9 @@ export default function ShowHandle() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manageable, isSovereign, handle]);
 
-  // Directly purchasable here → show the dedicated claim/purchase view.
+  // Directly purchasable here → show the dedicated claim/purchase view. An OWNED
+  // demo is `owned` (above), so it's excluded; a PROSPECTIVE demo still reaches
+  // Buy via the server's "available" status, so reviewers can buy it via sandbox.
   const buyable =
     !owned &&
     !keyMismatch &&
@@ -1046,8 +1093,9 @@ export default function ShowHandle() {
       onPress: () =>
         router.push({ pathname: "/(main)/(tabs)/handles/handle-action", params: { handle, action: "transfer" } }),
     },
-    // Reorder is only meaningful with more than one record.
-    ...(getRecords(handle).length > 1
+    // Reorder mode (up/down chevrons) is the web/Android path; iOS reorders via
+    // native drag in the SwiftUI list, so the menu item is redundant there.
+    ...(Platform.OS !== "ios" && getRecords(handle).length > 1
       ? ([
           {
             type: "action",
@@ -1347,9 +1395,12 @@ export default function ShowHandle() {
           unverified={unverifiedResolution}
           dirty={dirty}
           changed={changedFlags(handle)}
+          changeCount={changeCount(handle)}
           reordering={reordering}
           onMoveUp={(i) => moveRecord(handle, i, i - 1)}
           onMoveDown={(i) => moveRecord(handle, i, i + 1)}
+          onMoveRecord={(from, to) => moveRecord(handle, from, to)}
+          onDeleteRecord={(i) => deleteRecord(handle, i)}
           banner={banner}
           copied={copiedId}
           certState={certState}

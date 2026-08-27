@@ -10,7 +10,7 @@ import {
   Row,
   Spacer,
 } from "@expo/ui";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import { ActionFooter } from "@/ui/actionFooter";
 import { authenticate } from "@/auth";
 import { trustFromInput } from "@/fabric";
@@ -54,7 +54,7 @@ export default function TrustApprove() {
   return (
     <>
       <Stack.Screen options={{ title: "Trust ID" }} />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup>
           <FieldGroup.Section>
             <FieldGroup.SectionHeader>

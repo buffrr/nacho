@@ -12,7 +12,8 @@ import * as SecureStore from "expo-secure-store";
 import { kvGet, kvSet, kvRemove, certDelete, recordsDelete } from "@/db";
 import { clearHistory } from "@/resolveHistory";
 import { migrateLegacyStore } from "@/migrateLegacy";
-import { loadNetConfig } from "@/config";
+import { loadNetConfig, resetNetConfig } from "@/config";
+import { wipeTrust } from "@/fabric";
 import { CertData, isCertData, areCertDataEqual } from "@/cert";
 import {
   xpubFromXprv,
@@ -325,6 +326,21 @@ function nextDerivedPath(handles: HandlesMap): string {
 
 export type HandlesMap = Record<string, HandleData>;
 
+// A stable fingerprint of the backup-worthy state: each cert-backed handle plus
+// its cert sovereignty. It changes when a new cert-backed handle is added or a
+// cert finalizes (temp → sovereign), which is exactly when the .sqlite backup
+// goes stale and the user should re-export it. Handles with no cert yet aren't
+// included — there's nothing to lose until the cert lands (demo @example handles
+// never have one, so they never nag).
+export function backupSignature(handles: HandlesMap | null): string {
+  if (!handles) return "";
+  return Object.entries(handles)
+    .filter(([, d]) => !!(d.certRef || d.cert))
+    .map(([name, d]) => `${name}:${d.certRef?.sovereignty ?? "cert"}`)
+    .sort()
+    .join("|");
+}
+
 export type Keystore = {
   xpub: string;
   handles: HandlesMap;
@@ -431,6 +447,11 @@ type StoreContextType = {
   // backup nudge (shown once they own a cert-backed handle). Sticky once true.
   seedBackedUp: boolean;
   markSeedBackedUp: () => Promise<void>;
+  // The .sqlite backup file is stale relative to the current keystore — a new
+  // cert-backed handle was added, or a cert finalized (temp → sovereign), since
+  // the last file export. Re-drives the backup nudge even after the seed is saved.
+  backupStale: boolean;
+  markBackupSaved: () => Promise<void>;
   // Dev/testing: reset the app to fresh onboarding (keeps network config).
   wipeEverything: () => Promise<void>;
 };
@@ -442,6 +463,9 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   const [handles, setHandles] = useState<HandlesMap | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [seedBackedUp, setSeedBackedUp] = useState(false);
+  // Signature of the keystore state captured at the last .sqlite backup. When it
+  // differs from the current signature, the backup file is stale.
+  const [backupSig, setBackupSig] = useState<string>("");
   // Always-latest handles, updated synchronously in saveKeystore, so the
   // per-handle setters merge into the current map instead of a stale render
   // closure (which caused resolution/certRef writes to clobber each other and
@@ -470,6 +494,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       if ((await kvGet("seedBackedUp")) === "1") setSeedBackedUp(true);
+      setBackupSig((await kvGet("backupSig")) ?? "");
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {
@@ -514,6 +539,16 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     await kvSet("seedBackedUp", "1");
   };
 
+  // Current backup-worthy signature vs. the one captured at the last file export.
+  const currentBackupSig = backupSignature(handles);
+  const backupStale = currentBackupSig !== "" && currentBackupSig !== backupSig;
+
+  const markBackupSaved = async (): Promise<void> => {
+    const sig = backupSignature(currentHandles());
+    setBackupSig(sig);
+    await kvSet("backupSig", sig);
+  };
+
   // Dev/testing: wipe the keystore, every handle's secrets/cert/records, the
   // backup flag and the resolve history — resetting the app to fresh onboarding.
   // Network config (relays/API) is intentionally kept. Best-effort: individual
@@ -541,8 +576,20 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     }
     await kvRemove("keystore");
     await kvRemove("seedBackedUp");
+    await kvRemove("backupSig");
     try {
       await clearHistory();
+    } catch {
+      // ignore
+    }
+    try {
+      // Revert the network config (seeds + API URL) to defaults so a wipe
+      // doesn't keep a custom/local endpoint.
+      await resetNetConfig();
+      // Revert trust state to fabric's defaults (drops any pinned anchor, custom
+      // pool, or fallback-disabled flag) so a fresh keystore isn't left with
+      // "fallback sources not set".
+      await wipeTrust();
     } catch {
       // ignore
     }
@@ -550,6 +597,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     setHandles(null);
     setXpub(null);
     setSeedBackedUp(false);
+    setBackupSig("");
   };
 
   const setupKeystore = async (
@@ -824,6 +872,8 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         setHandlePurchase,
         seedBackedUp,
         markSeedBackedUp,
+        backupStale,
+        markBackupSaved,
         wipeEverything,
       }}
     >

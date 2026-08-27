@@ -29,6 +29,8 @@ PODS:
     - Yoga
   - ExpoAsset (57.0.9):
     - ExpoModulesCore
+  - ExpoBlur (57.0.2):
+    - ExpoModulesCore
   - ExpoCamera (57.0.3):
     - ExpoModulesCore
   - ExpoCameraBarcodeScanning (57.0.3):
@@ -2008,7 +2010,7 @@ PODS:
     - React-utils (= 0.86.2)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.2)
-  - ReactNativeLibveritas (0.3.3):
+  - ReactNativeLibveritas (0.4.2):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2372,6 +2374,7 @@ DEPENDENCIES:
   - EXConstants (from `../node_modules/expo-constants/ios`)
   - Expo (from `../node_modules/expo`)
   - ExpoAsset (from `../node_modules/expo-asset/ios`)
+  - ExpoBlur (from `../node_modules/expo-blur/ios`)
   - ExpoCamera (from `../node_modules/expo-camera/ios`)
   - ExpoCameraBarcodeScanning (from `../node_modules/expo-camera/ios`)
   - ExpoClipboard (from `../node_modules/expo-clipboard/ios`)
@@ -2497,6 +2500,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo"
   ExpoAsset:
     :path: "../node_modules/expo-asset/ios"
+  ExpoBlur:
+    :path: "../node_modules/expo-blur/ios"
   ExpoCamera:
     :path: "../node_modules/expo-camera/ios"
   ExpoCameraBarcodeScanning:
@@ -2725,6 +2730,7 @@ SPEC CHECKSUMS:
   EXConstants: 05451cfe61c84dd2d840831d05bb0c115f96ec6a
   Expo: da739a9dc8d16ac61adf80ae40f46e24a02957df
   ExpoAsset: cfe3aa47b38c5bc793613f2d7224f2314ad132d0
+  ExpoBlur: 69e67b4fbfed6f7325377af2aefa8aa4f00cd2af
   ExpoCamera: a5e9d9ce2fc06689eb2dd676f1f8d5f22f8aa292
   ExpoCameraBarcodeScanning: b869ac87ebe30bb99b26c55b0e0471301383c90b
   ExpoClipboard: 95055b11758f339b61d4d8064dd799df1cf03b7f
@@ -2827,7 +2833,7 @@ SPEC CHECKSUMS:
   ReactCodegen: 3bbb7de19774794a7428ef623a7b777106cf3737
   ReactCommon: 9002f006f571256348994183f7d4387aa7cf84e8
   ReactNativeDependencies: 2bd6854ade79bf1b60586d1ab7813a389df1b6bf
-  ReactNativeLibveritas: 373aff5b0585d175aa848e6496b6558a0634b371
+  ReactNativeLibveritas: 3297ab8bb6a6876273a677ac2c9a84ba59873c39
   RNCAsyncStorage: 2ad919e88b8bc2cd80e8697ce66d04d006743283
   RNCMaskedView: eb2b2e538afa907f05a5848a1a1ac26092e6fec9
   RNGestureHandler: a426f18ab9021991fe2cbc8bf1677b740e20e70c
@@ -2839,6 +2845,6 @@ SPEC CHECKSUMS:
   Yoga: 9891cfb1c680f64de9c41b09e7453dea33454d2b
   ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5
 
-PODFILE CHECKSUM: 0d4820de9337accfc5f6327ca124969d35ddae1f
+PODFILE CHECKSUM: 7bd7ac37e5778445b279f522ce5c9af9472a7a26
 
 COCOAPODS: 1.17.0

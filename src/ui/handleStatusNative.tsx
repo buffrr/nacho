@@ -12,7 +12,7 @@ import {
   Spacer,
   RNHostView,
 } from "@expo/ui";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
 import { ActionFooter } from "@/ui/actionFooter";
 
@@ -55,7 +55,7 @@ export function HandleStatusNative({
   const { scheme, colors } = useTheme();
   return (
     <>
-      <Host style={{ flex: 1, paddingTop: WEB_TOP_INSET }} colorScheme={scheme}>
+      <Host style={[boundedHost, { paddingTop: WEB_TOP_INSET }]} colorScheme={scheme}>
       <FieldGroup>
         <FieldGroup.Section>
           <FieldGroup.SectionHeader>

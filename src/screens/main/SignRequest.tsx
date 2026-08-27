@@ -23,7 +23,7 @@ import {
   TextInput as NTextInput,
   useNativeState,
 } from "@expo/ui";
-import { Colors, useTheme } from "@/theme";
+import { Colors, useTheme, boundedHost } from "@/theme";
 import { Layout } from "@/ui/Layout";
 import { Message } from "@/ui/Message";
 import { ActionFooter } from "@/ui/actionFooter";
@@ -190,7 +190,7 @@ function ResultView({
   return (
     <>
       <Stack.Screen options={{ title: "Signed" }} />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <NFieldGroup>
           <NFieldGroup.Section>
             <NFieldGroup.SectionHeader>
@@ -297,10 +297,10 @@ function MessageConfirm({
   if (!handle) {
     return (
       <>
-        <Stack.Screen options={{ title: "Sign in" }} />
-        <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <Stack.Screen options={{ title: "Sign message" }} />
+        <Host style={boundedHost} colorScheme={scheme}>
           <NFieldGroup>
-            <NFieldGroup.Section title="Choose the handle to prove you own">
+            <NFieldGroup.Section title="Sign with">
               {owned.map((h) => (
                 <NListItem
                   key={h}
@@ -320,31 +320,29 @@ function MessageConfirm({
 
   return (
     <>
-      <Stack.Screen options={{ title: "Sign in" }} />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Stack.Screen options={{ title: "Sign message" }} />
+      <Host style={boundedHost} colorScheme={scheme}>
         <NFieldGroup>
           <NFieldGroup.Section>
             <NFieldGroup.SectionHeader>
               <NRow alignment="center">
                 <NSpacer flexible />
                 <NColumn alignment="center" spacing={8}>
-                  <NIcon name="at" size={40} color={colors.accent} />
+                  <NIcon name="signature" size={38} color={colors.accent} />
                   <NText textStyle={{ fontSize: 14, color: colors.textSecondary }}>
-                    Prove you own
+                    Sign with
                   </NText>
                   <NText textStyle={{ fontSize: 20, fontWeight: "700", color: colors.text }}>{handle}</NText>
                 </NColumn>
                 <NSpacer flexible />
               </NRow>
             </NFieldGroup.SectionHeader>
-            <NListItem
-              trailing={
-                <NText textStyle={{ color: colors.textSecondary }}>
-                  A one-time challenge
-                </NText>
-              }
-            >
-              <NText>Signs</NText>
+          </NFieldGroup.Section>
+
+          {/* Show exactly what will be signed, verbatim. */}
+          <NFieldGroup.Section title="Message">
+            <NListItem>
+              <NText textStyle={{ color: colors.text }}>{request.challenge}</NText>
             </NListItem>
             {request.exp !== undefined ? (
               <NListItem
@@ -357,13 +355,13 @@ function MessageConfirm({
                 <NText>Expires</NText>
               </NListItem>
             ) : null}
-            {host ? (
-              <NFieldGroup.SectionFooter>
-                <NText textStyle={{ fontSize: 12, color: colors.textSecondary }}>
-                  {`Your signature is sent to ${host} only when you tap Sign. Nothing is sent before that.`}
-                </NText>
-              </NFieldGroup.SectionFooter>
-            ) : null}
+            <NFieldGroup.SectionFooter>
+              <NText textStyle={{ fontSize: 12, color: colors.textSecondary }}>
+                {host
+                  ? `Signs the text above with ${handle}. The signature is sent to ${host} only when you tap Sign — nothing before that.`
+                  : `Signs the text above with ${handle} — proof this handle's key signed it. Your records aren't changed.`}
+              </NText>
+            </NFieldGroup.SectionFooter>
           </NFieldGroup.Section>
 
           {error ? (
@@ -523,7 +521,7 @@ function RecordsConfirm({
     return (
       <>
         <Stack.Screen options={{ title: "Sign in" }} />
-        <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <Host style={boundedHost} colorScheme={scheme}>
           <NFieldGroup>
             {error ? (
               <NFieldGroup.Section>
@@ -562,7 +560,7 @@ function RecordsConfirm({
     return (
       <>
         <Stack.Screen options={{ title: "Done" }} />
-        <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <Host style={boundedHost} colorScheme={scheme}>
           <NFieldGroup>
             <NFieldGroup.Section>
               <NFieldGroup.SectionHeader>
@@ -609,7 +607,7 @@ function RecordsConfirm({
       <Stack.Screen
         options={{ title: changed ? "Records changed" : "Approve record change" }}
       />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <NFieldGroup>
           {changed ? (
             <NFieldGroup.Section>
@@ -867,7 +865,7 @@ function TransferConfirm({
   return (
     <>
       <Stack.Screen options={{ title: "Transfer handle" }} />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <NFieldGroup>
           <NFieldGroup.Section>
             <NFieldGroup.SectionHeader>
@@ -1057,7 +1055,7 @@ function SaleConfirm({
   return (
     <>
       <Stack.Screen options={{ title: "Sell handle" }} />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <NFieldGroup>
           <NFieldGroup.Section>
             <NFieldGroup.SectionHeader>
@@ -1208,7 +1206,7 @@ function RotateConfirm({
   return (
     <>
       <Stack.Screen options={{ title: "Rotate key" }} />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <NFieldGroup>
           <NFieldGroup.Section>
             <NFieldGroup.SectionHeader>

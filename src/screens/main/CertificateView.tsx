@@ -11,7 +11,7 @@ import {
   Spacer,
 } from "@expo/ui";
 import { refreshable } from "@/ui/rowModifiers";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import { useStore } from "@/Store";
 import { NativeEmpty } from "@/ui/nativeEmpty";
 import { loadCert } from "@/certStore";
@@ -201,7 +201,7 @@ export default function CertificateView() {
   return (
     <>
       <Stack.Screen options={{ title: "Certificate" }} />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup modifiers={[refreshable(onRefresh)]}>
           {/* Status hero — its detail line lives with it; any extra note sits
               OUTSIDE the card as a footer. Confirming keeps the default color. */}

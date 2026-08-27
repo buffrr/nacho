@@ -21,8 +21,8 @@ const SAMPLE_RECORDS: { type: "addr" | "txt"; key: string; value: string }[] = [
 ];
 
 export function SampleProfileCard() {
-  const { colors } = useTheme();
-  const styles = React.useMemo(() => makeStyles(colors), [colors]);
+  const { colors, scheme } = useTheme();
+  const styles = React.useMemo(() => makeStyles(colors, scheme), [colors, scheme]);
 
   return (
     <View style={styles.card}>
@@ -85,7 +85,7 @@ export function SampleProfileCard() {
   );
 }
 
-const makeStyles = (c: Colors) =>
+const makeStyles = (c: Colors, scheme: "light" | "dark") =>
   StyleSheet.create({
     card: {
       borderRadius: 22,
@@ -122,7 +122,11 @@ const makeStyles = (c: Colors) =>
       padding: 12,
       borderRadius: 14,
       borderCurve: "continuous",
-      backgroundColor: "rgba(255,255,255,0.06)",
+      // A white overlay lifts the row on the dark card; on the light card it's
+      // invisible (white-on-warm-white) — use a subtle dark tint there instead so
+      // the CTA reads as a distinct filled affordance in both themes.
+      backgroundColor:
+        scheme === "light" ? "rgba(0,0,0,0.045)" : "rgba(255,255,255,0.06)",
     },
     bitcoinCircle: {
       width: 30,

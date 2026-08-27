@@ -43,8 +43,8 @@ export default function RegisterHub() {
           go: () => router.push("/(main)/(tabs)/handles/shop"),
         },
         {
-          title: "Redeem a code",
-          subtitle: "Voucher or gift code",
+          title: "I have a code",
+          subtitle: "Bind to this keystore",
           Icon: Ticket,
           go: () => router.push("/(main)/redeem"),
         },

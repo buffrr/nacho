@@ -11,7 +11,7 @@ import {
   Row,
   Spacer,
 } from "@expo/ui";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import { NativeEmpty } from "@/ui/nativeEmpty";
 import { ActionFooter } from "@/ui/actionFooter";
 import { useStore } from "@/Store";
@@ -74,7 +74,7 @@ export default function CancelOffers() {
     return (
       <>
         <Stack.Screen options={{ title: "Cancel listings" }} />
-        <Host style={{ flex: 1 }} colorScheme={scheme}>
+        <Host style={boundedHost} colorScheme={scheme}>
           <FieldGroup>
             <FieldGroup.Section>
               <FieldGroup.SectionHeader>
@@ -129,7 +129,7 @@ export default function CancelOffers() {
   return (
     <>
       <Stack.Screen options={{ title: "Cancel listings" }} />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup>
           <FieldGroup.Section
             title={`Invalidate ${offers.length} live listing${offers.length === 1 ? "" : "s"}`}

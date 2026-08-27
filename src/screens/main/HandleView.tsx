@@ -10,6 +10,7 @@ import {
 import { recordResolve } from "@/resolveHistory";
 import { ResolvedProfileNative, recordCountOf } from "@/ui/handleProfileNative";
 import { NativeEmpty } from "@/ui/nativeEmpty";
+import { isExample, resolveExampleFromCache } from "@/exampleResolve";
 
 // A standalone, read-only view of a resolved handle — opened from Recents by
 // tapping a row. Unlike the Search tab it auto-resolves on entry and shows no
@@ -35,7 +36,12 @@ export default function HandleView() {
     setResult(null);
     setPending(true);
     try {
-      const resolved = await resolveHandle(name);
+      // Demo (@example) handles are local-only — resolve them from the cache, not
+      // the network (the real relays have no @example space, which would read as
+      // "not registered" here, e.g. when reopened from Recents).
+      const resolved = isExample(name)
+        ? await resolveExampleFromCache(name)
+        : await resolveHandle(name);
       if (resolved) {
         setResult(resolved);
         void recordResolve({

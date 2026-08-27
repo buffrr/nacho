@@ -9,7 +9,7 @@ import {
   TextInput,
   useNativeState,
 } from "@expo/ui";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import { ActionFooter } from "@/ui/actionFooter";
 import { encodeSignRequest, extractReqParam, SignRequest } from "@/signRequest";
 
@@ -88,7 +88,7 @@ export default function HandleAction() {
   return (
     <>
       <Stack.Screen options={{ title }} />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup>
           <FieldGroup.Section title="Current UTXO">
             <ListItem>

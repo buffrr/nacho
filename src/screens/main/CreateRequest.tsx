@@ -10,7 +10,7 @@ import {
   useNativeState,
 } from "@expo/ui";
 import { useStore } from "@/Store";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import { ActionFooter } from "@/ui/actionFooter";
 import {
   fetchHandleStatus,
@@ -120,7 +120,7 @@ export default function CreateRequest() {
 
   return (
     <>
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup>
           <FieldGroup.Section title="Handle">
             <ListItem>

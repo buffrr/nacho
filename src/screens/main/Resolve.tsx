@@ -17,6 +17,7 @@ import { recordResolve } from "@/resolveHistory";
 import { ResolvedProfileNative, recordCountOf } from "@/ui/handleProfileNative";
 import { NativeEmpty } from "@/ui/nativeEmpty";
 import { ShopResults } from "@/ui/shopResults";
+import { isExample, resolveExampleFromCache } from "@/exampleResolve";
 
 export default function Resolve() {
   const { colors } = useTheme();
@@ -29,6 +30,9 @@ export default function Resolve() {
   const [error, setError] = useState<"network" | "verify" | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [staleAnchor, setStaleAnchor] = useState(false);
+  // Shop results are only shown after the user submits a non-"@" query (not live
+  // while typing). Cleared on every keystroke; set on the search-button press.
+  const [shopQuery, setShopQuery] = useState<string | null>(null);
 
   const phase: "idle" | "loading" | "result" | "notfound" | "error" = pending
     ? "loading"
@@ -54,7 +58,9 @@ export default function Resolve() {
     setResult(null);
     setPending(name);
     try {
-      const resolved = await resolveHandle(name);
+      const resolved = isExample(name)
+        ? await resolveExampleFromCache(name)
+        : await resolveHandle(name);
       if (resolved) {
         setResult(resolved);
         void recordResolve({
@@ -91,7 +97,9 @@ export default function Resolve() {
     const name = result?.handle;
     if (!name) return;
     try {
-      const resolved = await resolveHandle(name);
+      const resolved = isExample(name)
+        ? await resolveExampleFromCache(name)
+        : await resolveHandle(name);
       if (resolved) {
         setResult(resolved);
         void recordResolve({
@@ -115,6 +123,23 @@ export default function Resolve() {
     }
   };
 
+  // Search submitted (Search/Done key). A handle ("@") resolves; anything else is
+  // a name to shop for — only THEN do we show shop results (never live-as-typed).
+  const onSubmit = (text: string) => {
+    const name = text.trim().toLowerCase();
+    if (name.includes("@")) {
+      setShopQuery(null);
+      onResolve(name);
+    } else if (name.length > 0) {
+      setResult(null);
+      setNotFound(null);
+      setError(null);
+      searchRef.current?.blur();
+      Keyboard.dismiss();
+      setShopQuery(name);
+    }
+  };
+
   // Stale-anchor recovery: re-pin the semi-trusted anchor to the current tip,
   // then resolve again.
   const refreshAndRetry = async () => {
@@ -122,9 +147,13 @@ export default function Resolve() {
     onResolve(handle);
   };
 
+  // Arriving via a scan (prefill) shows a result, not a text field — suppress the
+  // focus effect's auto-focus so the keyboard never opens on that path.
+  const suppressFocus = useRef(false);
   const { prefill } = useLocalSearchParams<{ prefill?: string }>();
   useEffect(() => {
     if (prefill) {
+      suppressFocus.current = true;
       setHandle(prefill);
       onResolve(prefill);
       // Consume the param. Expo Router dedupes identical param values, so if we
@@ -151,17 +180,34 @@ export default function Resolve() {
     useCallback(() => {
       setError(null);
       setNotFound(null);
-      const t = setTimeout(() => searchRef.current?.focus(), 60);
+      // The prefill effect runs synchronously on focus/mount, so by the time this
+      // timeout fires suppressFocus is already set for the scan path → skip focus.
+      const t = setTimeout(() => {
+        if (!suppressFocus.current) searchRef.current?.focus();
+        suppressFocus.current = false;
+      }, 60);
       return () => clearTimeout(t);
     }, []),
   );
+
+  // Any non-idle phase means a resolve is underway or done (typed-and-submitted
+  // OR arrived via a scan prefill, where the focus effect opened the keyboard) —
+  // drop it. Only the idle/typing state keeps the keyboard up.
+  useEffect(() => {
+    if (phase !== "idle") {
+      searchRef.current?.blur();
+      Keyboard.dismiss();
+    }
+  }, [phase]);
 
   const searchScreen = (
     <Stack.Screen
       options={{
         headerSearchBarOptions: {
           ref: searchRef,
-          autoFocus: true,
+          // No autoFocus: it re-fires on every re-render (e.g. entering the
+          // not-found/result state) and re-opens the keyboard right after we
+          // dismiss it. The focus effect below handles the initial focus instead.
           placeholder: "satoshi@bitcoin",
           autoCapitalize: "none",
           hideWhenScrolling: false,
@@ -172,9 +218,12 @@ export default function Resolve() {
             setHandle(t);
             setError(null);
             setNotFound(null);
+            // Hide shop results as soon as the query is edited — they only show
+            // after an explicit submit.
+            setShopQuery(null);
             if (!t) setResult(null);
           },
-          onSearchButtonPress: (e) => onResolve(e.nativeEvent.text),
+          onSearchButtonPress: (e) => onSubmit(e.nativeEvent.text),
           onCancelButtonPress: () => {
             // Just clear the search — don't auto-navigate to Handles (it felt
             // laggy). The user can tab back if they want.
@@ -182,23 +231,21 @@ export default function Resolve() {
             setError(null);
             setNotFound(null);
             setResult(null);
+            setShopQuery(null);
           },
         },
       }}
     />
   );
 
-  // A query without an "@" isn't a handle — treat it as a name to shop for, and
-  // show buyable results inline (mirrors the Shop tab). Handles (with "@") go
-  // through the resolve phases below.
-  const q = handle.trim();
-  const shopMode = q.length > 0 && !q.includes("@");
-  if (shopMode) {
+  // Shop results show only after an explicit submit of a non-"@" query (never
+  // live as the user types). Handles (with "@") go through the resolve phases.
+  if (shopQuery) {
     return (
       <>
         {searchScreen}
         <ShopResults
-          query={q}
+          query={shopQuery}
           onBuy={(h) => router.push({ pathname: "/(main)/(tabs)/resolve/show-handle", params: { handle: h } })}
           onOpen={(h) => router.push({ pathname: "/(main)/(tabs)/resolve/view-handle", params: { handle: h } })}
         />
@@ -224,7 +271,7 @@ export default function Resolve() {
         <NativeEmpty
           sf="at"
           title="Resolve a handle"
-          message="Try satoshi@bitcoin, or a name to buy."
+          message="Try grace@key, or a name to buy."
         />
       )}
 

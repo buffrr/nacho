@@ -15,7 +15,7 @@ const GROUP_TITLES: Record<RecordGroup, string> = {
   socials: "Socials",
   general: "General",
 };
-const GROUP_ORDER: RecordGroup[] = ["payments", "identity", "socials", "general"];
+const GROUP_ORDER: RecordGroup[] = ["payments", "socials", "identity", "general"];
 
 export default function AddRecord() {
   const router = useRouter();

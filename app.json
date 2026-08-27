@@ -2,7 +2,7 @@
   "expo": {
     "name": "nacho",
     "slug": "nacho",
-    "version": "0.0.2",
+    "version": "0.1.0",
     "scheme": "nacho",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.impervious.nacho",
-      "buildNumber": "5",
+      "buildNumber": "6",
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -38,6 +38,7 @@
         "expo-camera",
         {
           "cameraPermission": "Camera access is required to scan QR codes and handles",
+          "microphonePermission": false,
           "recordAudioAndroid": false
         }
       ],

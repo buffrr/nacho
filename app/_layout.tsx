@@ -1,5 +1,5 @@
 import React from "react";
-import { Platform, View, StyleSheet } from "react-native";
+import { Platform, View, StyleSheet, LogBox } from "react-native";
 import {
   Stack,
   ThemeProvider as NavThemeProvider,
@@ -14,6 +14,10 @@ import { useKarla, applyKarlaDefault } from "@/fonts";
 // Runs once at module load (patches the default Text font). Must stay a
 // top-level side effect, not inside a component.
 applyKarlaDefault();
+
+// Hide the dev-only LogBox warning overlay so it never appears in screenshots.
+// No-op in release builds (__DEV__ is false there).
+if (__DEV__) LogBox.ignoreAllLogs();
 
 // Auth gate: pick the (main) or (onboarding) group from the store's configured
 // state. StoreProvider renders null until it has loaded, so this never mounts

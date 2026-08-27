@@ -135,7 +135,9 @@ export const lightColors: Colors = {
   placeholder: "#B8B8BF",
   iconDefault: "#B8B8BF",
   chevron: "#C4C4CC",
-  accentText: "#000000",
+  // White on the orange accent in light mode (black looked muddy on the bright
+  // orange against a light background). Dark mode keeps black.
+  accentText: "#FFFFFF",
   border: "#E5E7EA",
   borderWarm: "#E5E7EA",
   accent: "#FF7B00",
@@ -167,6 +169,22 @@ export const lightColors: Colors = {
   tilePinkBg: "#FCE5F2",
 };
 
+// Max width for a screen's content column. On wide screens (iPad) content is
+// capped at this and centered so it reads as an intentional layout instead of a
+// stretched phone screen; on phones the window is narrower so it's a no-op.
+// Single knob — tune here, every bounded screen follows.
+export const CONTENT_MAX_WIDTH = 600;
+
+// Ready-made style for a full-screen @expo/ui <Host>: caps + centers the
+// SwiftUI content column on iPad (matches CONTENT_MAX_WIDTH), no-op on phones.
+// Spread extra props (e.g. paddingTop) via an array: style={[boundedHost, {…}]}.
+export const boundedHost = {
+  flex: 1,
+  width: "100%",
+  maxWidth: CONTENT_MAX_WIDTH,
+  alignSelf: "center",
+} as const;
+
 export type ThemeMode = "system" | "light" | "dark";
 
 type ThemeContextValue = {
@@ -178,9 +196,30 @@ type ThemeContextValue = {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
+// Narrow RN's ColorSchemeName ("light" | "dark" | "unspecified" | null) to a
+// concrete scheme, or null when it carries no usable signal.
+function asScheme(s: unknown): "light" | "dark" | null {
+  return s === "light" || s === "dark" ? s : null;
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const system = useColorScheme();
+  // useColorScheme() can transiently return null (notably right after
+  // Appearance.setColorScheme fires — including resetting to "unspecified" when
+  // switching back to System), and while a mode is FORCED it returns our own
+  // override, not the OS. The old `system === "light" ? light : dark` mapped that
+  // null to dark, flipping a light OS to dark on the System setting. Track the
+  // last KNOWN-GOOD OS scheme instead: seed from the live Appearance, and only
+  // trust useColorScheme while we're actually following the system.
+  const rnScheme = useColorScheme();
+  const [sysScheme, setSysScheme] = useState<"light" | "dark">(
+    () => asScheme(rnScheme) ?? asScheme(Appearance.getColorScheme?.()) ?? "light",
+  );
   const [mode, setModeState] = useState<ThemeMode>("system");
+
+  useEffect(() => {
+    const v = asScheme(rnScheme);
+    if (mode === "system" && v) setSysScheme(v);
+  }, [rnScheme, mode]);
 
   useEffect(() => {
     AsyncStorage.getItem("themeMode").then((v) => {
@@ -202,10 +241,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Native-only: RN web has no Appearance.setColorScheme.
     Appearance.setColorScheme?.(mode === "system" ? "unspecified" : mode);
+    // Re-reading the live OS scheme after resetting to "unspecified" recovers the
+    // true system value even if useColorScheme() is momentarily null.
+    if (mode === "system") {
+      const s = asScheme(Appearance.getColorScheme?.());
+      if (s) setSysScheme(s);
+    }
   }, [mode]);
 
-  const scheme: "light" | "dark" =
-    mode === "system" ? (system === "light" ? "light" : "dark") : mode;
+  const scheme: "light" | "dark" = mode === "system" ? sysScheme : mode;
   const colors = scheme === "light" ? lightColors : darkColors;
 
   // Web: @expo/ui's web components read their palette from `--expo-ui-*` CSS vars

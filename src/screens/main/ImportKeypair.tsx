@@ -10,7 +10,7 @@ import {
   useNativeState,
 } from "@expo/ui";
 import { useStore } from "@/Store";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import { isValidHandle } from "@/handle";
 import { isValidPrivkeyHex } from "@/keys";
 import { ActionFooter } from "@/ui/actionFooter";
@@ -48,7 +48,7 @@ export default function ImportKeypair() {
 
   return (
     <>
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup>
           <FieldGroup.Section title="Handle">
             <ListItem>

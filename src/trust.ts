@@ -19,7 +19,7 @@ import type {
   SemiTrustConfig,
   SemiTrustResult,
 } from "@spacesprotocol/fabric-core";
-import { kvGet, kvSet } from "@/db";
+import { kvGet, kvSet, kvRemove } from "@/db";
 import { networkTag } from "@/config";
 
 export type { SemiTrustedRelay, Quorum, SemiTrustConfig, SemiTrustResult };
@@ -301,6 +301,20 @@ export function cachedTrustAnchor(): TrustAnchor | null {
 export function resetTrustCache(): void {
   cachedAnchor = null;
   semiTrustPromise = null;
+}
+
+// Erase all persisted trust state for the active network (pinned anchors, the
+// custom pool, and the fallback-disabled flag) so the next init reverts to the
+// SDK defaults (DEFAULT_SEMI_TRUSTED). Used by "Delete everything".
+export async function wipeTrustStorage(): Promise<void> {
+  for (const key of [stateKey(), poolKey(), semiDisabledKey()]) {
+    try {
+      await kvRemove(key);
+    } catch {
+      // best-effort
+    }
+  }
+  resetTrustCache();
 }
 
 // "#956,124 · 960a 3d99…d932"

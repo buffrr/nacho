@@ -12,7 +12,7 @@ import {
   Switch,
   useNativeState,
 } from "@expo/ui";
-import { useTheme } from "@/theme";
+import { useTheme, boundedHost } from "@/theme";
 import {
   ensureSemiTrust,
   refreshSemiTrust,
@@ -382,7 +382,7 @@ export default function Settings() {
   return (
     <>
       <Stack.Screen options={{ unstable_headerRightItems: () => headerItems }} />
-      <Host style={{ flex: 1 }} colorScheme={scheme}>
+      <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup>
           {/* YOUR TRUST ID — strongest guarantee; first on the page. */}
           <FieldGroup.Section title="Your Trust ID">
@@ -431,8 +431,7 @@ export default function Settings() {
             )}
             <FieldGroup.SectionFooter>
               <Text textStyle={{ fontSize: 12, color: colors.textSecondary }}>
-                Scanned from a local Veritas client, your Trust ID verifies
-                sovereign handles against your own anchor — the strongest
+                Scan from a desktop veritas client you run yourself — the strongest
                 guarantee, with nothing trusted in between.
               </Text>
             </FieldGroup.SectionFooter>

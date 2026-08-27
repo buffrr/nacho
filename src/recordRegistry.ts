@@ -16,7 +16,6 @@ import {
   EyeOff,
   Droplet,
   Anchor,
-  AtSign,
   Key,
   Lock,
   Terminal,
@@ -30,6 +29,8 @@ import {
   Discord,
   Github,
   Mail,
+  NostrN,
+  Bluesky,
   IconProps,
 } from "@/ui/icons";
 import { RecordTier } from "@/recordTiers";
@@ -54,6 +55,9 @@ export type RecordDef = {
   label: string;
   Icon: (p: IconProps) => React.JSX.Element;
   color: string;
+  // Optional brand gradient for the icon squircle (bottom-left → top-right),
+  // e.g. Instagram. Overrides the solid `color` when present.
+  gradient?: string[];
   tier: RecordTier;
   action: RecordAction;
   group: RecordGroup;
@@ -68,6 +72,12 @@ const VIOLET = "#8B5CF6";
 const BLUE = "#5B9BD5";
 const GREEN = "#4BB77B";
 const GREY = "#8A857E";
+
+// Brand colours for socials, matched to each app's icon.
+const X_BLACK = "#000000";
+const GITHUB_DARK = "#181717";
+// Instagram's icon is a diagonal gradient (warm bottom-left → cool top-right).
+const IG_GRADIENT = ["#FEDA75", "#FA7E1E", "#D62976", "#962FBF", "#4F5BD5"];
 
 // A single value slot is the common case.
 const ONE = (label: string, placeholder?: string): ValueSlot[] => [
@@ -84,7 +94,7 @@ const REGISTRY: RecordDef[] = [
 
   // ── Identity — getting these wrong is impersonation, not lost funds ────────
   {
-    rtype: "addr", key: "nostr", label: "Nostr", Icon: AtSign, color: VIOLET, tier: "identity", action: "open", group: "identity",
+    rtype: "addr", key: "nostr", label: "Nostr", Icon: NostrN, color: "#8E30EB", gradient: ["#7A2FE0", "#B54DFF"], tier: "identity", action: "open", group: "socials",
     slots: [
       { label: "Public key", placeholder: "npub1…" },
       { label: "Relay hints", placeholder: "wss://…", optional: true, multi: true },
@@ -96,13 +106,14 @@ const REGISTRY: RecordDef[] = [
   { rtype: "addr", key: "did", label: "DID", Icon: Key, color: GREY, tier: "identity", action: "copy", group: "identity", slots: ONE("DID", "did:…") },
 
   // ── Socials — profiles on other services (a wrong one is impersonation) ────
-  { rtype: "txt", key: "x", label: "X", Icon: XTwitter, color: GREY, tier: "identity", action: "open", group: "socials", slots: ONE("Username or URL", "@handle") },
-  { rtype: "txt", key: "instagram", label: "Instagram", Icon: Instagram, color: "#E1306C", tier: "identity", action: "open", group: "socials", slots: ONE("Username", "@handle") },
-  { rtype: "txt", key: "mastodon", label: "Mastodon", Icon: Mastodon, color: "#6364FF", tier: "identity", action: "open", group: "socials", slots: ONE("Address", "@user@server") },
-  { rtype: "txt", key: "telegram", label: "Telegram", Icon: Telegram, color: "#229ED9", tier: "identity", action: "open", group: "socials", slots: ONE("Username", "@handle") },
-  { rtype: "txt", key: "discord", label: "Discord", Icon: Discord, color: "#5865F2", tier: "identity", action: "copy", group: "socials", slots: ONE("Username") },
-  { rtype: "txt", key: "github", label: "GitHub", Icon: Github, color: GREY, tier: "identity", action: "open", group: "socials", slots: ONE("Username") },
-  { rtype: "txt", key: "email", label: "Email", Icon: Mail, color: BLUE, tier: "identity", action: "copy", group: "socials", slots: ONE("Address", "you@example.com") },
+  { rtype: "txt", key: "x", label: "X", Icon: XTwitter, color: X_BLACK, gradient: ["#000000", "#232427"], tier: "identity", action: "open", group: "socials", slots: ONE("Username or URL", "@handle") },
+  { rtype: "txt", key: "bluesky", label: "Bluesky", Icon: Bluesky, color: "#0085FF", gradient: ["#0074E4", "#48B0FF"], tier: "identity", action: "open", group: "socials", slots: ONE("Handle", "name.bsky.social") },
+  { rtype: "txt", key: "instagram", label: "Instagram", Icon: Instagram, color: "#D62976", gradient: IG_GRADIENT, tier: "identity", action: "open", group: "socials", slots: ONE("Username", "@handle") },
+  { rtype: "txt", key: "mastodon", label: "Mastodon", Icon: Mastodon, color: "#6364FF", gradient: ["#5A4BDA", "#8A8CFF"], tier: "identity", action: "open", group: "socials", slots: ONE("Address", "@user@server") },
+  { rtype: "txt", key: "telegram", label: "Telegram", Icon: Telegram, color: "#229ED9", gradient: ["#1C93C4", "#2FB0F0"], tier: "identity", action: "open", group: "socials", slots: ONE("Username", "@handle") },
+  { rtype: "txt", key: "discord", label: "Discord", Icon: Discord, color: "#5865F2", gradient: ["#4752C4", "#7983F6"], tier: "identity", action: "copy", group: "socials", slots: ONE("Username") },
+  { rtype: "txt", key: "github", label: "GitHub", Icon: Github, color: GITHUB_DARK, gradient: ["#181717", "#464646"], tier: "identity", action: "open", group: "socials", slots: ONE("Username") },
+  { rtype: "txt", key: "email", label: "Email", Icon: Mail, color: BLUE, gradient: ["#4E86BE", "#7BB4E8"], tier: "identity", action: "copy", group: "socials", slots: ONE("Address", "you@example.com") },
 
   // ── General — pointers and free text ──────────────────────────────────────
   { rtype: "txt", key: "website", label: "Website", Icon: Globe, color: BLUE, tier: "generic", action: "open", group: "general", slots: ONE("URL", "https://…") },
@@ -130,6 +141,7 @@ const ALIASES: Record<string, string> = {
   tg: "telegram",
   gh: "github",
   mail: "email",
+  bsky: "bluesky",
 };
 
 const byKey = new Map<string, RecordDef>();
@@ -169,10 +181,11 @@ export function lookupRecord(
 
 // The registry, grouped for the Add-record picker (payments / identity / general).
 export function registryGroups(): Record<RecordGroup, RecordDef[]> {
+  // Order here drives the Add-record picker: socials above identity.
   const out: Record<RecordGroup, RecordDef[]> = {
     payments: [],
-    identity: [],
     socials: [],
+    identity: [],
     general: [],
   };
   for (const def of REGISTRY) out[def.group].push(def);
@@ -200,6 +213,8 @@ export function recordLink(def: RecordDef, raw: string): string | null {
       return isUrl ? v : `https://instagram.com/${handle}`;
     case "telegram":
       return isUrl ? v : `https://t.me/${handle}`;
+    case "bluesky":
+      return isUrl ? v : `https://bsky.app/profile/${handle}`;
     case "github":
       return isUrl ? v : `https://github.com/${handle}`;
     case "mastodon": {

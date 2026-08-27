@@ -30,7 +30,7 @@ export const DEFAULT_NET_CONFIG: NetConfig = {
     "https://relay-cosmos.spacesprotocol.org",
     "https://relay-atlas.spacesprotocol.org",
   ],
-  apiUrl: "https://testnet.atbitcoin.com/api",
+  apiUrl: "https://atbitcoin.com/api",
 };
 
 const KV_KEY = "net_config";
@@ -83,6 +83,12 @@ export async function saveNetConfig(next: NetConfig): Promise<void> {
     // keep the in-memory value even if persistence fails
   }
   listeners.forEach((fn) => fn());
+}
+
+// Revert the network config (seeds + API URL) to the built-in defaults — used by
+// "Delete everything" so a wipe doesn't leave a custom/local endpoint behind.
+export async function resetNetConfig(): Promise<void> {
+  await saveNetConfig(DEFAULT_NET_CONFIG);
 }
 
 // undefined → the SDK's built-in DEFAULT_SEEDS.

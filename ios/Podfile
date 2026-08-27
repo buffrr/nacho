@@ -62,7 +62,7 @@ target 'nacho' do
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
 
-    # Workaround for @spacesprotocol/react-native-libveritas (as of 0.3.3): its
+    # Workaround for @spacesprotocol/react-native-libveritas (still as of 0.4.2): its
     # vendored xcframework ships the static lib as `liblibveritas_uniffi.a`
     # (double `lib`), but CocoaPods emits `-lveritas_uniffi` (which searches for
     # `libveritas_uniffi.a`) → `ld: library 'veritas_uniffi' not found`.

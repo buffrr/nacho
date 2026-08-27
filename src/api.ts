@@ -27,6 +27,34 @@ export async function fetchProposedHandles(query: string): Promise<string[]> {
   }
 }
 
+// Available namespaces (@bitcoin, @orbee, …) for Shop's suffix chips + up-front
+// price. GET /namespaces → { namespaces: [{ tld, price, …product ids }] }.
+// `price` is in cents; `tld` is the bare space name (no "@").
+export type Namespace = { tld: string; price: number };
+
+export async function fetchNamespaces(): Promise<Namespace[]> {
+  try {
+    const response = await fetch(`${activeApiUrl()}/namespaces`);
+    if (!response.ok) {
+      throw new Error(`HTTP status: ${response.status}`);
+    }
+    const data = await response.json();
+    const raw: unknown[] = Array.isArray(data) ? data : data.namespaces ?? [];
+    return raw
+      .map((x) => {
+        const o = x as { tld?: string; name?: string; price?: number };
+        return {
+          tld: String(o?.tld ?? o?.name ?? "").replace(/^@/, "").trim(),
+          price: Number(o?.price) || 0,
+        };
+      })
+      .filter((n) => n.tld);
+  } catch (error) {
+    console.error("Failed to fetch namespaces:", error);
+    return [];
+  }
+}
+
 export type HandleStatus = (
   | {
       handle: string;
