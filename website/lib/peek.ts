@@ -8,6 +8,15 @@ const RELAY_BASE =
   process.env.NACHO_RELAY_BASE?.replace(/\/$/, "") ??
   "https://relay-orion.spacesprotocol.org";
 
+// Short host label for the "served by" line (e.g. relay-orion.spacesprotocol.org).
+export const RELAY_HOST = (() => {
+  try {
+    return new URL(RELAY_BASE).host;
+  } catch {
+    return "a Spaces relay";
+  }
+})();
+
 export type ZoneRecord = {
   type: string; // "addr" | "txt" | "seq" | "sig" | …
   key?: string;
@@ -21,6 +30,7 @@ export type Zone = {
   sovereignty?: string; // "sovereign" | "dependent" | "unknown"
   num_id?: string | null;
   alias?: string | null;
+  anchor?: number; // Bitcoin block height the zone is anchored at
   script_pubkey?: string;
   records: ZoneRecord[];
 };

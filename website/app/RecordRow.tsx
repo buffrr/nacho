@@ -1,26 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import type { CSSProperties, MouseEvent } from "react";
+import type { MouseEvent } from "react";
 import { Icon } from "@/lib/icons";
-import { recordMeta, glyphBackground } from "@/lib/records";
+import { recordMeta, glyphBackground, recordDesc } from "@/lib/records";
 import type { Rec } from "./ProfileCard";
 
-// Long opaque values (keys, BOLT12 offers) → a readable preview: head · tail tail.
-// Short values (usernames, domains) are shown as-is.
+// Long opaque values (keys, BOLT12 offers) → middle-ellipsis; short ones as-is.
 function preview(v: string): string {
-  if (v.length <= 24) return v;
-  const head = v.slice(0, 4);
-  const tail = v.slice(-8);
-  return `${head} · ${tail.slice(0, 4)} ${tail.slice(4)}`;
+  if (v.length <= 30) return v;
+  return `${v.slice(0, 20)}…${v.slice(-8)}`;
 }
 
-export function RecordRow({ r, i }: { r: Rec; i: number }) {
+export function RecordRow({ r }: { r: Rec }) {
   const [copied, setCopied] = useState(false);
   const m = recordMeta(r.type, r.key);
   const val = r.value.join(", ");
-  const href = m.href ? m.href(r.value[0]) : null; // only true "links" (socials/site)
-  const style = { animationDelay: `${80 + i * 50}ms` } as CSSProperties;
+  const desc = recordDesc(r.key);
+  const href = m.href ? m.href(r.value[0]) : null;
 
   async function copy(e: MouseEvent) {
     e.preventDefault();
@@ -35,11 +32,14 @@ export function RecordRow({ r, i }: { r: Rec; i: number }) {
   }
 
   return (
-    <div className="rec" style={style}>
+    <div className="rec">
       <span className="ic" style={{ background: glyphBackground(m) }}>
         <Icon name={m.icon} size={16} />
       </span>
-      <span className="rn">{m.label}</span>
+      <span className="rec-tx">
+        <span className="rn">{m.label}</span>
+        {desc ? <span className="rd">{desc}</span> : null}
+      </span>
       <span className="rv">{preview(val)}</span>
       {href ? (
         <a className="recbtn" href={href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${m.label}`} title="Open">

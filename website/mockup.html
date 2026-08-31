@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nacho — handle page, two column</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=Martian+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --ink:#08070A; --orange:#FF7B00;
+            --fg:#F7F4F0; --fg2:#9A948E; --fg3:#645E59; --fg4:#3B3733;
+            --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+            --green:#4BB77B;
+            --display:"Bricolage Grotesque",Georgia,serif;
+            --sans:"Instrument Sans",system-ui,sans-serif;
+            --mono:"Martian Mono",ui-monospace,monospace;
+            --ease:cubic-bezier(.22,1,.36,1);
+        }
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{background:var(--ink);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.6;padding:46px 24px 90px}
+        .doc{max-width:1280px;margin:0 auto}
+        .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--orange);margin-bottom:14px}
+        h1{font-family:var(--display);font-weight:800;font-size:clamp(30px,5vw,50px);letter-spacing:-.04em;line-height:1;margin-bottom:16px}
+        .standfirst{color:var(--fg2);max-width:66ch;margin-bottom:38px}
+        .lab{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--fg3);margin:0 0 14px}
+        .lab b{color:var(--orange);font-weight:500}
+        .why{margin-top:16px;font-size:14px;color:var(--fg2);max-width:72ch;line-height:1.62}
+        .why strong{color:var(--fg);font-weight:500}
+        .why code{font-family:var(--mono);font-size:12.5px;color:var(--orange)}
+
+        /* browser chrome */
+        .win{border:1px solid var(--line2);border-radius:16px;overflow:hidden;background:#0A0A0C;
+            box-shadow:0 40px 90px -40px rgba(0,0,0,.95);position:relative}
+        .win .bar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.03)}
+        .win .bar i{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.14)}
+        .win .url{margin-left:12px;font-family:var(--mono);font-size:11.5px;color:var(--fg3)}
+        .stage{position:relative;height:660px;overflow-y:auto;
+            background:radial-gradient(ellipse 80% 46% at 50% 0%, rgba(255,123,0,.14), transparent 62%), #0A0A0C}
+        .stage::-webkit-scrollbar{width:8px}
+        .stage::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
+
+        nav{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 30px;
+            position:sticky;top:0;z-index:5;backdrop-filter:blur(14px);background:rgba(10,10,12,.72);border-bottom:1px solid var(--line)}
+        .logo svg{width:74px;height:auto;display:block}
+        .nsearch{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.05);border:1px solid transparent;
+            border-radius:100px;padding:0 15px;height:36px;width:270px}
+        .nsearch input{background:none;border:none;outline:none;color:var(--fg);font-family:var(--mono);font-size:12.5px;width:100%}
+        .nsearch input::placeholder{color:var(--fg4)}
+        .btn{display:inline-flex;align-items:center;gap:7px;border:none;cursor:pointer;font-family:var(--sans);
+            border-radius:100px;padding:9px 17px;font-size:13.5px;font-weight:600;letter-spacing:-.01em;text-decoration:none}
+        .btn-p{background:var(--orange);color:#1B0E00}
+
+        /* two column */
+        .cols{display:grid;grid-template-columns:352px 1fr;gap:34px;padding:38px 30px 70px;align-items:start}
+        .side{position:sticky;top:88px}
+        .panel{padding:28px 24px;text-align:center}
+        .av{width:78px;height:78px;border-radius:50%;margin:0 auto 15px;display:flex;align-items:center;justify-content:center;
+            font-family:var(--display);font-weight:600;font-size:28px;color:#fff;
+            background:linear-gradient(180deg,hsl(195 10% 36%),hsl(195 22% 20%))}
+        .hd{font-family:var(--mono);font-size:21px;font-weight:500;letter-spacing:-.04em}
+        .hd .at{color:var(--orange)}
+        .stat{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:11px;font-size:12.5px;color:var(--green)}
+        .stat svg{width:13px;height:13px}
+        .stat .dim{color:var(--fg3)}
+        .acts{display:flex;justify-content:center;gap:10px;margin-top:22px}
+        .act{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 4px;border-radius:13px;
+            background:rgba(255,255,255,.04);border:1px solid var(--line);cursor:pointer;transition:background .18s}
+        .act:hover{background:rgba(255,255,255,.08)}
+        .act svg{width:17px;height:17px;color:var(--fg2)}
+        .act span{font-size:11.5px;color:var(--fg2)}
+        .qrwrap{margin-top:16px;border:1px solid var(--line);border-radius:18px;padding:20px;background:rgba(255,255,255,.025)}
+        .qr{width:160px;height:160px;margin:0 auto;border-radius:10px;background:#fff;padding:9px}
+        .qr div{width:100%;height:100%;background-image:
+                repeating-conic-gradient(#000 0% 25%, #fff 0% 50%);background-size:11px 11px}
+        .qrc{margin-top:14px;font-size:12.5px;color:var(--fg3);line-height:1.45}
+        .qrc b{display:block;color:var(--fg2);font-size:13px;font-weight:500;margin-bottom:3px}
+
+        .main{min-width:0}
+        .pay{display:flex;align-items:center;gap:15px;padding:17px 20px;border-radius:16px;text-decoration:none;color:var(--fg);
+            background:linear-gradient(100deg,rgba(255,123,0,.16),rgba(255,123,0,.06));
+            border:1px solid rgba(255,123,0,.3);transition:background .2s}
+        .pay:hover{background:linear-gradient(100deg,rgba(255,123,0,.24),rgba(255,123,0,.09))}
+        .pay .bi{width:40px;height:40px;border-radius:50%;background:var(--orange);color:#1B0E00;flex-shrink:0;
+            display:flex;align-items:center;justify-content:center}
+        .pay .bi svg{width:20px;height:20px}
+        .pay .pt{font-size:16px;font-weight:600}
+        .pay .pd{font-size:12.5px;color:var(--fg3);margin-top:1px}
+        .reclabel{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg3);
+            margin:30px 0 10px 2px}
+        .recs{border:1px solid var(--line);border-radius:16px;overflow:hidden}
+        .rec{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--line);
+            text-decoration:none;color:var(--fg);transition:background .16s}
+        .rec:last-child{border-bottom:none}
+        .rec:hover{background:rgba(255,255,255,.035)}
+        .rec .ic{width:32px;height:32px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+        .rec .ic svg{width:16px;height:16px;color:#fff}
+        .rec .rn{font-size:14.5px;flex:1}
+        .rec .rv{font-family:var(--mono);font-size:12px;color:var(--fg3);letter-spacing:-.02em;
+            max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .rec .go{width:15px;height:15px;color:var(--fg4);flex-shrink:0}
+        .pnote{margin-top:22px;font-size:12.5px;color:var(--fg3);line-height:1.55;max-width:60ch}
+        .openapp{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:16px;padding:14px;
+            border:1px solid rgba(255,123,0,.28);border-radius:14px;color:var(--orange);font-weight:600;font-size:14px;
+            text-decoration:none;background:rgba(255,123,0,.05)}
+        /* mobile stacked comparison */
+        .phone{width:330px;border:1px solid var(--line2);border-radius:26px;overflow:hidden;background:#0A0A0C;
+            box-shadow:0 30px 70px -34px rgba(0,0,0,.95)}
+        .pstage{height:600px;overflow-y:auto;
+            background:radial-gradient(ellipse 100% 30% at 50% 0%, rgba(255,123,0,.13), transparent 60%), #0A0A0C}
+        .pstage::-webkit-scrollbar{width:0}
+        .pnav{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+        .pnav .logo svg{width:58px}
+        .pnav .btn{padding:7px 13px;font-size:12px}
+        .pbody{padding:22px 16px 40px}
+        .pbody .panel{padding:24px 18px}
+        .pbody .av{width:66px;height:66px;font-size:24px}
+        .pbody .hd{font-size:19px}
+        .pbody .qr{width:132px;height:132px}
+        .row2{display:flex;gap:34px;flex-wrap:wrap;align-items:flex-start}
+        @media(max-width:1180px){.cols{grid-template-columns:1fr}.side{position:static}}
+    </style>
+</head>
+<body>
+<div class="doc">
+
+    <p class="eyebrow">Nacho · handle page</p>
+    <h1>Sticky identity,<br>scrolling records</h1>
+    <p class="standfirst">Not a 50/50 split — a sidebar that stays put. The handle is the frame, the records are the content, so the frame shouldn't scroll away while you read.</p>
+
+    <p class="lab">Desktop · <b>≥ 1180px</b></p>
+    <div class="win">
+        <div class="bar"><i></i><i></i><i></i><span class="url">nacho.app/grace@key</span></div>
+        <div class="stage">
+            <nav>
+                <a class="logo" href="#" aria-label="nacho">
+                    <svg viewBox="0 0 245 140" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M36.239 21.244C31.0838 9.82436 41.3339 -2.52292 53.5024 0.448335L179.208 31.1425C190.465 33.8911 194.511 47.8102 186.482 56.1681L110.391 135.379C103.02 143.052 90.2317 140.848 85.8535 131.149L36.239 21.244Z" fill="#FF7B00"/>
+                        <path d="M5.9383 50.729C7.25191 50.729 8.56535 51.0452 10.2993 52.6219L31.8453 71.9672V51.3083H41.7776V80.4304C41.7774 85.1086 38.9388 87.0528 35.7859 87.0528C34.4198 87.0528 33.1062 86.738 31.4249 85.1613L9.87892 65.816V86.4748H0V57.3007C0 52.6222 2.83786 50.729 5.9383 50.729Z" fill="#fff"/>
+                        <path d="M135.944 60.455H119.653C113.768 60.4552 109.354 63.9764 109.354 69.0224C109.354 74.0162 113.715 77.4334 119.653 77.4336H142.933L135.944 86.4748H119.653C107.462 86.4746 98.4756 78.7477 98.4756 68.5499C98.4756 58.2468 107.462 51.3085 119.653 51.3083H142.933L135.944 60.455Z" fill="#fff"/>
+                        <path d="M157.64 63.7656H178.555V51.3083H189.38V86.4748H178.555V72.9123H157.64V86.4748H146.709V51.3083H157.64V63.7656Z" fill="#fff"/>
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M219.304 87.0528C202.173 87.0527 193.608 81.4284 193.608 68.8649C193.608 56.3016 202.173 50.7291 219.304 50.729C236.435 50.7291 245 56.3016 245 68.8649C245 81.4284 236.435 87.0527 219.304 87.0528ZM204.433 68.8649C204.433 61.2956 208.374 59.8757 219.304 59.8757C230.234 59.8757 234.175 61.2956 234.175 68.8649C234.175 76.4345 230.234 77.9061 219.304 77.9061C208.374 77.9061 204.433 76.4345 204.433 68.8649Z" fill="#fff"/>
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M48.7224 77.8447L65.1481 54.6723C66.589 52.6647 68.6812 50.7314 71.9792 50.7314C75.2771 50.7314 77.3693 52.6647 78.8102 54.6723L95.2359 77.8447C97.8025 81.4653 95.2145 86.4748 90.7775 86.4748H53.1809C48.7438 86.4748 46.1558 81.4653 48.7224 77.8447ZM61.8707 77.4336L71.9792 63.1355L82.0876 77.4336H61.8707Z" fill="#fff"/>
+                    </svg>
+                </a>
+                <div class="nsearch">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#645E59" stroke-width="2.2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                    <input placeholder="Search" readonly>
+                </div>
+                <a class="btn btn-p" href="#">Get the app</a>
+            </nav>
+
+            <div class="cols">
+                <!-- LEFT: sticky identity -->
+                <div class="side">
+                    <div class="panel">
+                        <div class="av">gr</div>
+                        <div class="hd">grace<span class="at">@</span>key</div>
+                        <div class="stat">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                            Sovereign <span class="dim">· updated 3d ago</span>
+                        </div>
+                        <div class="acts">
+                            <div class="act">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                <span>Copy</span>
+                            </div>
+                            <div class="act">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M20 14v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5"/></svg>
+                                <span>Share</span>
+                            </div>
+                            <div class="act">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                                <span>Verify</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="qrwrap">
+                        <div class="qr"><div></div></div>
+                        <p class="qrc"><b>Pay from another device</b>Scan with any Lightning wallet.</p>
+                    </div>
+                </div>
+
+                <!-- RIGHT: actions + records -->
+                <div class="main">
+                    <a class="pay" href="#">
+                        <span class="bi"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></svg></span>
+                        <span style="flex:1">
+            <span class="pt" style="display:block">Pay with Lightning</span>
+            <span class="pd" style="display:block">Opens a wallet on this device</span>
+          </span>
+                        <span style="color:var(--fg3)">&#8599;</span>
+                    </a>
+
+                    <p class="reclabel">Records · 7</p>
+                    <div class="recs">
+                        <div class="rec">
+                            <span class="ic" style="background:linear-gradient(135deg,#716c65,#b3aea7)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
+                            <span class="rn">age key</span>
+                            <span class="rv">age1k2spr6duuu07857wqg…wspyzh4t</span>
+                            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        </div>
+                        <a class="rec" href="#">
+                            <span class="ic" style="background:linear-gradient(135deg,#7243dd,#b485ff)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></svg></span>
+                            <span class="rn">Lightning offer</span>
+                            <span class="rv">lno1zrxq8pjw7qjlm68mt…phs9nq</span>
+                            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M9 7h8v8"/></svg>
+                        </a>
+                        <a class="rec" href="#">
+                            <span class="ic" style="background:linear-gradient(135deg,#181717,#464646)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></span>
+                            <span class="rn">GitHub</span>
+                            <span class="rv">buffrr</span>
+                            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M9 7h8v8"/></svg>
+                        </a>
+                        <a class="rec" href="#">
+                            <span class="ic" style="background:linear-gradient(135deg,#1C93C4,#2FB0F0)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg></span>
+                            <span class="rn">Telegram</span>
+                            <span class="rv">@buffrr</span>
+                            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M9 7h8v8"/></svg>
+                        </a>
+                        <a class="rec" href="#">
+                            <span class="ic" style="background:linear-gradient(135deg,#000,#232427)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></span>
+                            <span class="rn">X</span>
+                            <span class="rv">_buffrr</span>
+                            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M9 7h8v8"/></svg>
+                        </a>
+                        <a class="rec" href="#">
+                            <span class="ic" style="background:linear-gradient(135deg,#4282bc,#84c4fe)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>
+                            <span class="rn">Website</span>
+                            <span class="rv">buffrr.dev</span>
+                            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M9 7h8v8"/></svg>
+                        </a>
+                        <div class="rec">
+                            <span class="ic" style="background:linear-gradient(135deg,#716c65,#b3aea7)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8l6 6v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg></span>
+                            <span class="rn">Notes</span>
+                            <span class="rv">one, two, three</span>
+                            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        </div>
+                    </div>
+
+                    <a class="openapp" href="#">Open in the nacho app &#8599;</a>
+                    <p class="pnote">Records served by a Spaces relay. Open in the nacho app to verify them against your own trust anchor.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <p class="why"><strong>The sidebar doesn't scroll.</strong> Identity stays on screen while you read the records, which is the right relationship — the handle is the frame, the records are the content. Scroll the panel above to see it hold.</p>
+    <p class="why"><strong>The QR moved out of the reading path.</strong> It was sitting between "Pay with Lightning" and the records, so you scrolled past a payment block to reach what you came for. In the sidebar it's available without interrupting anything.</p>
+    <p class="why"><strong>Record values get room.</strong> At full width a truncated <code>lno1…</code> can show 30 characters instead of 12, which is the difference between recognising an offer and not.</p>
+    <p class="why"><strong>"Records · 7"</strong> — the count belongs on the label, and it tells someone whether scrolling is worth it.</p>
+
+    <p class="lab" style="margin-top:52px">Mobile · <b>&lt; 1180px</b> — stacks back to one column</p>
+    <div class="row2">
+        <div class="phone">
+            <div class="pstage">
+                <div class="pnav">
+                    <a class="logo" href="#" aria-label="nacho">
+                        <svg viewBox="0 0 245 140" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M36.239 21.244C31.0838 9.82436 41.3339 -2.52292 53.5024 0.448335L179.208 31.1425C190.465 33.8911 194.511 47.8102 186.482 56.1681L110.391 135.379C103.02 143.052 90.2317 140.848 85.8535 131.149L36.239 21.244Z" fill="#FF7B00"/>
+                            <path d="M5.9383 50.729C7.25191 50.729 8.56535 51.0452 10.2993 52.6219L31.8453 71.9672V51.3083H41.7776V80.4304C41.7774 85.1086 38.9388 87.0528 35.7859 87.0528C34.4198 87.0528 33.1062 86.738 31.4249 85.1613L9.87892 65.816V86.4748H0V57.3007C0 52.6222 2.83786 50.729 5.9383 50.729Z" fill="#fff"/>
+                            <path d="M135.944 60.455H119.653C113.768 60.4552 109.354 63.9764 109.354 69.0224C109.354 74.0162 113.715 77.4334 119.653 77.4336H142.933L135.944 86.4748H119.653C107.462 86.4746 98.4756 78.7477 98.4756 68.5499C98.4756 58.2468 107.462 51.3085 119.653 51.3083H142.933L135.944 60.455Z" fill="#fff"/>
+                            <path d="M157.64 63.7656H178.555V51.3083H189.38V86.4748H178.555V72.9123H157.64V86.4748H146.709V51.3083H157.64V63.7656Z" fill="#fff"/>
+                            <path fill-rule="evenodd" clip-rule="evenodd" d="M219.304 87.0528C202.173 87.0527 193.608 81.4284 193.608 68.8649C193.608 56.3016 202.173 50.7291 219.304 50.729C236.435 50.7291 245 56.3016 245 68.8649C245 81.4284 236.435 87.0527 219.304 87.0528ZM204.433 68.8649C204.433 61.2956 208.374 59.8757 219.304 59.8757C230.234 59.8757 234.175 61.2956 234.175 68.8649C234.175 76.4345 230.234 77.9061 219.304 77.9061C208.374 77.9061 204.433 76.4345 204.433 68.8649Z" fill="#fff"/>
+                            <path fill-rule="evenodd" clip-rule="evenodd" d="M48.7224 77.8447L65.1481 54.6723C66.589 52.6647 68.6812 50.7314 71.9792 50.7314C75.2771 50.7314 77.3693 52.6647 78.8102 54.6723L95.2359 77.8447C97.8025 81.4653 95.2145 86.4748 90.7775 86.4748H53.1809C48.7438 86.4748 46.1558 81.4653 48.7224 77.8447ZM61.8707 77.4336L71.9792 63.1355L82.0876 77.4336H61.8707Z" fill="#fff"/>
+                        </svg>
+                    </a>
+                    <a class="btn btn-p" href="#">Get the app</a>
+                </div>
+                <div class="pbody">
+                    <div class="panel">
+                        <div class="av">gr</div>
+                        <div class="hd">grace<span class="at">@</span>key</div>
+                        <div class="stat">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                            Sovereign <span class="dim">· 3d ago</span>
+                        </div>
+                        <div class="acts">
+                            <div class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span></div>
+                            <div class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M20 14v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5"/></svg><span>Share</span></div>
+                            <div class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg><span>Verify</span></div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:16px">
+                        <a class="pay" href="#">
+                            <span class="bi"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></svg></span>
+                            <span style="flex:1">
+              <span class="pt" style="display:block;font-size:15px">Pay with Lightning</span>
+              <span class="pd" style="display:block">Opens your wallet</span>
+            </span>
+                        </a>
+                    </div>
+
+                    <p class="reclabel">Records · 7</p>
+                    <div class="recs">
+                        <a class="rec" href="#" style="padding:12px 14px">
+                            <span class="ic" style="background:linear-gradient(135deg,#7243dd,#b485ff)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></svg></span>
+                            <span class="rn" style="font-size:14px">Lightning offer</span>
+                            <span class="rv" style="max-width:80px">lno1zrx…</span>
+                        </a>
+                        <a class="rec" href="#" style="padding:12px 14px">
+                            <span class="ic" style="background:linear-gradient(135deg,#181717,#464646)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></span>
+                            <span class="rn" style="font-size:14px">GitHub</span>
+                            <span class="rv">buffrr</span>
+                        </a>
+                        <a class="rec" href="#" style="padding:12px 14px">
+                            <span class="ic" style="background:linear-gradient(135deg,#1C93C4,#2FB0F0)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg></span>
+                            <span class="rn" style="font-size:14px">Telegram</span>
+                            <span class="rv">@buffrr</span>
+                        </a>
+                        <a class="rec" href="#" style="padding:12px 14px">
+                            <span class="ic" style="background:linear-gradient(135deg,#4282bc,#84c4fe)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>
+                            <span class="rn" style="font-size:14px">Website</span>
+                            <span class="rv">buffrr.dev</span>
+                        </a>
+                    </div>
+                    <a class="openapp" href="#" style="font-size:13.5px">Open in the nacho app &#8599;</a>
+                </div>
+            </div>
+        </div>
+
+        <div style="flex:1;min-width:300px">
+            <p class="why" style="margin-top:0"><strong>No QR on mobile.</strong> You're already on the device with the wallet — a QR to scan with the phone you're holding is the one thing nobody needs. Render it only above the breakpoint.</p>
+            <p class="why"><strong>Everything else stacks in the same order:</strong> identity, pay, records. That's the layout you already have, so mobile needs no work.</p>
+            <p class="why"><strong>Truncate harder.</strong> At 330px a Lightning offer gets 8 characters, which is enough to confirm it's there but not to read. The row is a tap target, not a display — full value belongs on tap.</p>
+            <p class="why"><strong>The breakpoint is 1180px</strong>, not 900. Below that the sidebar and the record values are both squeezed, and two cramped columns are worse than one comfortable one.</p>
+        </div>
+    </div>
+
+    <div style="border-top:1px solid rgba(255,255,255,.16);margin-top:56px;padding-top:34px">
+        <p class="lab">Worth deciding</p>
+        <p class="why" style="margin-top:0"><strong>Verify is a claim you can't back on the web.</strong> The button is in the sidebar because it's the honest version of that green tick — it should explain that the site got these from a relay, and offer the app as the way to check for yourself. If it just shows a tooltip saying "verified", it's worse than not having it.</p>
+        <p class="why"><strong>"updated 3d ago" needs a source.</strong> If the relay gives you a publish timestamp, good. If you're inferring it, drop it — a wrong freshness claim on a page about verifiable records is a bad trade for a small detail.</p>
+        <p class="why"><strong>The sidebar can hold more later</strong> — public key, certificate state, namespace link. It has room now and it's the natural home for facts about the handle rather than things the handle points at.</p>
+    </div>
+
+</div>
+</body>
+</html>

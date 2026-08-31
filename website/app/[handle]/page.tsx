@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { peek, displayRecords, isSovereign, seqUpdatedAt, normalizeHandle } from "@/lib/peek";
+import { peek, displayRecords, isSovereign, seqUpdatedAt, normalizeHandle, RELAY_HOST } from "@/lib/peek";
 import { Logo } from "../Logo";
 import { ProfileCard, APP_STORE_URL, initials, hueFor, type Data } from "../ProfileCard";
 import { HandleSearch } from "./HandleSearch";
@@ -46,16 +46,13 @@ export default async function HandlePage({
         found: true,
         sovereign: isSovereign(zone),
         updatedAt: seqUpdatedAt(zone),
+        anchor: typeof zone.anchor === "number" ? zone.anchor : null,
+        pubkey: zone.num_id ?? null,
+        alias: zone.alias ?? null,
+        relayHost: RELAY_HOST,
         records: displayRecords(zone),
       };
-      body = (
-        <>
-          <ProfileCard data={data} />
-          <p className="pnote">
-            Open in the nacho app to verify records are legitimate yourself.
-          </p>
-        </>
-      );
+      body = <ProfileCard data={data} />;
     }
   }
 
@@ -63,13 +60,15 @@ export default async function HandlePage({
     <div className="lp lp-sub">
       <Bg />
       <nav>
-        <a className="logo" href="/" aria-label="nacho">
-          <Logo height={53} />
-        </a>
-        <HandleSearch />
-        <a className="btn btn-p" href={APP_STORE_URL}>
-          Get the app
-        </a>
+        <div className="navinner">
+          <a className="logo" href="/" aria-label="nacho">
+            <Logo height={44} />
+          </a>
+          <HandleSearch />
+          <a className="btn btn-p" href={APP_STORE_URL}>
+            Get the app
+          </a>
+        </div>
       </nav>
 
       <main>
@@ -84,7 +83,7 @@ export default async function HandlePage({
 function NotFound({ handle, invalid }: { handle: string; invalid?: boolean }) {
   const hue = hueFor(handle);
   return (
-    <div className="card">
+    <div className="card nfcard">
       <div className="card-top">
         <div
           className="av"

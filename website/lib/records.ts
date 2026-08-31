@@ -64,6 +64,48 @@ export function recordMeta(type: string, key: string): RecordMeta {
   );
 }
 
+// Category for grouping rows into sections / filter tabs.
+export type RecordGroup = "pay" | "key" | "link" | "note";
+const KEY_KEYS = new Set(["age", "pgp", "ssh", "did"]);
+export function recordGroup(key: string, m: RecordMeta): RecordGroup {
+  if (m.pay) return "pay";
+  if (KEY_KEYS.has(key)) return "key";
+  if (m.href) return "link";
+  return "note";
+}
+
+// Neutral, factual one-liners (NOT verification claims — the web can't check
+// signatures). Derived from the record type only.
+const DESC: Record<string, string> = {
+  ln: "BOLT12 offer",
+  btc: "On-chain address",
+  sp: "Silent payment address",
+  liquid: "Liquid address",
+  ark: "Ark address",
+  age: "Public encryption key",
+  pgp: "PGP key",
+  ssh: "SSH public key",
+  did: "Decentralised identifier",
+  github: "Code & projects",
+  telegram: "Direct message",
+  x: "Formerly Twitter",
+  twitter: "Formerly Twitter",
+  bluesky: "on Bluesky",
+  instagram: "Photos",
+  mastodon: "on the Fediverse",
+  discord: "Chat",
+  email: "Email address",
+  website: "Homepage",
+  note: "Free-form note",
+  notes: "Free-form note",
+  nostr: "Nostr profile",
+  tor: "Onion service",
+  hyper: "HyperDHT key",
+};
+export function recordDesc(key: string): string | null {
+  return DESC[key] ?? null;
+}
+
 // CSS background for a record squircle — the registry gradient, or a subtle
 // derived one from the solid colour so every glyph reads as a filled tile.
 export function glyphBackground(m: RecordMeta): string {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const APP_STORE_URL = "https://apps.apple.com/app/id6755894049";
 
-export function HeaderActions({ handle }: { handle: string }) {
+export function CardActions({ handle }: { handle: string }) {
   const [copied, setCopied] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
 
@@ -48,35 +48,43 @@ export function HeaderActions({ handle }: { handle: string }) {
 
   return (
     <>
-      <div className="pactions">
-        <button type="button" className="pbtn" onClick={copyHandle}>
-          {copied ? (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 6 9 17l-5-5" />
-            </svg>
-          ) : (
+      <div className="cardactions">
+        <div className="sharewrap">
+          <button type="button" className="shareb" onClick={copyHandle} aria-label={copied ? "Copied" : "Copy handle"} title={copied ? "Copied" : "Copy handle"}>
+            {copied ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="11" height="11" rx="2.5" />
+                <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+              </svg>
+            )}
+          </button>
+          <span className="sharelbl">{copied ? "Copied" : "Copy"}</span>
+        </div>
+
+        <div className="sharewrap">
+          <button type="button" className="shareb" onClick={share} aria-label="Share" title="Share">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <rect x="9" y="9" width="11" height="11" rx="2.5" />
-              <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+              <path d="M12 3v13" />
+              <path d="m7 8 5-5 5 5" />
+              <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
             </svg>
-          )}
-          <span>{copied ? "Copied" : "Copy handle"}</span>
-        </button>
+          </button>
+          <span className="sharelbl">Share</span>
+        </div>
 
-        <button type="button" className="pbtn pbtn-icon" onClick={share} aria-label="Share" title="Share">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 3v13" />
-            <path d="m7 8 5-5 5 5" />
-            <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
-          </svg>
-        </button>
-
-        <button type="button" className="pbtn pbtn-icon" onClick={() => setVerifyOpen(true)} aria-label="Verify" title="Verify">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" />
-            <path d="m9 12 2 2 4-4" />
-          </svg>
-        </button>
+        <div className="sharewrap">
+          <button type="button" className="shareb" onClick={() => setVerifyOpen(true)} aria-label="Verify" title="Verify">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+          </button>
+          <span className="sharelbl">Verify</span>
+        </div>
       </div>
 
       {verifyOpen && (
