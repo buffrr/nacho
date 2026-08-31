@@ -18,7 +18,7 @@ const APP_STORE_ID = "6755894049";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   title: {
-    default: "nacho — one handle for the whole internet",
+    default: "nacho — Own your internet address",
     template: "%s · nacho",
   },
   description:

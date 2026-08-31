@@ -11,6 +11,7 @@ import { recordResolve } from "@/resolveHistory";
 import { ResolvedProfileNative, recordCountOf } from "@/ui/handleProfileNative";
 import { NativeEmpty } from "@/ui/nativeEmpty";
 import { isExample, resolveExampleFromCache } from "@/exampleResolve";
+import { shareHeaderItem } from "@/ui/shareHandle";
 
 // A standalone, read-only view of a resolved handle — opened from Recents by
 // tapping a row. Unlike the Search tab it auto-resolves on entry and shows no
@@ -75,8 +76,17 @@ export default function HandleView() {
     void run();
   };
 
-  // Handle shown big under the avatar, so the bar carries no title.
-  const screen = <Stack.Screen options={{ title: "" }} />;
+  // Handle shown big under the avatar, so the bar carries no title. Once a handle
+  // resolves, offer a Share button (its universal link) in the top-right.
+  const screen = (
+    <Stack.Screen
+      options={{
+        title: "",
+        unstable_headerRightItems: () =>
+          result ? [shareHeaderItem(result.handle)] : [],
+      }}
+    />
+  );
 
   // Result → the native @expo/ui view, which is its own scroll container (fills
   // the screen directly, not inside the RN Layout ScrollView). Header + native
