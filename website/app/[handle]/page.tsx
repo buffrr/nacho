@@ -15,12 +15,15 @@ export async function generateMetadata({
   const { handle: raw } = await params;
   const handle = normalizeHandle(raw) ?? raw;
   // No relay fetch here — keep previews free of network requests.
-  const description = `${handle} · own your internet address.`;
+  const description = "Own your address on the internet.";
   return {
     title: handle,
     description,
     openGraph: { title: handle, description, type: "profile" },
-    twitter: { title: handle, description },
+    // `card` must be set here — a child `twitter` object replaces the root's,
+    // so without it the page falls back to the small `summary` card (tiny
+    // thumbnail on Telegram/X instead of the large banner).
+    twitter: { card: "summary_large_image", title: handle, description },
   };
 }
 
