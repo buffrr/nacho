@@ -15,7 +15,6 @@ import {
 } from "@/fabricResolver";
 import { recordResolve } from "@/resolveHistory";
 import { ResolvedProfileNative, recordCountOf } from "@/ui/handleProfileNative";
-import { shareHeaderItem } from "@/ui/shareHandle";
 import { NativeEmpty } from "@/ui/nativeEmpty";
 import { ShopResults } from "@/ui/shopResults";
 import { isExample, resolveExampleFromCache } from "@/exampleResolve";
@@ -235,10 +234,6 @@ export default function Resolve() {
             setShopQuery(null);
           },
         },
-        unstable_headerRightItems: () =>
-          phase === "result" && result
-            ? [shareHeaderItem(result.handle)]
-            : [],
       }}
     />
   );

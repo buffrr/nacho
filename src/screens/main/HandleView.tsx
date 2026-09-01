@@ -76,8 +76,10 @@ export default function HandleView() {
     void run();
   };
 
-  // Handle shown big under the avatar, so the bar carries no title. Once a handle
-  // resolves, offer a Share button (its universal link) in the top-right.
+  // Handle shown big under the avatar, so the bar carries no title. This view has
+  // a normal top header (no search bar), so a Share button fits top-right once a
+  // handle resolves. (The Resolve/Search tab can't use this — its iOS 26 search
+  // bar sits at the bottom and collapses the top bar.)
   const screen = (
     <Stack.Screen
       options={{
