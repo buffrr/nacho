@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { recordMeta, recordGroup } from "@/lib/records";
 import type { RecordGroup } from "@/lib/records";
 import { RecordRow } from "./RecordRow";
@@ -14,13 +14,28 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "link", label: "Links" },
 ];
 const SECTIONS: { title: string; groups: RecordGroup[] }[] = [
-  { title: "Payments · Keys", groups: ["pay", "key"] },
+  { title: "Payments and keys", groups: ["pay", "key"] },
   { title: "Links", groups: ["link"] },
-  { title: "Notes", groups: ["note"] },
+  { title: "Note", groups: ["note"] },
 ];
 
 export function RecordsPanel({ records, source }: { records: Rec[]; source: string }) {
   const [tab, setTab] = useState<Tab>("all");
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [thumb, setThumb] = useState<{ x: number; w: number }>({ x: 0, w: 0 });
+
+  const positionThumb = () => {
+    const i = TABS.findIndex((t) => t.id === tab);
+    const el = tabRefs.current[i];
+    if (el) setThumb({ x: el.offsetLeft - 2, w: el.offsetWidth });
+  };
+  useLayoutEffect(positionThumb, [tab]);
+  useEffect(() => {
+    window.addEventListener("resize", positionThumb);
+    return () => window.removeEventListener("resize", positionThumb);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
   const tagged = records.map((r) => ({ r, g: recordGroup(r.key, recordMeta(r.type, r.key)) }));
   const visible = tab === "all" ? tagged : tagged.filter((x) => x.g === tab);
 
@@ -28,13 +43,22 @@ export function RecordsPanel({ records, source }: { records: Rec[]; source: stri
     <div className="recpanel">
       <div className="rechead">
         <p className="recsrc">
-          {records.length} record{records.length === 1 ? "" : "s"} · served by {source}
+
         </p>
-        <div className="rectabs">
-          {TABS.map((t) => (
+        <div className="rectabs" role="tablist" aria-label="Filter records">
+          <span
+            className="seg-thumb"
+            style={{ transform: `translateX(${thumb.x}px)`, width: thumb.w }}
+          />
+          {TABS.map((t, i) => (
             <button
               key={t.id}
+              ref={(el) => {
+                tabRefs.current[i] = el;
+              }}
               type="button"
+              role="tab"
+              aria-selected={tab === t.id}
               className={`rectab${tab === t.id ? " on" : ""}`}
               onClick={() => setTab(t.id)}
             >

@@ -63,7 +63,6 @@ export default function Home() {
 
       <main>
         <div className="hero">
-          <h1 className="hero-title">Own your internet address</h1>
 
           <p className="hint">
             Self-sovereign irrevocable handles{" "}

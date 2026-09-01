@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 const APP_STORE_URL = "https://apps.apple.com/app/id6755894049";
 
@@ -49,73 +50,75 @@ export function CardActions({ handle }: { handle: string }) {
   return (
     <>
       <div className="cardactions">
-        <div className="sharewrap">
-          <button type="button" className="shareb" onClick={copyHandle} aria-label={copied ? "Copied" : "Copy handle"} title={copied ? "Copied" : "Copy handle"}>
-            {copied ? (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="11" height="11" rx="2.5" />
-                <path d="M5 15V5a2 2 0 0 1 2-2h10" />
-              </svg>
-            )}
-          </button>
-          <span className="sharelbl">{copied ? "Copied" : "Copy"}</span>
-        </div>
-
-        <div className="sharewrap">
-          <button type="button" className="shareb" onClick={share} aria-label="Share" title="Share">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3v13" />
-              <path d="m7 8 5-5 5 5" />
-              <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
+        <button type="button" className="shareb" onClick={copyHandle} aria-label={copied ? "Copied" : "Copy handle"}>
+          {copied ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6 9 17l-5-5" />
             </svg>
-          </button>
-          <span className="sharelbl">Share</span>
-        </div>
-
-        <div className="sharewrap">
-          <button type="button" className="shareb" onClick={() => setVerifyOpen(true)} aria-label="Verify" title="Verify">
+          ) : (
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" />
-              <path d="m9 12 2 2 4-4" />
+              <rect x="9" y="9" width="11" height="11" rx="2.5" />
+              <path d="M5 15V5a2 2 0 0 1 2-2h10" />
             </svg>
-          </button>
-          <span className="sharelbl">Verify</span>
-        </div>
+          )}
+          <span>{copied ? "Copied" : "Copy"}</span>
+        </button>
+
+        <button type="button" className="shareb" onClick={share} aria-label="Share">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3v13" />
+            <path d="m7 8 5-5 5 5" />
+            <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
+          </svg>
+          <span>Share</span>
+        </button>
+
+        <button type="button" className="shareb" onClick={() => setVerifyOpen(true)} aria-label="Verify">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" />
+            <path d="m9 12 2 2 4-4" />
+          </svg>
+          <span>Verify</span>
+        </button>
       </div>
 
-      {verifyOpen && (
-        <div className="modalbg" role="dialog" aria-modal="true" aria-label="Verify this handle" onClick={() => setVerifyOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="modalx" onClick={() => setVerifyOpen(false)} aria-label="Close">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
-            <div className="micon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" />
-                <path d="m9 12 2 2 4-4" />
-              </svg>
-            </div>
-            <h3>Verify this handle</h3>
-            <p>
-              This page reads a single relay. To confirm{" "}
-              <span className="mhandle">{handle}</span> is anchored on Bitcoin,
-              open it in the nacho app and verify against your own trust anchor.
-            </p>
-            <a className="btn btn-p" href={APP_STORE_URL}>
-              Get the app
-            </a>
-            <button type="button" className="mlater" onClick={() => setVerifyOpen(false)}>
-              Maybe later
-            </button>
-          </div>
-        </div>
-      )}
+      {verifyOpen && typeof document !== "undefined"
+        ? createPortal(
+            // Portaled to <body> so it escapes the sticky sidebar's stacking
+            // context (otherwise <main>/records paint over it). Wrapper carries
+            // the CSS scope + tokens but is transparent so it doesn't cover.
+            <div className="lp lp-sub" style={{ background: "transparent", minHeight: 0 }}>
+              <div className="modalbg" role="dialog" aria-modal="true" aria-label="Verify this handle" onClick={() => setVerifyOpen(false)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()}>
+                  <button type="button" className="modalx" onClick={() => setVerifyOpen(false)} aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                  <div className="micon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" />
+                      <path d="m9 12 2 2 4-4" />
+                    </svg>
+                  </div>
+                  <h3>Verify this handle</h3>
+                  <p>
+                    This page reads a single relay. To confirm{" "}
+                    <span className="mhandle">{handle}</span> is anchored on Bitcoin,
+                    open it in the nacho app and verify against your own trust anchor.
+                  </p>
+                  <a className="btn btn-p" href={APP_STORE_URL}>
+                    Get the app
+                  </a>
+                  <button type="button" className="mlater" onClick={() => setVerifyOpen(false)}>
+                    Maybe later
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

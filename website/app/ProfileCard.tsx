@@ -2,6 +2,7 @@ import qrcode from "qrcode-generator";
 import { Icon } from "@/lib/icons";
 import { recordMeta } from "@/lib/records";
 import { CardActions } from "./CardActions";
+import { PayBlock } from "./PayBlock";
 import { CopyChip } from "./CopyChip";
 import { RecordsPanel } from "./RecordsPanel";
 
@@ -15,6 +16,7 @@ export type Data = {
   updatedAt?: number | null;
   anchor?: number | null;
   pubkey?: string | null;
+  numId?: string | null;
   alias?: string | null;
   relayHost?: string;
   records?: Rec[];
@@ -46,9 +48,6 @@ const short = (v: string) => (v.length <= 34 ? v : `${v.slice(0, 22)}…${v.slic
 
 export function ProfileCard({ data }: { data: Data }) {
   const handle = data.handle;
-  const at = handle.indexOf("@");
-  const before = at >= 0 ? handle.slice(0, at) : handle;
-  const after = at >= 0 ? handle.slice(at + 1) : "";
   const hue = hueFor(handle);
   const av = `linear-gradient(145deg, hsl(${hue} 20% 46%), hsl(${hue} 26% 26%))`;
   const recs = data.records ?? [];
@@ -71,29 +70,43 @@ export function ProfileCard({ data }: { data: Data }) {
           <div className="av" style={{ background: av }}>
             {initials(handle)}
           </div>
-          <div className="rhandle">
-            {before}
-            {at >= 0 ? <span className="at">@</span> : null}
-            {after}
-          </div>
+          <div className="rhandle">{handle}</div>
+          <p className="status">
+            <svg className="seal" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M8 .8 9.8 2 12 1.7l.9 2 2 .9-.3 2.2L15.8 8l-1.2 1.2.3 2.2-2 .9-.9 2-2.2-.3L8 15.2 6.8 14l-2.2.3-.9-2-2-.9.3-2.2L.8 8 2 6.8l-.3-2.2 2-.9.9-2L6.8 2 8 .8Zm3.1 5.1a.7.7 0 0 0-1 0L7.2 8.8 5.9 7.5a.7.7 0 1 0-1 1l1.8 1.8c.3.3.7.3 1 0l3.4-3.4a.7.7 0 0 0 0-1Z" />
+            </svg>
+            <b>{data.sovereign ? "Sovereign" : "Registered"}</b>
+            {data.updatedAt ? <> · updated {ago(data.updatedAt)}</> : null}
+          </p>
           <div className="trust">
-            <div className="trust-top">
-              <span className="trust-badge">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-                {data.sovereign ? "Sovereign" : "Registered"}
-              </span>
-              {data.updatedAt ? (
-                <span className="trust-upd">updated {ago(data.updatedAt)}</span>
-              ) : null}
-            </div>
             <dl className="trust-list">
               {data.pubkey ? (
                 <div className="trust-row">
                   <dt>Public key</dt>
                   <dd>
-                    <CopyChip value={data.pubkey} display={short(data.pubkey)} />
+                    <CopyChip
+                      value={data.pubkey}
+                      display={
+                        data.pubkey.length > 21
+                          ? `${data.pubkey.slice(0, 20)}…`
+                          : data.pubkey
+                      }
+                    />
+                  </dd>
+                </div>
+              ) : null}
+              {data.numId ? (
+                <div className="trust-row">
+                  <dt>Num id</dt>
+                  <dd>
+                    <CopyChip
+                      value={data.numId}
+                      display={
+                        data.numId.length > 21
+                          ? `${data.numId.slice(0, 20)}…`
+                          : data.numId
+                      }
+                    />
                   </dd>
                 </div>
               ) : null}
@@ -112,30 +125,19 @@ export function ProfileCard({ data }: { data: Data }) {
             </dl>
           </div>
 
-          {payUri ? (
-            <a className="pay" href={payUri}>
-              <span className="bi">
-                <Icon name={payMeta!.icon} size={18} />
-              </span>
-              {payLabel}
-            </a>
+          {payUri && payRec ? (
+            <PayBlock
+              payUri={payUri}
+              payLabel={payLabel}
+              icon={<Icon name={payMeta!.icon} size={18} />}
+              qr={<Qr text={payUri} size={188} />}
+              scanStr={short(payRec.value[0])}
+              isBolt12={isBolt12}
+            />
           ) : null}
 
           <CardActions handle={handle} />
         </div>
-
-        {payUri && payRec ? (
-          <div className="scancard">
-            <div className="scan-top">
-              <span className="scan-lab">Scan to pay</span>
-              {isBolt12 ? <span className="scan-badge">BOLT12</span> : null}
-            </div>
-            <div className="scan-qr">
-              <Qr text={payUri} size={188} />
-            </div>
-            <p className="scan-str">{short(payRec.value[0])}</p>
-          </div>
-        ) : null}
       </aside>
 
       {/* RIGHT — records */}
@@ -143,8 +145,8 @@ export function ProfileCard({ data }: { data: Data }) {
         <RecordsPanel records={recs} source={relayHost} />
         <div className="mainfoot">
           <p className="pnote">
-            Records are served by a Spaces relay. Open the nacho app to re-verify
-            them against your own trust anchor.
+            Open the nacho app to verify
+            the records are legitimate against your own trust anchor.
           </p>
           <a className="openapp" href={openInApp}>
             Open in the nacho app ↗

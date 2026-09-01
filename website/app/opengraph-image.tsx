@@ -3,39 +3,22 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 export const runtime = "nodejs";
-export const alt = "nacho handle";
+export const alt = "nacho — own your address on the internet";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 // Vendored fonts (public/fonts) so previews render the brand type with ZERO
 // network requests. Satori supports woff (not woff2).
 const fontDir = join(process.cwd(), "public", "fonts");
+const bricolage800 = readFileSync(join(fontDir, "bricolage-800.woff"));
 const bricolage500 = readFileSync(join(fontDir, "bricolage-500.woff"));
-const mono500 = readFileSync(join(fontDir, "martianmono-500.woff"));
 
-// Dot pattern as a tiled SVG data-URI <img>. Satori doesn't repeat a CSS
-// background-image gradient (it paints one radial fill), so we use an SVG
-// <pattern> instead, which tiles natively inside the image.
+// Dot pattern as a tiled SVG data-URI <img> (Satori doesn't repeat a CSS
+// background-image gradient; an SVG <pattern> tiles natively inside the image).
 const dotSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630'><defs><pattern id='d' width='30' height='30' patternUnits='userSpaceOnUse'><circle cx='1.5' cy='1.5' r='1.4' fill='#ffffff' fill-opacity='0.10'/></pattern></defs><rect width='1200' height='630' fill='url(#d)'/></svg>`;
 const dotUri = `data:image/svg+xml,${encodeURIComponent(dotSvg)}`;
 
-export default async function Image({
-  params,
-}: {
-  params: Promise<{ handle: string }>;
-}) {
-  const { handle: raw } = await params;
-  let handle = raw;
-  try {
-    handle = decodeURIComponent(raw);
-  } catch {
-    /* keep raw */
-  }
-  handle = handle.toLowerCase();
-
-  const hSize =
-    handle.length > 30 ? 58 : handle.length > 22 ? 74 : handle.length > 15 ? 94 : 112;
-
+export default async function Image() {
   return new ImageResponse(
     (
       <div
@@ -48,7 +31,7 @@ export default async function Image({
           alignItems: "center",
           justifyContent: "center",
           background: "#0c0b10",
-          fontFamily: "Martian",
+          fontFamily: "Bricolage",
         }}
       >
         {/* dot pattern across the whole canvas (tiled SVG) */}
@@ -61,37 +44,21 @@ export default async function Image({
           style={{ position: "absolute", top: 0, left: 0 }}
         />
 
-        {/* nacho logo, top-center */}
-        <div style={{ position: "absolute", top: 54, display: "flex" }}>
-          <Mark height={40} />
+        {/* nacho logo — large, centered */}
+        <div style={{ display: "flex" }}>
+          <Mark height={132} />
         </div>
 
-        {/* the handle — large, centered */}
+        {/* tagline */}
         <div
           style={{
             display: "flex",
-            fontFamily: "Martian",
-            fontSize: hSize,
-            fontWeight: 500,
-            letterSpacing: -1,
-            color: "#f7f4f0",
-            textAlign: "center",
-            padding: "0 60px",
-          }}
-        >
-          {handle}
-        </div>
-
-        {/* tagline, bottom */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 66,
-            display: "flex",
+            marginTop: 56,
             fontFamily: "Bricolage",
-            fontSize: 32,
-            fontWeight: 500,
-            color: "#9a948e",
+            fontSize: 46,
+            fontWeight: 800,
+            letterSpacing: -1.5,
+            color: "#f7f4f0",
           }}
         >
           Own your address on the internet
@@ -101,8 +68,8 @@ export default async function Image({
     {
       ...size,
       fonts: [
+        { name: "Bricolage", data: bricolage800, weight: 800, style: "normal" },
         { name: "Bricolage", data: bricolage500, weight: 500, style: "normal" },
-        { name: "Martian", data: mono500, weight: 500, style: "normal" },
       ],
     },
   );

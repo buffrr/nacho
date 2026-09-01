@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import { Suspense } from "react";
 import { peek, displayRecords, isSovereign, seqUpdatedAt, normalizeHandle, RELAY_HOST } from "@/lib/peek";
 import { Logo } from "../Logo";
 import { ProfileCard, APP_STORE_URL, initials, hueFor, type Data } from "../ProfileCard";
@@ -32,30 +32,10 @@ export default async function HandlePage({
   const { handle: raw } = await params;
   const handle = normalizeHandle(raw);
 
-  let body: ReactNode;
-
-  if (!handle) {
-    body = <NotFound handle={raw} invalid />;
-  } else {
-    const zone = await peek(handle);
-    if (!zone) {
-      body = <NotFound handle={handle} />;
-    } else {
-      const data: Data = {
-        handle,
-        found: true,
-        sovereign: isSovereign(zone),
-        updatedAt: seqUpdatedAt(zone),
-        anchor: typeof zone.anchor === "number" ? zone.anchor : null,
-        pubkey: zone.num_id ?? null,
-        alias: zone.alias ?? null,
-        relayHost: RELAY_HOST,
-        records: displayRecords(zone),
-      };
-      body = <ProfileCard data={data} />;
-    }
-  }
-
+  // The relay `peek` is the slow part. Render the shell (nav + frame) instantly
+  // and stream the profile inside a Suspense boundary — this lets the router
+  // transition immediately on navigation instead of blocking on the fetch,
+  // showing a skeleton in place until the zone resolves.
   return (
     <div className="lp lp-sub">
       <Bg />
@@ -72,10 +52,95 @@ export default async function HandlePage({
       </nav>
 
       <main>
-        <div className="phandle">{body}</div>
+        <div className="phandle">
+          {handle ? (
+            <Suspense key={handle} fallback={<ProfileSkeleton handle={handle} />}>
+              <HandleBody handle={handle} />
+            </Suspense>
+          ) : (
+            <NotFound handle={raw} invalid />
+          )}
+        </div>
       </main>
 
       <Footer />
+    </div>
+  );
+}
+
+async function HandleBody({ handle }: { handle: string }) {
+  const zone = await peek(handle);
+  if (!zone) return <NotFound handle={handle} />;
+  const data: Data = {
+    handle,
+    found: true,
+    sovereign: isSovereign(zone),
+    updatedAt: seqUpdatedAt(zone),
+    anchor: typeof zone.anchor === "number" ? zone.anchor : null,
+    pubkey: zone.script_pubkey ?? null,
+    numId: zone.num_id ?? null,
+    alias: zone.alias ?? null,
+    relayHost: RELAY_HOST,
+    records: displayRecords(zone),
+  };
+  return <ProfileCard data={data} />;
+}
+
+// Streamed placeholder shown while the relay peek is in flight. Reuses the
+// ProfileCard layout classes so nothing shifts when real data arrives; the
+// avatar + handle are already known, so only the details shimmer.
+function ProfileSkeleton({ handle }: { handle: string }) {
+  const hue = hueFor(handle);
+  const av = `linear-gradient(145deg, hsl(${hue} 20% 46%), hsl(${hue} 26% 26%))`;
+  return (
+    <div className="pcols">
+      <aside className="side">
+        <div className="sidecard">
+          <div className="av" style={{ background: av }}>
+            {initials(handle)}
+          </div>
+          <div className="rhandle">{handle}</div>
+          <p className="status">
+            <span className="sk sk-line" style={{ width: 150 }} />
+          </p>
+          <div className="trust">
+            <dl className="trust-list">
+              <div className="trust-row">
+                <dt>Public key</dt>
+                <dd>
+                  <span className="sk sk-line" style={{ width: 140 }} />
+                </dd>
+              </div>
+              <div className="trust-row">
+                <dt>Anchored</dt>
+                <dd>
+                  <span className="sk sk-line" style={{ width: 90 }} />
+                </dd>
+              </div>
+            </dl>
+          </div>
+          <div className="payrow">
+            <span className="sk sk-pay" />
+            <span className="sk sk-qr" />
+          </div>
+          <div className="cardactions">
+            <span className="sk sk-line" style={{ width: 48 }} />
+            <span className="sk sk-line" style={{ width: 48 }} />
+            <span className="sk sk-line" style={{ width: 48 }} />
+          </div>
+        </div>
+      </aside>
+      <div className="main">
+        <div className="recskel" aria-hidden="true">
+          <span className="sk sk-tabs" />
+          <span className="sk sk-sec" />
+          <span className="sk sk-row" />
+          <span className="sk sk-row" />
+          <span className="sk sk-sec" />
+          <span className="sk sk-row" />
+          <span className="sk sk-row" />
+        </div>
+      </div>
     </div>
   );
 }

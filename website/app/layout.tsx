@@ -6,6 +6,7 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import "./landing.css";
+import "./resolve.css";
 
 const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-display" });
 const sans = Instrument_Sans({ subsets: ["latin"], variable: "--font-sans" });
