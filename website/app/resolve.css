@@ -48,6 +48,7 @@
   top: 0;
   z-index: 40;
   overflow: hidden; /* clip the grain layer to the bar */
+  padding: 0; /* navinner owns padding; also blocks landing's ≤760 nav padding */
   background: rgba(10, 9, 12, 0.55);
   backdrop-filter: blur(22px) saturate(180%);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
@@ -242,6 +243,9 @@
 /* pay row: filled Pay button + a square QR-toggle button beside it */
 .lp-sub .payrow {
   display: flex;
+  flex-direction: row; /* stay side-by-side on mobile — beats landing's ≤760
+     `.lp .payrow { flex-direction: column }`, which would collapse the flex:1
+     pay button to its text height (cramped vertical padding) */
   gap: 10px;
   margin-top: 26px;
   padding: 0; /* kill landing's `.lp .payrow { padding: 20px 22px }` */
@@ -357,6 +361,7 @@
 
 /* QR block (revealed inline under the pay row via the QR-toggle button) */
 .lp-sub .scancard {
+  display: block; /* beats landing's ≤980 `.lp .scancard { display:none }` */
   margin-top: 18px;
   padding: 0;
   background: none;
@@ -672,4 +677,138 @@
   width: 100%;
   height: 66px;
   border-radius: 14px;
+}
+
+/* ─────────────────────── responsive ─────────────────────── */
+
+/* ≤980: stack identity over records (single column, centered) */
+@media (max-width: 980px) {
+  .lp-sub .pcols {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    max-width: 620px;
+    margin: 0 auto;
+  }
+  .lp-sub .side {
+    position: static;
+    top: auto;
+  }
+  /* center the identity cluster (avatar + handle + status) once stacked */
+  .lp-sub .sidecard {
+    text-align: center;
+  }
+  .lp-sub .sidecard .av {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .lp-sub .status {
+    justify-content: center;
+  }
+  /* meta fields stay a LEFT-aligned key/value list, but the list is contained
+     and centered as a block so it doesn't stray to the far-left edge on wide
+     (iPad) stacked columns */
+  .lp-sub .trust-list {
+    justify-items: start;
+    width: max-content;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: left;
+  }
+  .lp-sub .trust-row {
+    justify-content: flex-start;
+  }
+  /* actions sit under the full-width pay button — keep them centered */
+  .lp-sub .sidecard .cardactions {
+    justify-content: center;
+  }
+}
+
+/* ≤600: phone — compact nav, tighter spacing, smaller identity */
+@media (max-width: 600px) {
+  /* nav: shrink logo, let the search fill the row, drop the Get-the-app pill */
+  .lp-sub nav .navinner {
+    gap: 12px;
+    padding: 10px 16px;
+  }
+  .lp-sub .logo svg {
+    width: 60px;
+  }
+  .lp-sub nav .btn-p {
+    display: none;
+  }
+  .lp-sub .psearch {
+    flex: 1 1 0;
+  }
+
+  .lp-sub .phandle {
+    padding: 26px 18px 88px;
+  }
+  .lp-sub .pcols {
+    gap: 26px;
+  }
+
+  /* identity: a touch smaller on phones */
+  .lp-sub .sidecard .av {
+    width: 74px;
+    height: 74px;
+    font-size: 26px;
+  }
+  .lp-sub .rhandle {
+    font-size: 27px;
+  }
+
+  /* records header: label + segmented tabs stack, tabs left-aligned */
+  .lp-sub .rechead {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .lp-sub .rectabs {
+    align-self: flex-start;
+  }
+
+  /* record rows → 2-row grid so the description doesn't wrap in a squeezed
+     middle column. Top line: name (left) + description (right). Bottom line:
+     value (full width) + copy/open button. `display:contents` on the text
+     wrapper promotes .rn/.rd to grid items without changing the JSX. */
+  .lp-sub .rec {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "ic name desc"
+      "ic value btn";
+    column-gap: 12px;
+    row-gap: 3px;
+    align-items: center;
+  }
+  .lp-sub .rec .rec-tx {
+    display: contents;
+  }
+  .lp-sub .rec .ic {
+    grid-area: ic;
+    align-self: center;
+  }
+  .lp-sub .rec .rn {
+    grid-area: name;
+    align-self: end;
+  }
+  .lp-sub .rec .rd {
+    grid-area: desc;
+    align-self: end;
+    justify-self: end;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .lp-sub .rec .rv {
+    grid-area: value;
+    align-self: start;
+    justify-self: start;
+    max-width: none; /* full row width now — overrides landing's ≤760 120px cap */
+  }
+  .lp-sub .rec .recbtn {
+    grid-area: btn;
+    align-self: center;
+    justify-self: end; /* hug the right edge so buttons line up across all rows */
+  }
 }

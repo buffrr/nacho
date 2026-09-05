@@ -172,7 +172,7 @@ export default function Home({ preview = false }: { preview?: boolean }) {
           </View>
 
           <View style={[styles.copy, { marginTop: GAP }]}>
-            <Text style={styles.headline}>Own your{"\n"}internet address</Text>
+            <Text style={styles.headline}>Own your address{"\n"}on the internet.</Text>
             <Text style={styles.lede}>One handle for everything you want found.</Text>
           </View>
 

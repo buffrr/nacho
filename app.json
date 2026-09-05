@@ -2,7 +2,7 @@
   "expo": {
     "name": "nacho",
     "slug": "nacho",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "scheme": "nacho",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.impervious.nacho",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "associatedDomains": [
         "applinks:nacho.io"
       ],
