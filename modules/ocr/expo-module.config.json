@@ -1,6 +1,9 @@
 {
-  "platforms": ["apple"],
+  "platforms": ["apple", "android"],
   "apple": {
     "modules": ["ScanViewModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.ocr.ScanViewModule"]
   }
 }

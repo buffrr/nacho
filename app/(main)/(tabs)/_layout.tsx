@@ -12,6 +12,7 @@ import { useTheme } from "@/theme";
 const isIOS = Platform.OS === "ios";
 const PNG = {
   handles: require("../../../assets/tabs/handles.png"),
+  recents: require("../../../assets/tabs/recents.png"),
   resolve: require("../../../assets/tabs/resolve.png"),
   scan: require("../../../assets/tabs/scan.png"),
 };
@@ -28,13 +29,13 @@ export default function TabsLayout() {
         )}
         <NativeTabs.Trigger.Label>Handles</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      {/* Recents — handles resolved before. Android reuses the handles glyph as a
-          placeholder until a dedicated recents.png ships (iOS uses the SF clock). */}
+      {/* Recents — handles resolved before. iOS uses the SF clock; Android uses
+          the dedicated history glyph (assets/tabs/recents.png). */}
       <NativeTabs.Trigger name="recents">
         {isIOS ? (
           <NativeTabs.Trigger.Icon sf="clock.arrow.circlepath" />
         ) : (
-          <NativeTabs.Trigger.Icon src={PNG.handles} renderingMode="template" />
+          <NativeTabs.Trigger.Icon src={PNG.recents} renderingMode="template" />
         )}
         <NativeTabs.Trigger.Label>Recents</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>

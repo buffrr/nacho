@@ -1,4 +1,5 @@
 import React from "react";
+import { Platform } from "react-native";
 import { Stack } from "expo-router";
 import { RecordsDraftProvider } from "@/RecordsDraft";
 import { useTheme } from "@/theme";
@@ -37,9 +38,13 @@ export default function MainLayout() {
             sheetGrabberVisible: true,
             sheetCornerRadius: 24,
             headerShown: false,
-            // Transparent container so the sheet's native (glass) material shows
-            // through — the Stack's opaque `contentStyle` would otherwise cover it.
-            contentStyle: { backgroundColor: "transparent" },
+            // iOS: transparent so the native formSheet's glass material shows
+            // through. Android's formSheet has no glass — a transparent container
+            // leaves the sheet see-through (content behind bleeds in), so it needs
+            // an opaque themed background.
+            contentStyle: {
+              backgroundColor: Platform.OS === "ios" ? "transparent" : colors.background,
+            },
           }}
         />
         {/* Handle-detail subtree lives in the Handles tab stack; view-handle in

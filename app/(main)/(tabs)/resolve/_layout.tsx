@@ -3,6 +3,7 @@ import { Stack, router } from "expo-router";
 import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
 import { useTheme } from "@/theme";
 import { nativeHeader, solidNativeHeader } from "@/ui/nativeHeader";
+import { headerLeftItemsOption } from "@/ui/androidHeaderItems";
 
 export default function ResolveTabLayout() {
   const { colors } = useTheme();
@@ -25,7 +26,7 @@ export default function ResolveTabLayout() {
     () => ({
       ...nativeHeader(colors),
       title: "Resolve",
-      unstable_headerLeftItems: () => leftItems,
+      ...headerLeftItemsOption(leftItems, colors.text),
     }),
     [colors, leftItems],
   );

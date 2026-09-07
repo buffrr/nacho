@@ -6,10 +6,12 @@
     "doctor": "expo-doctor",
     "pretty": "prettier -w .",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo-google-fonts/karla": "^0.4.2",
+    "@expo/material-symbols": "^0.1.1",
     "@expo/metro-runtime": "~57.0.8",
     "@noble/hashes": "^2.0.1",
     "@noble/secp256k1": "^3.0.0",
@@ -56,6 +58,7 @@
     "@babel/core": "^7.29.0",
     "@types/react": "~19.2.4",
     "expo-doctor": "^1.17.8",
+    "patch-package": "^8.0.1",
     "prettier": "^3.6.2",
     "typescript": "~6.0.3"
   },

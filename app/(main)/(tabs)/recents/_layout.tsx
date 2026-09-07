@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { useTheme } from "@/theme";
 import { solidNativeHeader } from "@/ui/nativeHeader";
 import { appMenuLeftItems } from "@/ui/appMenu";
+import { headerLeftItemsOption } from "@/ui/androidHeaderItems";
 
 // Recents: handles the user has resolved before (src/screens/main/Recents).
 // Same large-title treatment as Handles; the Edit/Done button is a native
@@ -23,7 +24,7 @@ export default function RecentsTabLayout() {
       headerTintColor: colors.text,
       headerLargeTitleStyle: { color: colors.text },
       contentStyle: { backgroundColor: colors.background },
-      unstable_headerLeftItems: () => leftItems,
+      ...headerLeftItemsOption(leftItems, colors.text),
     }),
     [colors.text, colors.background, leftItems],
   );

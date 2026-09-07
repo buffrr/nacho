@@ -1,9 +1,11 @@
 import React from "react";
+import { Platform } from "react-native";
 import { Stack, router } from "expo-router";
 import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
 import { useTheme } from "@/theme";
 import { solidNativeHeader } from "@/ui/nativeHeader";
 import { appMenuLeftItems } from "@/ui/appMenu";
+import { AppMenuAndroid, HeaderIconButtonAndroid } from "@/ui/appMenuAndroid";
 
 // The "+" (Register a handle) as a native bar-button item (SF Symbol), memoized
 // with stable deps + the imported `router` singleton so its identity doesn't
@@ -45,8 +47,23 @@ export default function HandlesTabLayout() {
       headerTintColor: colors.text,
       headerLargeTitleStyle: { color: colors.text },
       contentStyle: { backgroundColor: colors.background },
-      unstable_headerLeftItems: () => leftItems,
-      unstable_headerRightItems: () => rightItems,
+      // iOS uses native UIMenu bar items; Android renders RN header components
+      // (native items don't render on Android) — same actions, iOS untouched.
+      ...(Platform.OS === "ios"
+        ? {
+            unstable_headerLeftItems: () => leftItems,
+            unstable_headerRightItems: () => rightItems,
+          }
+        : {
+            headerLeft: () => <AppMenuAndroid tint={colors.text} />,
+            headerRight: () => (
+              <HeaderIconButtonAndroid
+                tint={colors.text}
+                sf="plus"
+                onPress={() => router.push("/(main)/register-hub")}
+              />
+            ),
+          }),
     }),
     [colors.text, colors.background, leftItems, rightItems],
   );
