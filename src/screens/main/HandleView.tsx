@@ -12,6 +12,7 @@ import { ResolvedProfileNative, recordCountOf } from "@/ui/handleProfileNative";
 import { NativeEmpty } from "@/ui/nativeEmpty";
 import { isExample, resolveExampleFromCache } from "@/exampleResolve";
 import { shareHeaderItem } from "@/ui/shareHandle";
+import { headerRightItemsOption } from "@/ui/androidHeaderItems";
 
 // A standalone, read-only view of a resolved handle — opened from Recents by
 // tapping a row. Unlike the Search tab it auto-resolves on entry and shows no
@@ -84,8 +85,10 @@ export default function HandleView() {
     <Stack.Screen
       options={{
         title: "",
-        unstable_headerRightItems: () =>
+        ...headerRightItemsOption(
           result ? [shareHeaderItem(result.handle)] : [],
+          colors.text,
+        ),
       }}
     />
   );

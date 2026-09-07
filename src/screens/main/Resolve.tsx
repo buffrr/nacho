@@ -213,6 +213,8 @@ export default function Resolve() {
           hideWhenScrolling: false,
           textColor: colors.text,
           tintColor: colors.accent,
+          hintTextColor: colors.textMuted,
+          headerIconColor: colors.text,
           onChangeText: (e) => {
             const t = e.nativeEvent.text.trim().toLowerCase();
             setHandle(t);

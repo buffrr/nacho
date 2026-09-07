@@ -2,6 +2,7 @@ import React from "react";
 import type { SFSymbol } from "sf-symbols-typescript";
 import { Host, Column, Row, Spacer, Icon, Text } from "@expo/ui";
 import { useTheme } from "@/theme";
+import { sfIcon } from "@/ui/sfIcon";
 import { ActionFooter } from "@/ui/actionFooter";
 
 type Action = { label: string; onPress: () => void };
@@ -50,7 +51,7 @@ export function NativeEmpty({
                 style={{ width: 86, height: 86, borderRadius: 26, backgroundColor: badge }}
               >
                 <Spacer flexible />
-                <Icon name={sf} size={40} color={glyph} />
+                <Icon name={sfIcon(sf)} size={40} color={glyph} />
                 <Spacer flexible />
               </Column>
 

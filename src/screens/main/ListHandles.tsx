@@ -2,12 +2,12 @@ import React, { useState, useCallback } from "react";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import {
   Host,
-  ListItem,
-  Icon,
-  Text as UIText,
   Row,
   RNHostView,
 } from "@expo/ui";
+import { Text as UIText } from "@/ui/text";
+import { ListItem } from "@/ui/listItem";
+import { Icon } from "@/ui/icon";
 import { listRowBackground, listRowSeparator } from "@/ui/rowModifiers";
 import { PlainList } from "@/ui/PlainList";
 import { HandleData, useStore } from "@/Store";
@@ -149,6 +149,11 @@ export default function ListHandles() {
           hideWhenScrolling: true,
           textColor: colors.text,
           tintColor: colors.accent,
+          // Android: without these the placeholder + search/clear icons default
+          // to white → invisible on the light header. (iOS ignores them / uses
+          // its own defaults.)
+          hintTextColor: colors.textMuted,
+          headerIconColor: colors.text,
           onChangeText: (e) => setQuery(e.nativeEvent.text),
         },
       }}

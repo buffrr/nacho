@@ -2,15 +2,15 @@ import React from "react";
 import { WEB_TOP_INSET } from "@/ui/webInset";
 import {
   Host,
-  FieldGroup,
-  ListItem,
-  Icon,
-  Text,
   Column,
   Row,
   Spacer,
   RNHostView,
 } from "@expo/ui";
+import { FieldGroup } from "@/ui/fieldGroup";
+import { Text } from "@/ui/text";
+import { ListItem } from "@/ui/listItem";
+import { Icon } from "@/ui/icon";
 import type { SFSymbol } from "sf-symbols-typescript";
 import { refreshable } from "@/ui/rowModifiers";
 import { useTheme, boundedHost } from "@/theme";

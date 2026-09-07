@@ -4,15 +4,16 @@ import { useLocalSearchParams, useNavigation, useRouter, Stack } from "expo-rout
 import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
 import {
   Host,
-  FieldGroup,
-  ListItem,
-  Icon,
-  Text,
   TextInput,
   Picker,
   useNativeState,
 } from "@expo/ui";
+import { FieldGroup } from "@/ui/fieldGroup";
+import { Text } from "@/ui/text";
+import { ListItem } from "@/ui/listItem";
+import { Icon } from "@/ui/icon";
 import { useTheme, boundedHost } from "@/theme";
+import { headerRightItemsOption } from "@/ui/androidHeaderItems";
 import { useRecordsDraft } from "@/RecordsDraft";
 import { lookupRecord } from "@/recordRegistry";
 import { RecordGlyph } from "@/ui/handleProfileNative";
@@ -211,7 +212,7 @@ export default function EditRecord() {
   return (
     <>
       <Stack.Screen
-        options={{ title, unstable_headerRightItems: () => headerItems }}
+        options={{ title, ...headerRightItemsOption(headerItems, colors.text) }}
       />
       <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup>

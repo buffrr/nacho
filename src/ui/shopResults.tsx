@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Host, ListItem, Icon, Text, Button, RNHostView } from "@expo/ui";
+import { Host, Button, RNHostView } from "@expo/ui";
+import { Text } from "@/ui/text";
+import { ListItem } from "@/ui/listItem";
+import { Icon } from "@/ui/icon";
 import {
   listRowBackground,
   listRowSeparator,

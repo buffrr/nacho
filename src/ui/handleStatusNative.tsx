@@ -3,15 +3,15 @@ import { WEB_TOP_INSET } from "@/ui/webInset";
 import type { SFSymbol } from "sf-symbols-typescript";
 import {
   Host,
-  FieldGroup,
-  ListItem,
-  Icon,
-  Text,
   Column,
   Row,
   Spacer,
   RNHostView,
 } from "@expo/ui";
+import { FieldGroup } from "@/ui/fieldGroup";
+import { Text } from "@/ui/text";
+import { ListItem } from "@/ui/listItem";
+import { Icon } from "@/ui/icon";
 import { useTheme, boundedHost } from "@/theme";
 import { Avatar } from "@/ui/Avatar";
 import { ActionFooter } from "@/ui/actionFooter";

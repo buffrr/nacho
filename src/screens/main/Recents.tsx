@@ -4,16 +4,17 @@ import { Stack, useFocusEffect, useRouter } from "expo-router";
 import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
 import {
   Host,
-  ListItem,
-  Icon,
-  Text as UIText,
   Row,
   RNHostView,
 } from "@expo/ui";
+import { Text as UIText } from "@/ui/text";
+import { ListItem } from "@/ui/listItem";
+import { Icon } from "@/ui/icon";
 import { listRowBackground, listRowSeparator } from "@/ui/rowModifiers";
 import { PlainList } from "@/ui/PlainList";
 import type { SFSymbol } from "sf-symbols-typescript";
 import { Colors, useTheme } from "@/theme";
+import { headerRightItemsOption } from "@/ui/androidHeaderItems";
 import { Avatar } from "@/ui/Avatar";
 import { NativeEmpty } from "@/ui/nativeEmpty";
 import {
@@ -103,7 +104,7 @@ export default function Recents() {
   const screen = (
     <Stack.Screen
       options={{
-        unstable_headerRightItems: () => headerItems,
+        ...headerRightItemsOption(headerItems, colors.text),
         // Native header search filters the list (only when there's something to
         // filter). Same feel as the Handles list.
         ...(entries.length > 0
@@ -114,6 +115,9 @@ export default function Recents() {
                 hideWhenScrolling: true,
                 textColor: colors.text,
                 tintColor: colors.accent,
+                // Android: keep placeholder + icons readable on the light header.
+                hintTextColor: colors.textMuted,
+                headerIconColor: colors.text,
                 onChangeText: (e: { nativeEvent: { text: string } }) =>
                   setQuery(e.nativeEvent.text),
               },

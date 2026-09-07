@@ -78,6 +78,8 @@ export default function Shop() {
           hideWhenScrolling: false,
           textColor: colors.text,
           tintColor: colors.accent,
+          hintTextColor: colors.textMuted,
+          headerIconColor: colors.text,
           onChangeText: (e) =>
             setQuery(e.nativeEvent.text.toLowerCase().replace(/[^a-z0-9@.\-]/g, "")),
         },

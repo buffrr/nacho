@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Platform } from "react-native";
 import { useRouter, useFocusEffect, Stack } from "expo-router";
 import type { NativeStackHeaderItem } from "@react-navigation/native-stack";
 import {
   Host,
-  FieldGroup,
-  ListItem,
-  Icon,
-  Text,
   TextInput,
   Picker,
   Switch,
   useNativeState,
 } from "@expo/ui";
+import { FieldGroup } from "@/ui/fieldGroup";
+import { Text } from "@/ui/text";
+import { ListItem } from "@/ui/listItem";
+import { Icon } from "@/ui/icon";
 import { useTheme, boundedHost } from "@/theme";
+import { headerRightItemsOption } from "@/ui/androidHeaderItems";
 import {
   ensureSemiTrust,
   refreshSemiTrust,
@@ -381,7 +383,7 @@ export default function Settings() {
 
   return (
     <>
-      <Stack.Screen options={{ unstable_headerRightItems: () => headerItems }} />
+      <Stack.Screen options={{ ...headerRightItemsOption(headerItems, colors.text) }} />
       <Host style={boundedHost} colorScheme={scheme}>
         <FieldGroup>
           {/* YOUR TRUST ID — strongest guarantee; first on the page. */}
@@ -497,11 +499,12 @@ export default function Settings() {
                 {/* Policy — Any / Majority / All / At least K. "Majority" and
                     "All" adapt to the pool size; "At least K" is a fixed count;
                     "Any" (K=1) means a single source suffices. */}
-                <ListItem
-                  supportingText={
-                    poolSize > 0 ? `Needs ${required} of ${poolSize} to agree` : undefined
-                  }
-                  trailing={
+                {(() => {
+                  const supporting =
+                    poolSize > 0
+                      ? `Needs ${required} of ${poolSize} to agree`
+                      : undefined;
+                  const picker = (
                     <Picker
                       selectedValue={quorumValue}
                       onValueChange={(v) => onQuorumChange(String(v))}
@@ -516,10 +519,23 @@ export default function Settings() {
                         />
                       ))}
                     </Picker>
-                  }
-                >
-                  <Text>Policy</Text>
-                </ListItem>
+                  );
+                  // iOS: Picker is a compact menu button, fine as a trailing.
+                  // Android: Picker is a full-width Material ExposedDropdown, so it
+                  // gets its own row below the label (a trailing would starve it).
+                  return Platform.OS === "android" ? (
+                    <>
+                      <ListItem supportingText={supporting}>
+                        <Text>Policy</Text>
+                      </ListItem>
+                      {picker}
+                    </>
+                  ) : (
+                    <ListItem supportingText={supporting} trailing={picker}>
+                      <Text>Policy</Text>
+                    </ListItem>
+                  );
+                })()}
 
                 {error ? (
                   <ListItem

@@ -5,15 +5,15 @@ import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
 import * as Clipboard from "expo-clipboard";
 import {
   Host,
-  FieldGroup,
-  ListItem,
-  Icon,
-  Text,
   Column,
   Row,
   Spacer,
   RNHostView,
 } from "@expo/ui";
+import { FieldGroup } from "@/ui/fieldGroup";
+import { Text } from "@/ui/text";
+import { ListItem } from "@/ui/listItem";
+import { Icon } from "@/ui/icon";
 import type { SFSymbol } from "sf-symbols-typescript";
 import { useRouter } from "expo-router";
 import { useTheme, boundedHost } from "@/theme";

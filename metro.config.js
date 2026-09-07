@@ -14,7 +14,9 @@ config.transformer.getTransformOptions = async () => ({
 config.resolver.sourceExts = [...config.resolver.sourceExts, "mjs"];
 
 // Serve the libveritas WASM binary as an asset so wasm-bindgen can fetch it.
-config.resolver.assetExts = [...config.resolver.assetExts, "wasm"];
+// `xml` → Android XML vector drawables from @expo/material-symbols, loaded at
+// runtime by @expo/ui's Icon (Android renders drawables, not SF Symbols).
+config.resolver.assetExts = [...config.resolver.assetExts, "wasm", "xml"];
 
 // Keep the standalone `website/` project (its own node_modules + web-only deps
 // like next/react-dom) out of the RN bundler — otherwise Metro crawls it and

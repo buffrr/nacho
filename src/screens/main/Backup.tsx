@@ -1,7 +1,11 @@
 import React, { useState } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { Host, FieldGroup, ListItem, Icon, Text } from "@expo/ui";
+import { Host } from "@expo/ui";
+import { FieldGroup } from "@/ui/fieldGroup";
+import { Text } from "@/ui/text";
+import { ListItem } from "@/ui/listItem";
+import { Icon } from "@/ui/icon";
 import { useStore } from "@/Store";
 import { useTheme, boundedHost } from "@/theme";
 import { ActionFooter } from "@/ui/actionFooter";

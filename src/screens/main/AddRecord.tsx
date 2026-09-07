@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from "react";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { Host, FieldGroup, ListItem, Icon, Text } from "@expo/ui";
+import { Host } from "@expo/ui";
+import { FieldGroup } from "@/ui/fieldGroup";
+import { Text } from "@/ui/text";
+import { ListItem } from "@/ui/listItem";
+import { Icon } from "@/ui/icon";
 import { useTheme } from "@/theme";
 import { registryGroups, RecordDef, RecordGroup } from "@/recordRegistry";
 import { RecordGlyph } from "@/ui/handleProfileNative";
@@ -73,6 +77,8 @@ export default function AddRecord() {
             hideWhenScrolling: false,
             textColor: colors.text,
             tintColor: colors.accent,
+            hintTextColor: colors.textMuted,
+            headerIconColor: colors.text,
             onChangeText: (e) => setQuery(e.nativeEvent.text),
           },
         }}

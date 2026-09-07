@@ -65,6 +65,7 @@ import {
 } from "@/certState";
 import { HandleStatusNative, StatusDetail } from "@/ui/handleStatusNative";
 import { PurchaseNative } from "@/ui/purchaseNative";
+import { headerRightItemsOption, headerLeftItemsOption } from "@/ui/androidHeaderItems";
 import {
   fetchHandleStatus,
   reserveHandle,
@@ -1228,7 +1229,7 @@ export default function ShowHandle() {
         },
       ];
   const leftFallbackOption = backFallbackLeft
-    ? { unstable_headerLeftItems: () => backFallbackLeft }
+    ? headerLeftItemsOption(backFallbackLeft, colors.text)
     : {};
 
   const shortPk = `${pubkey.slice(0, 8)}…${pubkey.slice(-8)}`;
@@ -1306,15 +1307,18 @@ export default function ShowHandle() {
             // list, not back to the Shop/Search results it was bought from.
             headerBackVisible: false,
             gestureEnabled: false,
-            unstable_headerLeftItems: () => [
-              {
-                type: "button",
-                label: "Handles",
-                icon: { type: "sfSymbol", name: "chevron.backward" },
-                tintColor: colors.text,
-                onPress: goToHandlesList,
-              },
-            ],
+            ...headerLeftItemsOption(
+              [
+                {
+                  type: "button",
+                  label: "Handles",
+                  icon: { type: "sfSymbol", name: "chevron.backward" },
+                  tintColor: colors.text,
+                  onPress: goToHandlesList,
+                },
+              ],
+              colors.text,
+            ),
           }}
         />
         <HandleStatusNative
@@ -1339,7 +1343,7 @@ export default function ShowHandle() {
     return (
       <>
         <Stack.Screen
-          options={{ title: "", unstable_headerRightItems: () => headerItems }}
+          options={{ title: "", ...headerRightItemsOption(headerItems, colors.text) }}
         />
         <HandleStatusNative
           handle={handle}
@@ -1381,7 +1385,7 @@ export default function ShowHandle() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Stack.Screen
-          options={{ title: "", unstable_headerRightItems: () => headerItems }}
+          options={{ title: "", ...headerRightItemsOption(headerItems, colors.text) }}
         />
         <OwnerProfileNative
           handle={handle}
@@ -1452,7 +1456,7 @@ export default function ShowHandle() {
           options={{
             title: "",
             headerBackVisible: true,
-            unstable_headerRightItems: () => removeHeaderItems,
+            ...headerRightItemsOption(removeHeaderItems, colors.text),
             ...leftFallbackOption,
           }}
         />
@@ -1476,7 +1480,7 @@ export default function ShowHandle() {
           options={{
             title: "",
             headerBackVisible: true,
-            unstable_headerRightItems: () => removeHeaderItems,
+            ...headerRightItemsOption(removeHeaderItems, colors.text),
             ...leftFallbackOption,
           }}
         />
@@ -1503,7 +1507,7 @@ export default function ShowHandle() {
         options={{
           title: headerTitle,
           headerBackVisible: true,
-          unstable_headerRightItems: () => requestHeaderItems,
+          ...headerRightItemsOption(requestHeaderItems, colors.text),
           ...leftFallbackOption,
         }}
       />

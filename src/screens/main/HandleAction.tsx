@@ -2,13 +2,13 @@ import React from "react";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import {
   Host,
-  FieldGroup,
-  ListItem,
-  Icon,
-  Text,
   TextInput,
   useNativeState,
 } from "@expo/ui";
+import { FieldGroup } from "@/ui/fieldGroup";
+import { Text } from "@/ui/text";
+import { ListItem } from "@/ui/listItem";
+import { Icon } from "@/ui/icon";
 import { useTheme, boundedHost } from "@/theme";
 import { ActionFooter } from "@/ui/actionFooter";
 import { encodeSignRequest, extractReqParam, SignRequest } from "@/signRequest";

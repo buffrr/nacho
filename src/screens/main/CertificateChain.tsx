@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Stack, useLocalSearchParams } from "expo-router";
 import * as Clipboard from "expo-clipboard";
-import { Host, FieldGroup, ListItem, Icon, Text, Column, Row } from "@expo/ui";
+import { Host, Column, Row } from "@expo/ui";
+import { FieldGroup } from "@/ui/fieldGroup";
+import { Text } from "@/ui/text";
+import { ListItem } from "@/ui/listItem";
+import { Icon } from "@/ui/icon";
 import { refreshable } from "@/ui/rowModifiers";
 import { useTheme, boundedHost } from "@/theme";
 import { NativeEmpty } from "@/ui/nativeEmpty";
