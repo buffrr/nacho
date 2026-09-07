@@ -36,3 +36,10 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# local Expo module (modules/) build output — generated, never commit the source
+# stays tracked (*.kt / *.swift / build.gradle / *.podspec / expo-module.config.json)
+modules/*/android/build/
+modules/*/android/.cxx/
+modules/*/android/.gradle/
+modules/*/ios/build/
