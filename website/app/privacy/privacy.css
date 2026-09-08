@@ -1,0 +1,84 @@
+.privacy {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 56px 20px 96px;
+  line-height: 1.6;
+  font-size: 16px;
+}
+.privacy .brandrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.privacy .mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+}
+.privacy .brand {
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  font-family: var(--font-display), sans-serif;
+}
+.privacy h1 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 32px;
+  letter-spacing: -0.02em;
+  margin: 28px 0 6px;
+}
+.privacy h2 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  margin: 34px 0 10px;
+}
+.privacy p,
+.privacy li {
+  color: var(--text-secondary);
+}
+.privacy strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.privacy a {
+  color: var(--accent);
+}
+.privacy a:hover {
+  text-decoration: underline;
+}
+.privacy .updated {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.privacy ul {
+  padding-left: 20px;
+}
+.privacy li {
+  margin: 6px 0;
+}
+.privacy .card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin: 18px 0;
+}
+.privacy hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 40px 0;
+}
+.privacy .fin {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 40px;
+}

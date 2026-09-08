@@ -256,9 +256,9 @@ export default function Home() {
         <div className="fin">
           <p>nacho — handles on the Spaces protocol</p>
           <div className="fl">
-            <a href="#">Privacy</a>
+            <a href="/privacy">Privacy</a>
             <a href="#">Terms</a>
-            <a href="#">Support</a>
+            <a href="mailto:support@impervious.com">Support</a>
             <a href="https://spacesprotocol.org" target="_blank" rel="noopener noreferrer">
               Spaces protocol
             </a>

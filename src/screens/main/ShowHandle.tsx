@@ -305,8 +305,10 @@ export default function ShowHandle() {
           setPurchasing(false);
         },
         onPurchaseError: (error) => {
-          if (__DEV__)
-            console.log("[nacho/iap] onPurchaseError:", error.code, error.message);
+          // TEMP: unconditional log so a silent/masquerading Play error shows in
+          // the release/internal build's logcat too — revert to __DEV__ before
+          // the final commit.
+          console.log("[nacho/iap] onPurchaseError:", error.code, error.message);
           if (error.code !== "user-cancelled") {
             setError("Purchase failed: " + error.message);
           }
@@ -344,23 +346,61 @@ export default function ShowHandle() {
   const { requestPurchase, finishTransaction } = iapApi;
 
   // Android BillingClient readiness. useIAP binds the Play billing service on
-  // mount and calls endConnection on unmount, so navigating between handles
-  // churns the (app-wide) client; requestPurchase on a still-(re)connecting
-  // client hangs in BillingClient's reconnect loop instead of opening the sheet.
-  // Gate the buy flow on this. The web/fallback path has no `connected` → treat
-  // as ready so non-native paths are unchanged.
+  // mount; `connected` flips true once it's bound. (web/fallback path has no
+  // `connected` → treated as ready so non-native paths are unchanged.)
   const billingConnected =
     iap && "connected" in iapApi ? (iapApi as ReturnType<IAPHook>).connected : true;
-  const billingConnectedRef = React.useRef(billingConnected);
-  React.useEffect(() => {
-    billingConnectedRef.current = billingConnected;
-  }, [billingConnected]);
+  const billingProducts =
+    iap && "products" in iapApi ? (iapApi as ReturnType<IAPHook>).products : [];
 
-  // NOTE: deliberately NO proactive getAvailablePurchases() sweep here. It shares
-  // the single app-wide BillingClient with the purchase, and on the (slow)
-  // emulator its query can run ~10s and collide with a concurrent
-  // requestPurchase, making the buy flaky. Consume-before-navigate in
-  // onPurchaseSuccess is what prevents unconsumed/stuck purchases; that's the fix.
+  // On Android the Buy button is "ready" only once BillingClient is connected AND
+  // our SKU is actually in its product cache — requestPurchase can't open the
+  // sheet before queryProductDetails has succeeded. Gating on this removes the
+  // race (no promise plumbing) and makes the button reflect real readiness: it
+  // enables exactly when a purchase will work. Non-Android / web treat as ready.
+  const billingReady =
+    Platform.OS !== "android" ||
+    !iap ||
+    (billingConnected &&
+      billingProducts.some((p) => p.id === "atbitcoin_handle_mainnet"));
+
+  // Live ref to the latest products so the retry loop can check "is the SKU
+  // cached yet?" without putting `billingProducts` in the effect deps (which would
+  // cancel+restart the timer on every render if useIAP returns a fresh array).
+  const productsRef = React.useRef(billingProducts);
+  productsRef.current = billingProducts;
+
+  // Android: pre-fetch product details once billing connects, WHILE the user reads
+  // the page — Play needs queryProductDetails cached before requestPurchase can
+  // launch the sheet. Lightweight (product metadata only; no getAvailablePurchases
+  // sweep — the server reconciles refunds). The billing service can be slow to
+  // answer right after connecting, so RETRY until the SKU lands in `products`
+  // (which flips billingReady → enables the button). Real devices succeed on the
+  // first try; a slow/flaky service just keeps the button disabled until it can.
+  React.useEffect(() => {
+    if (!iap || Platform.OS !== "android" || !billingConnected) return;
+    const hasSku = () =>
+      productsRef.current.some((p) => p.id === "atbitcoin_handle_mainnet");
+    if (hasSku()) return;
+    const { fetchProducts } = iapApi as ReturnType<IAPHook>;
+    let cancelled = false;
+    let attempts = 0;
+    const run = () => {
+      if (cancelled || hasSku()) return; // stop once the SKU is cached
+      attempts += 1;
+      fetchProducts({ skus: ["atbitcoin_handle_mainnet"], type: "in-app" }).catch(
+        (e) => {
+          if (__DEV__) console.warn("[nacho/iap] fetchProducts retry", attempts, String(e));
+        },
+      );
+      if (attempts < 30) setTimeout(run, 2000);
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billingConnected]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -693,24 +733,16 @@ export default function ShowHandle() {
     setError(null);
     setPurchasing(true);
 
-    // Android: wait for the Play billing service to be bound before doing
-    // anything. Calling requestPurchase while the BillingClient is still
-    // (re)connecting hangs on an internal reconnect loop ("Async task is taking
-    // too long / Max retries") and the sheet never opens. iOS connects reliably,
-    // so this guard is Android-only to keep iOS behaviour identical.
-    if (iap && Platform.OS === "android" && !billingConnectedRef.current) {
-      const start = Date.now();
-      while (!billingConnectedRef.current && Date.now() - start < 6000) {
-        await new Promise((r) => setTimeout(r, 150));
-      }
-      if (!billingConnectedRef.current) {
-        setError("Store isn’t ready yet — try again in a moment.");
-        setPurchasing(false);
-        return;
-      }
-    }
+    // Per-step timing so we can see exactly where the "processing" time goes.
+    // TEMP: logs unconditionally (not __DEV__) so it shows in the internal-track
+    // release build's logcat too — remove before the final commit.
+    const t0 = Date.now();
+    const tlog = (s: string) => {
+      console.log(`[nacho/iap] ${s} +${Date.now() - t0}ms`);
+    };
 
     const result = await reserveHandle(handle, script_pubkey);
+    tlog("reserveHandle done");
     if ("error" in result) {
       setError(result.error);
       setPurchasing(false);
@@ -727,20 +759,33 @@ export default function ShowHandle() {
     }
 
     // The purchase outcome arrives via the useIAP onPurchaseSuccess/onPurchaseError
-    // callbacks; this try only catches a failure to *start* the flow. A user
-    // cancel isn't an error worth surfacing.
+    // callbacks; this try only catches a failure to *start* the flow.
+    const req = {
+      request: {
+        apple: { sku: result.product_id },
+        google: { skus: [result.product_id] },
+      },
+      type: "in-app" as const,
+    };
     try {
-      await requestPurchase({
-        request: {
-          apple: { sku: result.product_id },
-          google: { skus: [result.product_id] },
-        },
-        type: "in-app",
-      });
+      tlog("requesting sheet");
+      if (Platform.OS === "android" && iap) {
+        // Android: do NOT await. Per the official expo-iap example, requestPurchase
+        // returns as soon as the billing intent is dispatched; the real outcome
+        // arrives via onPurchaseSuccess/onPurchaseError. Awaiting it hangs / resolves
+        // early on Android (the promise settles before the sheet is shown), which
+        // flips the button back via a swallowed "user-cancelled". iOS keeps its
+        // existing awaited flow (shipped + working) untouched.
+        void requestPurchase(req);
+      } else {
+        await requestPurchase(req);
+      }
+      tlog("requestPurchase dispatched");
     } catch (err) {
       const code = (err as { code?: string })?.code;
       const msg = err instanceof Error ? err.message : String(err);
-      if (__DEV__) console.log("[nacho/iap] requestPurchase threw:", code, msg);
+      // TEMP: unconditional so a start-of-flow failure shows in release logcat.
+      console.log("[nacho/iap] requestPurchase threw:", code, msg);
       if (code !== "user-cancelled" && !/cancel/i.test(msg)) {
         setError("Failed purchase: " + msg);
       }
@@ -1480,7 +1525,10 @@ export default function ShowHandle() {
           handle={handle}
           pubkey={pubkey}
           price={price}
-          purchasing={purchasing}
+          // Disabled + "Processing…" until Android billing is connected AND our
+          // SKU is cached (billingReady) — so a tap can't fire requestPurchase
+          // before Play can open the sheet.
+          purchasing={purchasing || !billingReady}
           onBuy={handleBuyHandle}
           onCopyKey={() => copy(pubkey)}
         />
