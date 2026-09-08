@@ -32,6 +32,17 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="nacho"/>
       </intent-filter>
+      <!-- nacho.io HTTPS App Links (Android counterpart of the iOS AASA): opens
+           handle slugs (paths containing "@") in-app. Verifies against
+           https://nacho.io/.well-known/assetlinks.json (see website route).
+           Kept in sync with app.json android.intentFilters; the committed
+           manifest is the source of truth for this bare project. -->
+      <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="https" android:host="nacho.io" android:pathPattern=".*@.*"/>
+      </intent-filter>
     </activity>
   </application>
 </manifest>

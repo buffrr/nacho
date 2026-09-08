@@ -26,10 +26,18 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.impervious.nacho",
-      "versionCode": 11,
+      "versionCode": 17,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [{ "scheme": "https", "host": "nacho.io", "pathPattern": ".*@.*" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "web": {

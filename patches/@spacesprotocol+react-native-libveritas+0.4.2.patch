@@ -1,3 +1,23 @@
+diff --git a/node_modules/@spacesprotocol/react-native-libveritas/android/CMakeLists.txt b/node_modules/@spacesprotocol/react-native-libveritas/android/CMakeLists.txt
+index 740e95e..8a0465a 100644
+--- a/node_modules/@spacesprotocol/react-native-libveritas/android/CMakeLists.txt
++++ b/node_modules/@spacesprotocol/react-native-libveritas/android/CMakeLists.txt
+@@ -29,6 +29,15 @@ add_library(spacesprotocol-react-native-libveritas            SHARED
+     cpp-adapter.cpp
+ )
+ 
++# 16 KB page alignment — required by Google Play for Android 15+ (SDK 35+).
++# NDK r27 does not apply it to this module's link by default (RN's own libs get
++# it via ReactAndroid's build), so force 16 KB on the final .so here. Without
++# this, this is the ONLY misaligned lib in the AAB and Play blocks production.
++target_link_options(spacesprotocol-react-native-libveritas PRIVATE
++    "-Wl,-z,max-page-size=16384"
++    "-Wl,-z,common-page-size=16384"
++)
++
+ # Set C++ compiler flags
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
 diff --git a/node_modules/@spacesprotocol/react-native-libveritas/android/cpp-adapter.cpp b/node_modules/@spacesprotocol/react-native-libveritas/android/cpp-adapter.cpp
 index fbb6262..a9540a8 100644
 --- a/node_modules/@spacesprotocol/react-native-libveritas/android/cpp-adapter.cpp

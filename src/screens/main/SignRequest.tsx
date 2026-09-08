@@ -12,7 +12,6 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import {
   Host,
-  Icon as NIcon,
   Column as NColumn,
   Row as NRow,
   Spacer as NSpacer,
@@ -20,6 +19,7 @@ import {
   TextInput as NTextInput,
   useNativeState,
 } from "@expo/ui";
+import { Icon as NIcon } from "@/ui/icon";
 import { FieldGroup as NFieldGroup } from "@/ui/fieldGroup";
 import { Text as NText } from "@/ui/text";
 import { ListItem as NListItem } from "@/ui/listItem";

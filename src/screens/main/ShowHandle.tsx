@@ -251,7 +251,7 @@ export default function ShowHandle() {
   const script_pubkey = p2trScriptFromPub(pubkey);
   const cert = handleData.cert;
 
-  const { requestPurchase, finishTransaction } = iap
+  const iapApi = iap
     ? iap.hook({
         onPurchaseSuccess: async (purchase) => {
           if (__DEV__) console.log("[nacho/iap] onPurchaseSuccess");
@@ -273,6 +273,22 @@ export default function ShowHandle() {
             purchase.purchaseToken,
             iap.platform,
           );
+          // Finish (consume — isConsumable) FIRST, before any navigation.
+          // finalizePurchase() navigates to Your handles + pushes the handle,
+          // which unmounts THIS screen; on Android that tears down the billing
+          // connection, so a finishTransaction running after it is dropped and
+          // the (reused) SKU stays "owned" — blocking the next purchase and
+          // hanging it. Finish whenever the server DURABLY saw the receipt
+          // (success OR terminal server error). Only a transport failure
+          // (errorKind "network") leaves it queued so a genuine retry can
+          // replay it next launch.
+          if (result.errorKind !== "network") {
+            try {
+              await finishTransaction({ purchase, isConsumable: true });
+            } catch (e) {
+              if (__DEV__) console.warn("[nacho/iap] finishTransaction failed", e);
+            }
+          }
           if (result.error) {
             setError(result.error);
             fetchAndUpdateHandleStatus();
@@ -285,20 +301,6 @@ export default function ShowHandle() {
             // the full status, pins the anchor, records the purchase, and resets
             // Back → Your handles.
             await finalizePurchase();
-          }
-          // Finish the StoreKit transaction whenever the server durably saw the
-          // receipt — on success OR a terminal server error. Only a transport
-          // failure (errorKind "network") leaves it queued so a genuine retry
-          // can replay it next launch. Gating this on status === "taken" (the
-          // old behaviour) stranded the transaction on every error/edge path,
-          // and StoreKit then replayed the stale receipt → duplicate-token
-          // conflict on the next purchase.
-          if (result.errorKind !== "network") {
-            try {
-              await finishTransaction({ purchase, isConsumable: true });
-            } catch (e) {
-              if (__DEV__) console.warn("[nacho/iap] finishTransaction failed", e);
-            }
           }
           setPurchasing(false);
         },
@@ -339,6 +341,26 @@ export default function ShowHandle() {
         ReturnType<IAPHook>,
         "requestPurchase" | "finishTransaction"
       >);
+  const { requestPurchase, finishTransaction } = iapApi;
+
+  // Android BillingClient readiness. useIAP binds the Play billing service on
+  // mount and calls endConnection on unmount, so navigating between handles
+  // churns the (app-wide) client; requestPurchase on a still-(re)connecting
+  // client hangs in BillingClient's reconnect loop instead of opening the sheet.
+  // Gate the buy flow on this. The web/fallback path has no `connected` → treat
+  // as ready so non-native paths are unchanged.
+  const billingConnected =
+    iap && "connected" in iapApi ? (iapApi as ReturnType<IAPHook>).connected : true;
+  const billingConnectedRef = React.useRef(billingConnected);
+  React.useEffect(() => {
+    billingConnectedRef.current = billingConnected;
+  }, [billingConnected]);
+
+  // NOTE: deliberately NO proactive getAvailablePurchases() sweep here. It shares
+  // the single app-wide BillingClient with the purchase, and on the (slow)
+  // emulator its query can run ~10s and collide with a concurrent
+  // requestPurchase, making the buy flaky. Consume-before-navigate in
+  // onPurchaseSuccess is what prevents unconsumed/stuck purchases; that's the fix.
 
   useFocusEffect(
     React.useCallback(() => {
@@ -670,6 +692,24 @@ export default function ShowHandle() {
   const handleBuyHandle = async () => {
     setError(null);
     setPurchasing(true);
+
+    // Android: wait for the Play billing service to be bound before doing
+    // anything. Calling requestPurchase while the BillingClient is still
+    // (re)connecting hangs on an internal reconnect loop ("Async task is taking
+    // too long / Max retries") and the sheet never opens. iOS connects reliably,
+    // so this guard is Android-only to keep iOS behaviour identical.
+    if (iap && Platform.OS === "android" && !billingConnectedRef.current) {
+      const start = Date.now();
+      while (!billingConnectedRef.current && Date.now() - start < 6000) {
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      if (!billingConnectedRef.current) {
+        setError("Store isn’t ready yet — try again in a moment.");
+        setPurchasing(false);
+        return;
+      }
+    }
+
     const result = await reserveHandle(handle, script_pubkey);
     if ("error" in result) {
       setError(result.error);
