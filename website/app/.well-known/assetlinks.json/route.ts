@@ -13,9 +13,10 @@ export const dynamic = "force-static";
 
 const SHA256_FINGERPRINTS = (
   process.env.ANDROID_CERT_SHA256 ??
-  // TODO: replace with the real fingerprint(s) from Play Console → App integrity
-  // (app-signing key, and optionally the upload key), colon-separated hex.
-  "REPLACE_WITH_PLAY_APP_SIGNING_SHA256"
+  // Play App Signing key SHA-256 (Play Console → App integrity). Public, not a
+  // secret. Add the upload key's SHA-256 here too (comma-separated) if you ever
+  // distribute upload-key-signed builds outside Play (bundletool / app-sharing).
+  "E5:04:30:17:F4:44:02:8E:E4:D6:39:07:CA:4F:C0:97:D2:A9:7F:1E:4F:1E:D8:DD:84:74:AB:71:20:FD:B4:14"
 )
   .split(",")
   .map((s) => s.trim())
