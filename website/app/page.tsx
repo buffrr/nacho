@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Logo } from "./Logo";
 import { Icon } from "@/lib/icons";
-import { APP_STORE_URL } from "./ProfileCard";
+import { APP_STORE_URL, PLAY_STORE_URL } from "./ProfileCard";
 
 export default function Home() {
   const [value, setValue] = useState("");
@@ -56,7 +56,7 @@ export default function Home() {
           <a href="#own">Ownership</a>
           <a href="#how">How it works</a>
         </div>
-        <a className="btn btn-p" href={APP_STORE_URL}>
+        <a className="btn btn-p" href="#get">
           Get the app
         </a>
       </nav>
@@ -113,9 +113,40 @@ export default function Home() {
           </div>
         </div>
 
+        <section id="own">
+          <div className="shead rise">
+            <span className="snum">01 — Ownership</span>
+            <h2>Every username you have is borrowed.</h2>
+            <p className="sdesc">
+              Change platforms, break a rule, or watch a company shut down — and
+              the name goes with it. Self-sovereign handles stay with you.
+            </p>
+          </div>
+          <div className="vs">
+            <div className="vcol bad rise">
+              <h3>A username</h3>
+              <ul>
+                <li><span>✕</span>Lives on somebody&apos;s server</li>
+                <li><span>✕</span>Can be suspended, reclaimed or renamed</li>
+                <li><span>✕</span>Disappears if the company does</li>
+                <li><span>✕</span>Custodial. Not your keys, not your name</li>
+              </ul>
+            </div>
+            <div className="vcol good rise">
+              <h3>A nacho handle</h3>
+              <ul>
+                <li><span>✓</span>Lives on keys only you hold</li>
+                <li><span>✓</span>Can&apos;t be closed or taken down — not even by us</li>
+                <li><span>✓</span>Ownership anchored in Bitcoin</li>
+                <li><span>✓</span>No account, no email, no sign-in</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
         <section id="what">
           <div className="shead rise">
-            <span className="snum">01 — What&apos;s behind a name</span>
+            <span className="snum">02 — What&apos;s behind a name</span>
             <h2>One name. Everything you want found.</h2>
             <p className="sdesc">
               A handle is a pointer publish what you like behind it.
@@ -175,37 +206,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="own">
-          <div className="shead rise">
-            <span className="snum">02 — Ownership</span>
-            <h2>Every username you have is borrowed.</h2>
-            <p className="sdesc">
-              Change platforms, break a rule, or watch a company shut down — and
-              the name goes with it. Self-sovereign handles stay with you.
-            </p>
-          </div>
-          <div className="vs">
-            <div className="vcol bad rise">
-              <h3>A username</h3>
-              <ul>
-                <li><span>✕</span>Lives on somebody&apos;s server</li>
-                <li><span>✕</span>Can be suspended, reclaimed or renamed</li>
-                <li><span>✕</span>Disappears if the company does</li>
-                <li><span>✕</span>Custodial. Not your keys, not your name</li>
-              </ul>
-            </div>
-            <div className="vcol good rise">
-              <h3>A nacho handle</h3>
-              <ul>
-                <li><span>✓</span>Lives on keys only you hold</li>
-                <li><span>✓</span>Can&apos;t be closed or taken down — not even by us</li>
-                <li><span>✓</span>Ownership anchored in Bitcoin</li>
-                <li><span>✓</span>No account, no email, no sign-in</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
         <section id="how">
           <div className="shead rise">
             <span className="snum">03 — How it works</span>
@@ -244,6 +244,9 @@ export default function Home() {
           <div className="ctabtns">
             <a className="btn btn-p btn-lg" href={APP_STORE_URL}>
               Download for iPhone
+            </a>
+            <a className="btn btn-p btn-lg" href={PLAY_STORE_URL}>
+              Download for Android
             </a>
             <a className="btn btn-g btn-lg" href="#what">
               See what&apos;s inside a handle

@@ -7,6 +7,8 @@ import { CopyChip } from "./CopyChip";
 import { RecordsPanel } from "./RecordsPanel";
 
 const APP_STORE_URL = "https://apps.apple.com/app/id6755894049";
+const PLAY_STORE_URL =
+  "https://play.google.com/store/apps/details?id=com.impervious.nacho";
 
 export type Rec = { type: string; key: string; value: string[] };
 export type Data = {
@@ -179,4 +181,4 @@ function Qr({ text, size = 188 }: { text: string; size?: number }) {
   );
 }
 
-export { APP_STORE_URL };
+export { APP_STORE_URL, PLAY_STORE_URL };

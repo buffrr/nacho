@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-const APP_STORE_URL = "https://apps.apple.com/app/id6755894049";
-
 export function CardActions({ handle }: { handle: string }) {
   const [copied, setCopied] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
@@ -107,7 +105,7 @@ export function CardActions({ handle }: { handle: string }) {
                     <span className="mhandle">{handle}</span> is anchored on Bitcoin,
                     open it in the nacho app and verify against your own trust anchor.
                   </p>
-                  <a className="btn btn-p" href={APP_STORE_URL}>
+                  <a className="btn btn-p" href="/#get">
                     Get the app
                   </a>
                   <button type="button" className="mlater" onClick={() => setVerifyOpen(false)}>

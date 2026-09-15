@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { peek, displayRecords, isSovereign, seqUpdatedAt, normalizeHandle, RELAY_HOST } from "@/lib/peek";
 import { Logo } from "../Logo";
-import { ProfileCard, APP_STORE_URL, initials, hueFor, type Data } from "../ProfileCard";
+import { ProfileCard, initials, hueFor, type Data } from "../ProfileCard";
 import { HandleSearch } from "./HandleSearch";
 
 type Params = { handle: string };
@@ -48,7 +48,7 @@ export default async function HandlePage({
             <Logo height={44} />
           </a>
           <HandleSearch />
-          <a className="btn btn-p" href={APP_STORE_URL}>
+          <a className="btn btn-p" href="/#get">
             Get the app
           </a>
         </div>
@@ -183,7 +183,7 @@ function NotFound({ handle, invalid }: { handle: string; invalid?: boolean }) {
             >
               Check on atbitcoin.com
             </a>
-            <a className="btn btn-g" href={APP_STORE_URL}>
+            <a className="btn btn-g" href="/#get">
               Check in the app
             </a>
           </div>
