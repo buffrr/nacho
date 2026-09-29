@@ -1,0 +1,66 @@
+/* Registry doc — prose page on the shared handle-page shell (.lp.lp-sub),
+   so it uses the real nacho nav + Logo + footer and the pitch-black tokens
+   from resolve.css instead of a bespoke header. */
+.lp-sub .regdoc {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 22px 88px;
+  line-height: 1.62;
+  font-size: 16px;
+  color: var(--label-2);
+}
+.lp-sub .regdoc h1 {
+  font-family: var(--font-display), var(--sys);
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--label);
+  margin: 8px 0 6px;
+}
+.lp-sub .regdoc .kicker {
+  color: var(--label-3);
+  font-size: 14px;
+  margin: 0 0 26px;
+}
+.lp-sub .regdoc h2 {
+  font-family: var(--font-display), var(--sys);
+  font-size: 21px;
+  letter-spacing: -0.01em;
+  color: var(--label);
+  margin: 38px 0 10px;
+}
+.lp-sub .regdoc p {
+  margin: 0 0 16px;
+}
+.lp-sub .regdoc strong {
+  color: var(--label);
+  font-weight: 600;
+}
+.lp-sub .regdoc a {
+  color: var(--acc);
+}
+.lp-sub .regdoc a:hover {
+  text-decoration: underline;
+}
+.lp-sub .regdoc .card {
+  background: var(--surface);
+  border: 0.5px solid var(--sep);
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin: 22px 0;
+  color: var(--label-2);
+}
+@supports (corner-shape: superellipse(2.5)) {
+  .lp-sub .regdoc .card {
+    corner-shape: superellipse(2.5);
+  }
+}
+.lp-sub .regdoc hr {
+  border: none;
+  border-top: 0.5px solid var(--sep);
+  margin: 40px 0 20px;
+}
+.lp-sub .regdoc .fin {
+  color: var(--label-3);
+  font-size: 13px;
+}

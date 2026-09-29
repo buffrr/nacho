@@ -67,8 +67,12 @@ export function recordMeta(type: string, key: string): RecordMeta {
 // Category for grouping rows into sections / filter tabs.
 export type RecordGroup = "pay" | "key" | "link" | "note";
 const KEY_KEYS = new Set(["age", "pgp", "ssh", "did"]);
+// Payment destinations (app registry group "payments"). Not all have a pay: URI
+// — liquid/ark are copy-only (no bitcoin:/lightning: scheme) — so grouping keys
+// off the record key, not off m.pay, otherwise they fall through to "note".
+const PAY_KEYS = new Set(["btc", "sp", "ln", "liquid", "ark"]);
 export function recordGroup(key: string, m: RecordMeta): RecordGroup {
-  if (m.pay) return "pay";
+  if (m.pay || PAY_KEYS.has(key)) return "pay";
   if (KEY_KEYS.has(key)) return "key";
   if (m.href) return "link";
   return "note";
